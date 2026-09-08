@@ -70,12 +70,37 @@ Phase/step-by-step implementation status. Authoritative scope lives in `PROJECT_
 - Legal page wording is structural placeholder pending Owner/legal review (§11.6 launch gate).
 - No automated E2E tests yet (Task 1.11); page verified by build + runtime HTTP/content checks.
 
+### Task 1.5 — Lead capture (public → PostgreSQL) — 🟩 DONE (2026-09-08)
+
+**Implemented:**
+
+- Real interest-registration form on `/register-interest` (replaces Task 1.3 placeholder): premium Task 1.3-consistent design, mobile-first, accessible labels, `aria-invalid`/`role="alert"` feedback, success state, in-flight "Submitting…" guard against accidental double-submit, links to Privacy/Terms/Disclosures, clear post-submission explanation, conservative results-vary note.
+- Server Action (`src/app/actions/lead.ts`) — the public funnel's first real prospect record:
+  - Server-side Zod validation (never trusts client), length caps on every field, phone normalization (`normalizePhone`), honeypot field (`website`), in-memory rate limiter (5 req/min/IP, `src/lib/rateLimit.ts`), generic error responses (no DB/internal error leakage), Next.js Server-Action origin checks (CSRF mitigation), Prisma parameterized queries (SQLi safe), React escaping (XSS safe).
+  - Persists via existing `Lead` model: `consent: true` + `consentAt` timestamp recorded; default status `NEW_LEAD`; duplicate-submission guard (active lead with same phone → friendly "already registered" response, no new record).
+  - Attribution boundary respected: `utm_*`, `firstTouchSource`, `landingPage` left null with a documented integration point for Task 1.4.
+- Automated tests (Vitest, `vitest.config.ts` with `@` alias): `tests/lead-validation.test.ts` (10 tests: valid, missing consent, short/oversized name, missing/invalid phone, invalid email, invalid interestType, honeypot, normalization), `tests/rate-limit.test.ts` (2), `tests/lead-persistence.test.ts` (2, real local DB: persistence with consent/timestamp/`NEW_LEAD`, attribution fields null, duplicate guard).
+- Playwright E2E written (`e2e/lead-capture.spec.ts` + `playwright.config.ts`): `/` → Register Your Interest → validation error without consent → valid submit → success state. **NOT YET EXECUTED** (see limitations).
+
+**Tests / verification performed:**
+
+- `pnpm lint` — PASS · `pnpm typecheck` — PASS · `pnpm build` — PASS (5 routes prerendered)
+- `pnpm test` — **14/14 PASS** (incl. real-DB persistence test against local Docker PostgreSQL)
+- `scripts/smoke.ts` data-layer smoke test — still ALL PASS (Task 1.2 intact)
+- Live production-build checks: `/`, `/register-interest`, `/privacy` → HTTP 200; form page contains all fields, honeypot, consent checkbox and legal links
+
+**Known limitations:**
+
+- Playwright browser download is blocked in this environment (revision 1243 unavailable locally, download fails) → the E2E spec is written but not yet executed. Compensating verification: unit tests + real-DB integration test + smoke test + live HTTP/content checks. Run `pnpm exec playwright install chromium` when network allows, then `pnpm exec playwright test`.
+- Rate limiter is in-memory (per-process) — adequate for single-instance MVP; revisit with production topology.
+- Consent wording is conservative placeholder pending Owner/legal review (§11.6 launch gate).
+
 ### Next tasks
 
 - 1.2 Local PostgreSQL (Docker) + initial migration — 🟩 DONE (2026-09-08, 11/11 smoke assertions PASS)
 - 1.3 Public landing page (business opportunity, disclosures structure, CTAs) — 🟩 DONE (2026-09-08)
 - 1.4 Campaign landing-page capability + UTM/attribution capture — ⚪ NOT STARTED
-- 1.5 Lead capture (server-side validation, consent + timestamp, PII minimization) — ⚪ NOT STARTED
+- 1.5 Lead capture (server-side validation, consent + timestamp, PII minimization) — 🟩 DONE (2026-09-08, 14/14 tests PASS; browser E2E written, pending browser install)
 - 1.6 Qualification flow — ⚪ NOT STARTED
 - 1.7 Admin auth (Better Auth) + CRM/admin interface — ⚪ NOT STARTED
 - 1.8 Office pipeline (meeting record/status/outcome) + follow-up — ⚪ NOT STARTED
