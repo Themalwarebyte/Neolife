@@ -576,7 +576,7 @@ When a phase meets its completion criteria, explicitly report: **"PHASE X IS COM
 | Owner authorization (Phase 1) | 🟩 Recorded 2026-09-08 (`docs/DECISIONS.md`) |
 | Phase 0 completion | 🟩 DONE |
 | Phase 1 (Traffic MVP) | 🔵 IN PROGRESS (foundation/scaffolding) |
-| Application implementation | 🔵 Foundation scaffolded & verified (install, Prisma, lint, typecheck, build all PASS) — see `docs/STATUS.md` |
+| Application implementation | 🔵 Task 1.1 🟩 + Task 1.2 🟩 (DB provisioned, migration applied, smoke test 11/11 PASS) — see `docs/STATUS.md` |
 
 **Next action:** Phase 1 foundation/scaffolding (local-first), then the critical-path build. No production deployment and no paid advertising until §11.4 and the §11.6 launch gate are satisfied.
 

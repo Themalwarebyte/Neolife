@@ -27,9 +27,27 @@ Phase/step-by-step implementation status. Authoritative scope lives in `PROJECT_
 - Better Auth auth tables intentionally NOT in the application schema (ecosystem convention); admin authentication is a later Phase 1 task.
 - Local PostgreSQL is NOT yet provisioned/migrated — next prerequisite.
 
+### Task 1.2 — Local PostgreSQL + initial migration + data-layer smoke test — 🟩 DONE (2026-09-08)
+
+**Implemented:**
+
+- Git initialized; clean baseline commit of Task 1.1 BEFORE migration work (18 tracked files; `.env`/secrets confirmed ignored).
+- `docker-compose.yml` — local dev PostgreSQL 16 (postgres:16-alpine), container `neolife-db`, named volume, healthcheck. **Port 5433** (not 5432) to avoid clashing with other local PostgreSQL instances. Local development only — NOT production infrastructure.
+- `.env` (gitignored, local dev values) + `.env.example` updated to port 5433.
+- Initial migration applied: `prisma/migrations/20260908191429_init/` (Lead, LeadEvent, Meeting, FollowUp + enums and indexes).
+- `scripts/smoke.ts` — end-to-end data-layer smoke test.
+
+**Tests / verification performed:**
+
+- `docker compose up -d` → `neolife-db Up (healthy)` on `localhost:5433`
+- `prisma migrate dev --name init` → migration created & applied; database in sync
+- Smoke test (`pnpm exec tsx scripts/smoke.ts`) — **11/11 PASS**: lead created with attribution + consent record/timestamp → defaults to NEW_LEAD; first-party lead event created; meeting defaults SCHEDULED; follow-up created; status lifecycle update (QUALIFIED); meeting ATTENDED + outcome; relations readable; leads queryable by `utmCampaign`; deletion/cleanup verified
+- `pnpm lint` — PASS · `pnpm typecheck` — PASS
+- `git check-ignore .env` — confirmed ignored (no secrets in repo)
+
 ### Next tasks
 
-- 1.2 Local PostgreSQL (Docker) + initial migration — ⚪ NOT STARTED
+- 1.2 Local PostgreSQL (Docker) + initial migration — 🟩 DONE (2026-09-08, 11/11 smoke assertions PASS)
 - 1.3 Public landing page (business opportunity, disclosures structure, CTAs) — ⚪ NOT STARTED
 - 1.4 Campaign landing-page capability + UTM/attribution capture — ⚪ NOT STARTED
 - 1.5 Lead capture (server-side validation, consent + timestamp, PII minimization) — ⚪ NOT STARTED
