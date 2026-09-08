@@ -119,6 +119,36 @@ Phase/step-by-step implementation status. Authoritative scope lives in `PROJECT_
 - First-touch is device-local (localStorage): a visitor who switches device/browser before submitting is not linkable to the original visit — acceptable for a privacy-conscious MVP (no fingerprinting per authorization).
 - Attribution is stored only on the lead at submission; anonymous visit-event logging (pure first-party counters) was deliberately not added (scope: attribution only).
 
+### Task 1.7 — Admin authentication + basic CRM — 🟩 DONE (2026-09-08)
+
+**Authentication (Better Auth 1.7.2, Owner-approved architecture):**
+- `src/lib/auth.ts` — `betterAuth()` with Prisma adapter (postgresql) + email/password enabled; `user.additionalFields.role` (default "staff", `input:false` so clients cannot self-assign).
+- Better Auth auth tables added to `prisma/schema.prisma` (`User` incl. `role`, `Session`, `Account` incl. `issuer`/`subject`/`password`, `Verification`) + migrations.
+- `src/app/api/auth/[...all]/route.ts` — `toNextJsHandler(auth)`.
+- Admin provisioning via `scripts/seed-admin.ts` (reads `ADMIN_EMAIL`/`ADMIN_PASSWORD` env, sets role `admin`; passwords hashed by Better Auth, never stored plaintext). No public sign-up route.
+
+**Authorization boundary:**
+- `src/server/auth/requireAdmin.ts` — server-side session verification (Better Auth loaded lazily to keep Node deps out of the client-reference graph); only `role === "admin"` users can access CRM.
+- Protected route group `src/app/admin/(protected)/layout.tsx` redirects unauthenticated/non-admin to `/admin/login`.
+
+**CRM:**
+- `/admin/leads` — protected lead list (name, phone, email, location, interest, status, source/campaign, created, meeting/follow-up indicators); responsive table + mobile cards.
+- `/admin/leads/[id]` — protected detail (full contact, consent + timestamp, full attribution, meetings, follow-ups, recent events).
+- Lead status management (`updateLeadStatus` action) records a `status_changed` event; follow-up notes (`addFollowUp` action) record a `follow_up_added` event. Statuses validated against the approved enum (membership only, no workflow engine).
+
+**Security controls:** server-side auth + authorization on every CRM read/write; IDOR prevented (unauthenticated/non-admin cannot reach any lead); UUID validation on route params and form input; input validation on status/note; Prisma parameterized queries (SQLi safe); React escaping (XSS safe); generic error messages (no internal leakage); no PII in URLs beyond the lead UUID; no secrets committed (`.env` gitignored, `ADMIN_*` in `.env.example` only).
+
+**Tests / verification performed:**
+- `pnpm lint` PASS · `pnpm typecheck` PASS · `pnpm build` PASS (routes: `/admin/leads`, `/admin/leads/[id]`, `/admin/login`, `/api/auth/[...all]` present)
+- `pnpm test` — **36/36 PASS** (new `tests/auth.test.ts`: sign-up default role `staff`, password hashed not plaintext, correct sign-in creates a session, wrong password rejected; status/follow-up validation)
+- `scripts/smoke.ts` — ALL PASS (Task 1.2 intact)
+- Live production-build verification: `/admin/leads` unauthenticated → **307 → /admin/login**; `/admin/login` 200; sign-in via `/api/auth/sign-in/email` → **200** (cookie set); authenticated `/admin/leads` → **200** (heading rendered); public routes `/`, `/register-interest`, `/campaign/launch` still 200
+
+**Known limitations:**
+- Admin provisioning is env-seed based (no self-service admin creation) — documented as the chosen MVP mechanism; additional admin accounts are added by re-running the seed with different credentials or direct DB access.
+- Single role boundary ("admin" vs "staff"); no per-lead ownership — appropriate for a single-office MVP.
+- Playwright Chromium still unavailable — E2E not executed (unchanged).
+
 ### Next tasks
 
 - 1.2 Local PostgreSQL (Docker) + initial migration — 🟩 DONE (2026-09-08, 11/11 smoke assertions PASS)
@@ -126,7 +156,7 @@ Phase/step-by-step implementation status. Authoritative scope lives in `PROJECT_
 - 1.4 Campaign landing-page capability + UTM/attribution capture — 🟩 DONE (2026-09-08, 29/29 tests PASS, first-touch preserved)
 - 1.5 Lead capture (server-side validation, consent + timestamp, PII minimization) — 🟩 DONE (2026-09-08, 14/14 tests PASS; browser E2E written, pending browser install)
 - 1.6 Qualification flow — ⚪ NOT STARTED
-- 1.7 Admin auth (Better Auth) + CRM/admin interface — ⚪ NOT STARTED
+- 1.7 Admin auth (Better Auth) + CRM/admin interface — 🟩 DONE (2026-09-08, 36/36 tests PASS, auth verified live)
 - 1.8 Office pipeline (meeting record/status/outcome) + follow-up — ⚪ NOT STARTED
 - 1.9 Funnel events + basic first-party analytics — ⚪ NOT STARTED
 - 1.10 Privacy/Terms/Disclaimer structures (placeholder copy) — ⚪ NOT STARTED

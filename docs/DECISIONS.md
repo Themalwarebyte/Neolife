@@ -48,6 +48,11 @@ Owner-approved decisions and their rationale. Every future implementation task m
 - **Decision:** Once the public landing page passes its local development and quality checks, the project may proceed to production deployment of the first slice (landing page/MVP) without completing the full platform. Deployment follows the §11.7 workflow and requirements (local-first, production isolation, no committed production secrets, approved deployment architecture, DNS/HTTPS verification, secure production env vars, production database/configuration, production smoke test, Owner production review/acceptance).
 - **Consequences:** Paid advertising still requires all applicable production, compliance (§11.6 gate), tracking, and Owner launch gates. The early deployment does NOT mean the full platform is complete. **Deployment status: ⚪ NOT STARTED.**
 
+### D-011 — Admin provisioning & authorization boundary (2026-09-08)
+
+- **Decision:** Initial admin/office account is provisioned via `scripts/seed-admin.ts` reading `ADMIN_EMAIL` + `ADMIN_PASSWORD` env vars (never committed). Passwords are hashed by Better Auth. Authorization uses a single `role` field (`admin` can access CRM; `staff` default). There is **no public sign-up route**, so only seeded accounts exist.
+- **Consequences:** Safe MVP boundary without an RBAC system. Additional accounts are added by re-running the seed or direct DB access. Flagged for Owner awareness — adjust if a richer role model is required later.
+
 ## Open / Pending Decisions
 
 - Hosting / domain target (before production deployment only).
