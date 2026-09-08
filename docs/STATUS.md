@@ -45,10 +45,35 @@ Phase/step-by-step implementation status. Authoritative scope lives in `PROJECT_
 - `pnpm lint` — PASS · `pnpm typecheck` — PASS
 - `git check-ignore .env` — confirmed ignored (no secrets in repo)
 
+### Task 1.3 — Public landing page — 🟩 DONE (2026-09-08)
+
+**Implemented (local-first, no new dependencies):**
+
+- Public landing page (`/`) with: sticky header + mobile menu, hero/value proposition with primary & secondary CTAs, "The Opportunity" pillars, "How It Works" 4-step journey (learn → register interest → office meeting → start with support — mirrors the approved funnel), "Support" section, FAQ (native `<details>`), final CTA section reserved for Task 1.5 lead capture, footer with legal navigation and conservative disclosure strip.
+- Placeholder legal/info pages with Owner/legal-review markers: `/privacy`, `/terms`, `/disclosures` (via reusable `InfoPageLayout`/`InfoSection`), plus `/register-interest` CTA destination placeholder (to be replaced by Task 1.5 lead capture).
+- Reusable components for future campaign landing pages: `src/components/ui/{CtaLink,Section,Reveal}.tsx`, `src/components/landing/*` (SiteHeader, SiteFooter, Hero, OpportunitySection, HowItWorksSection, SupportSection, FaqSection, CtaSection).
+- Compliance-safe copy only: no income guarantees, no earnings claims, no medical/therapeutic claims; all compliance-sensitive wording is conservative and explicitly marked `OWNER/LEGAL REVIEW` in code.
+- Brand tokens in `globals.css` (placeholder green palette), subtle IntersectionObserver scroll-reveal with `prefers-reduced-motion` support, visible `:focus-visible` outlines.
+
+**Tests / verification performed:**
+
+- `pnpm lint` — PASS (0 errors, 0 warnings) · `pnpm typecheck` — PASS
+- `pnpm build` (production, standalone) — PASS; 5 routes prerendered: `/`, `/privacy`, `/terms`, `/disclosures`, `/register-interest`
+- Production server runtime check: all 5 routes return **HTTP 200**; home page content verified (hero, CTAs, disclosure wording present); no build errors
+- Data layer re-verified after changes: `scripts/smoke.ts` — **11/11 PASS** (Task 1.2 work intact)
+- Mobile/responsive and visual (desktop + mobile widths): implemented via responsive Tailwind breakpoints (mobile menu, stacked layouts); final visual sign-off is an Owner review item (see limitations)
+
+**Known limitations:**
+
+- `/register-interest` is an intentional placeholder until Task 1.5 (lead capture).
+- Office contact details and brand assets (logo, exact brand colours) are placeholders pending Owner supply.
+- Legal page wording is structural placeholder pending Owner/legal review (§11.6 launch gate).
+- No automated E2E tests yet (Task 1.11); page verified by build + runtime HTTP/content checks.
+
 ### Next tasks
 
 - 1.2 Local PostgreSQL (Docker) + initial migration — 🟩 DONE (2026-09-08, 11/11 smoke assertions PASS)
-- 1.3 Public landing page (business opportunity, disclosures structure, CTAs) — ⚪ NOT STARTED
+- 1.3 Public landing page (business opportunity, disclosures structure, CTAs) — 🟩 DONE (2026-09-08)
 - 1.4 Campaign landing-page capability + UTM/attribution capture — ⚪ NOT STARTED
 - 1.5 Lead capture (server-side validation, consent + timestamp, PII minimization) — ⚪ NOT STARTED
 - 1.6 Qualification flow — ⚪ NOT STARTED
