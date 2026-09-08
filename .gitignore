@@ -1,0 +1,31 @@
+# dependencies
+node_modules/
+
+# next.js
+.next/
+out/
+next-env.d.ts
+
+# production
+build/
+
+# misc
+.DS_Store
+*.pem
+npm-debug.log*
+pnpm-debug.log*
+
+# env files — NEVER commit secrets
+.env
+.env*.local
+.env.production
+
+# typescript
+*.tsbuildinfo
+
+# generated
+src/generated/
+
+# test artifacts
+test-results/
+playwright-report/
