@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import {
   GENERIC_ERROR_MESSAGE,
   findActiveLeadByPhone,
+  parseAttributionPayload,
   parseLeadInput,
   persistLead,
   type SubmitLeadInput,
@@ -40,6 +41,13 @@ export async function submitLeadAction(
     interestType: formData.get("interestType") ?? undefined,
     consent: formData.get("consent") === "on" ? true : undefined,
     website: formData.get("website") ?? undefined,
+    // Task 1.4 — first-party attribution (hidden fields), re-validated:
+    utmSource: formData.get("utmSource") ?? undefined,
+    utmMedium: formData.get("utmMedium") ?? undefined,
+    utmCampaign: formData.get("utmCampaign") ?? undefined,
+    utmContent: formData.get("utmContent") ?? undefined,
+    utmTerm: formData.get("utmTerm") ?? undefined,
+    landingPage: formData.get("landingPage") ?? undefined,
   };
 
   const parsed = parseLeadInput(input);
@@ -61,7 +69,7 @@ export async function submitLeadAction(
       };
     }
 
-    await persistLead(parsed.data);
+    await persistLead(parsed.data, parseAttributionPayload(input));
     return {
       status: "success",
       message:

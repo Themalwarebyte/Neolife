@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AttributionCapture } from "@/components/tracking/AttributionCapture";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -12,7 +13,10 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className="bg-white text-neutral-900 antialiased">{children}</body>
+      <body className="bg-white text-neutral-900 antialiased">
+        <AttributionCapture />
+        {children}
+      </body>
     </html>
   );
 }

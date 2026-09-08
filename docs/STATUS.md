@@ -95,11 +95,35 @@ Phase/step-by-step implementation status. Authoritative scope lives in `PROJECT_
 - Rate limiter is in-memory (per-process) — adequate for single-instance MVP; revisit with production topology.
 - Consent wording is conservative placeholder pending Owner/legal review (§11.6 launch gate).
 
+### Task 1.4 — Campaign landing + UTM/attribution capture — 🟩 DONE (2026-09-08)
+
+**Implemented:**
+
+- **Attribution library** (`src/lib/attribution.ts`): validates/constrains untrusted UTM parameters (`utm_source/medium/campaign/content/term`, safe charset `A-Za-z0-9 _-./+:()%`, max 120 chars; landing page path max 200, must start with `/`). Invalid values are **dropped, never invented**. URLSearchParams parser + safe localStorage serializer/parser (never trusts storage content).
+- **First-touch capture** (`src/components/tracking/AttributionCapture.tsx`, mounted in root layout): on any landing URL with UTM parameters, stores first-touch attribution (incl. landing page path) in **first-party localStorage**. Later campaign visits **never overwrite** first-touch (`resolveFirstTouch` — existing always wins). No cookies, no third parties, no fingerprinting.
+- **Campaign landing-page capability**: `/campaign/[campaign]` dynamic route reusing the Task 1.3 visual system and approved copy (no invented per-campaign content). Slug validated `^[a-z0-9][a-z0-9-]{0,59}$` → invalid slugs 404. Example destination: `/campaign/launch?utm_source=facebook&utm_medium=paid_social&utm_campaign=launch`.
+- **Lead integration**: `LeadForm` reads stored first-touch attribution and submits it as hidden fields; the server action re-validates everything via `parseAttributionPayload` (charset/length, XSS/log-injection safe) and `persistLead` stores `utmSource/utmMedium/utmCampaign/utmContent/utmTerm/landingPage/firstTouchSource` — only when validly present, never invented. `firstTouchSource` is derived server-side from the validated first-touch `utm_source`.
+
+**Attribution behavior:** AD → campaign landing (or any landing URL) → first-touch stored on device → later visits do not overwrite → lead submission inherits first-touch attribution → lead record carries full source/campaign attribution.
+
+**Tests / verification performed:**
+
+- `pnpm lint` — PASS · `pnpm typecheck` — PASS · `pnpm build` — PASS (now includes dynamic `/campaign/[campaign]`)
+- `pnpm test` — **29/29 PASS**: attribution (13: no-params→nothing invented, valid capture, URLSearchParams parsing, malformed/XSS/log-injection values dropped, oversized trimmed to safe max, landing-path validation, first-touch never overwritten incl. landing page, storage round-trip, corrupt storage rejected), lead validation (10), rate limiting (2), persistence (4 incl. attribution reaches the lead record + unsafe attribution dropped)
+- `scripts/smoke.ts` — ALL PASS · Task 1.5 tests all still pass
+- Live production-build checks: `/` 200 · `/campaign/launch` 200 · `/campaign/Launch!!` → **404** (slug validation) · `/register-interest` 200
+
+**Known limitations:**
+
+- Playwright Chromium still unavailable (download blocked) — E2E not executed (Task 1.5 limitation carried forward, unchanged).
+- First-touch is device-local (localStorage): a visitor who switches device/browser before submitting is not linkable to the original visit — acceptable for a privacy-conscious MVP (no fingerprinting per authorization).
+- Attribution is stored only on the lead at submission; anonymous visit-event logging (pure first-party counters) was deliberately not added (scope: attribution only).
+
 ### Next tasks
 
 - 1.2 Local PostgreSQL (Docker) + initial migration — 🟩 DONE (2026-09-08, 11/11 smoke assertions PASS)
 - 1.3 Public landing page (business opportunity, disclosures structure, CTAs) — 🟩 DONE (2026-09-08)
-- 1.4 Campaign landing-page capability + UTM/attribution capture — ⚪ NOT STARTED
+- 1.4 Campaign landing-page capability + UTM/attribution capture — 🟩 DONE (2026-09-08, 29/29 tests PASS, first-touch preserved)
 - 1.5 Lead capture (server-side validation, consent + timestamp, PII minimization) — 🟩 DONE (2026-09-08, 14/14 tests PASS; browser E2E written, pending browser install)
 - 1.6 Qualification flow — ⚪ NOT STARTED
 - 1.7 Admin auth (Better Auth) + CRM/admin interface — ⚪ NOT STARTED

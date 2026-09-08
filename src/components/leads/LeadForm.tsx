@@ -1,8 +1,14 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useActionState } from "react";
 import { submitLeadAction, type SubmitLeadResult } from "@/app/actions/lead";
 import { CtaLink } from "@/components/ui/CtaLink";
+import {
+  ATTRIBUTION_STORAGE_KEY,
+  deserializeAttribution,
+  type Attribution,
+} from "@/lib/attribution";
 
 const fieldClass =
   "w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-neutral-900 placeholder:text-neutral-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30";
@@ -19,6 +25,21 @@ export function LeadForm() {
     SubmitLeadResult | null,
     FormData
   >(submitLeadAction, null);
+
+  // Task 1.4 — first-touch attribution captured earlier on this device
+  // (first-party localStorage). Values are re-validated server-side.
+  const [attribution, setAttribution] = useState<Attribution>({});
+  useEffect(() => {
+    try {
+      setAttribution(
+        deserializeAttribution(
+          window.localStorage.getItem(ATTRIBUTION_STORAGE_KEY),
+        ) ?? {},
+      );
+    } catch {
+      setAttribution({});
+    }
+  }, []);
 
   if (state?.status === "success") {
     return (
@@ -67,6 +88,30 @@ export function LeadForm() {
           autoComplete="off"
         />
       </div>
+
+      {/* Task 1.4 — first-touch attribution (hidden, server-revalidated) */}
+      {attribution.source ? (
+        <input type="hidden" name="utmSource" value={attribution.source} />
+      ) : null}
+      {attribution.medium ? (
+        <input type="hidden" name="utmMedium" value={attribution.medium} />
+      ) : null}
+      {attribution.campaign ? (
+        <input type="hidden" name="utmCampaign" value={attribution.campaign} />
+      ) : null}
+      {attribution.content ? (
+        <input type="hidden" name="utmContent" value={attribution.content} />
+      ) : null}
+      {attribution.term ? (
+        <input type="hidden" name="utmTerm" value={attribution.term} />
+      ) : null}
+      {attribution.landingPage ? (
+        <input
+          type="hidden"
+          name="landingPage"
+          value={attribution.landingPage}
+        />
+      ) : null}
       <div className="grid gap-5 sm:grid-cols-2">
         <div>
           <label htmlFor="firstName" className={labelClass}>

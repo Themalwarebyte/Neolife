@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/server/db/prisma";
+import { parseAttribution, type Attribution } from "@/lib/attribution";
 
 /**
  * Task 1.5 — lead-capture validation & persistence (public, untrusted input).
@@ -26,6 +27,14 @@ export type SubmitLeadInput = {
   interestType?: unknown;
   consent?: unknown;
   website?: unknown; // honeypot — must be empty
+  // Task 1.4 attribution (first-party, client-captured, re-validated here)
+  utmSource?: unknown;
+  utmMedium?: unknown;
+  utmCampaign?: unknown;
+  utmContent?: unknown;
+  utmTerm?: unknown;
+  landingPage?: unknown;
+  firstTouchSource?: unknown;
 };
 
 /** Normalizes a phone number for storage/duplicate checks (digits and leading + only). */
@@ -82,6 +91,34 @@ export type LeadParseResult =
   | { ok: true; data: z.output<typeof leadSchema> }
   | { ok: false; message: string; fieldErrors: Record<string, string> };
 
+// Task 1.4 — server-side validation of client-supplied attribution.
+// Values are constrained to a safe charset and length (see parseAttribution in
+// src/lib/attribution.ts); invalid values are dropped, never invented, so
+// attribution can never inject content into the database or responses.
+
+/** Validates the untrusted attribution payload sent with a lead submission. */
+export function parseAttributionPayload(input: SubmitLeadInput): Attribution {
+  const attribution = {
+    source:
+      typeof input.utmSource === "string" ? input.utmSource : undefined,
+    medium:
+      typeof input.utmMedium === "string" ? input.utmMedium : undefined,
+    campaign:
+      typeof input.utmCampaign === "string" ? input.utmCampaign : undefined,
+    content:
+      typeof input.utmContent === "string" ? input.utmContent : undefined,
+    term: typeof input.utmTerm === "string" ? input.utmTerm : undefined,
+    landingPage:
+      typeof input.landingPage === "string" ? input.landingPage : undefined,
+  };
+
+  const parsed = parseAttribution(attribution);
+  // firstTouchSource is derived from the validated first-touch utm_source.
+  return parsed
+    ? { ...parsed, firstTouchSource: parsed.source ?? undefined }
+    : {};
+}
+
 /** Validates untrusted form input; never throws on bad input. */
 export function parseLeadInput(
   input: SubmitLeadInput,
@@ -131,8 +168,11 @@ export async function findActiveLeadByPhone(normalizedPhone: string) {
 export const GENERIC_ERROR_MESSAGE =
   "Sorry, something went wrong on our side. Please try again in a moment.";
 
-/** Persist a validated lead. Kept separate from parsing so it is testable. */
-export async function persistLead(data: z.output<typeof leadSchema>) {
+/** Persist a validated lead (attribution pre-validated via parseAttributionPayload). */
+export async function persistLead(
+  data: z.output<typeof leadSchema>,
+  attribution: Attribution = {},
+) {
   return prisma.lead.create({
     data: {
       firstName: data.firstName,
@@ -143,7 +183,15 @@ export async function persistLead(data: z.output<typeof leadSchema>) {
       interestType: data.interestType,
       consent: true,
       consentAt: new Date(),
-      // status, utm_*, firstTouchSource, landingPage intentionally not set here
+      // Task 1.4 — first-party attribution, only when validly provided:
+      utmSource: attribution.source,
+      utmMedium: attribution.medium,
+      utmCampaign: attribution.campaign,
+      utmContent: attribution.content,
+      utmTerm: attribution.term,
+      landingPage: attribution.landingPage,
+      firstTouchSource: attribution.firstTouchSource,
+      // status intentionally not set here (defaults to NEW_LEAD)
     },
     select: { id: true },
   });
