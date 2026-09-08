@@ -359,6 +359,53 @@ Actual advertising must NOT go live until the following have been reviewed and a
 
 This gate is an Owner (and where relevant legal) review step — a launch dependency, recorded in `docs/DECISIONS.md` when passed.
 
+### 11.7 MVP Deployment Milestone
+
+Once the public landing page has been implemented and passes its applicable local development and quality checks, the project may proceed to production deployment without waiting for the entire long-term platform to be completed.
+
+**Deployment workflow:**
+
+```
+Local implementation
+        ↓
+Local testing
+        ↓
+Landing page / MVP launch-readiness verification
+        ↓
+Owner production deployment authorization
+        ↓
+Connect/configure owner's production server
+        ↓
+Configure domain/DNS/HTTPS/reverse proxy as required
+        ↓
+Configure production environment/secrets
+        ↓
+Deploy the approved build
+        ↓
+Production smoke testing
+        ↓
+Owner production review/acceptance
+        ↓
+Paid advertising launch
+```
+
+**Requirements:**
+
+- Development remains local-first.
+- Production infrastructure must remain isolated from local development.
+- Production secrets must never be committed to the repository.
+- The production server must be configured using the approved deployment architecture.
+- Domain/DNS and HTTPS must be verified before public launch.
+- Production environment variables must be configured securely.
+- The deployed application must use the production database/configuration, not local development resources.
+- A production smoke test must verify the actual deployed experience.
+- Deployment must not introduce features outside the approved MVP scope.
+- Paid advertising must not begin until the applicable production, compliance, tracking, and Owner launch gates have been satisfied.
+
+**Important:** the ability to deploy the landing page early does NOT mean the complete NEOLIFE platform is finished. The landing page/MVP can be deployed as the first production slice while later platform capabilities continue to be developed progressively.
+
+**Deployment status:** ⚪ NOT STARTED until the applicable MVP deployment milestone is reached.
+
 ### 11.5 Phase 1 attributes
 
 **Dependencies:** Phase 0 approval; §19 "before coding" decisions for the relevant components.

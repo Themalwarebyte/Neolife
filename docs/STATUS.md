@@ -59,3 +59,7 @@ Phase/step-by-step implementation status. Authoritative scope lives in `PROJECT_
 - 1.11 Tests (unit + E2E critical path) — ⚪ NOT STARTED
 
 **Pending pre-launch owner decisions (do not block local dev):** hosting/domain, ad platforms & tracking, final legal copy, meeting-model confirmation (§19, `DECISIONS.md`).
+
+### Deployment milestone (§11.7) — ⚪ NOT STARTED
+
+Recorded by Owner (D-010): early production deployment of the landing page/MVP slice is authorized once the landing page passes local checks AND explicit Owner production-deployment authorization is given at that gate. Requires hosting/domain decision (§19 item 5) before the server step.

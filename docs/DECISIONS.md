@@ -43,6 +43,11 @@ Owner-approved decisions and their rationale. Every future implementation task m
 
 - **Decision:** Design for expansion; do not build future features speculatively (§3 principle 11).
 
+### D-010 — Early MVP deployment milestone (2026-09-08)
+
+- **Decision:** Once the public landing page passes its local development and quality checks, the project may proceed to production deployment of the first slice (landing page/MVP) without completing the full platform. Deployment follows the §11.7 workflow and requirements (local-first, production isolation, no committed production secrets, approved deployment architecture, DNS/HTTPS verification, secure production env vars, production database/configuration, production smoke test, Owner production review/acceptance).
+- **Consequences:** Paid advertising still requires all applicable production, compliance (§11.6 gate), tracking, and Owner launch gates. The early deployment does NOT mean the full platform is complete. **Deployment status: ⚪ NOT STARTED.**
+
 ## Open / Pending Decisions
 
 - Hosting / domain target (before production deployment only).
