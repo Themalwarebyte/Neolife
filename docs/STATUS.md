@@ -2,6 +2,15 @@
 
 Phase/step-by-step implementation status. Authoritative scope lives in `PROJECT_PLAN.md`.
 
+## Launch-Gate Readiness Audit (§11.6 / §11.7) — 🟨 AWAITING OWNER DECISIONS (2026-09-08)
+
+Read-only audit (no new features, no deploy, no paid ads). Verified against live codebase, fresh production build, and live runtime.
+
+- **Verified green:** 43/43 tests PASS · lint/typecheck/build PASS · standalone server serves · all public routes 200 · `/admin/leads` unauthenticated → 307 → `/admin/login` · no third-party tracking/fingerprint/external fetch · `.env` ignored, only placeholder `.env.example` tracked, **no secret/token anywhere in the repo**.
+- **Gaps requiring Owner action:** final legal copy · hosting/domain + DNS/HTTPS/Cloudflare tunnel · production secrets · advertising platform decision.
+- **Recommended pre-launch hardening (not done, no deploy authorized):** security headers · health endpoint (`/health` currently 404) · production `BETTER_AUTH_URL`.
+- **§11.6 and §11.7 remain OPEN.**
+
 ## PHASE 1 — TRAFFIC MVP 🔵 IN PROGRESS
 
 ### Task 1.1 — Foundation / scaffolding — 🟩 DONE (2026-09-08)
