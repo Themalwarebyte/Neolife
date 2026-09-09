@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+docs
+test-results
+playwright-report
+*.tar.gz
+*.log
+.env
+.env.*
+!.env.example
+src/generated
