@@ -43,7 +43,7 @@ Read-only audit (no new features, no deploy, no paid ads). Verified against live
 - **Isolation confirmed additive:** dedicated `neolife` dir + `neolife` network + `neolife-web` (internal 3000) + `neolife-postgres` (internal 5432) + `neolife-tunnel`; no host port needed; no shared resource touched.
 - **Remaining Owner actions:** provision production secrets · create/provide the dedicated Cloudflare Tunnel connector token for `neolife.ooflowdesk.com` (or confirm an existing route) · explicit deployment authorization.
 - **§11.7 ⚪ NOT STARTED · Production deployment NOT AUTHORIZED · Paid advertising NOT AUTHORIZED.**
-- **Deployment execution plan:** `docs/DEPLOYMENT_EXECUTION_PLAN.md` — **READY FOR FINAL OWNER REVIEW**. `deploy/compose.yaml` added (web/db/tunnel + profiled `seed` service; ADMIN_* injected from secret file, never on CLI); secret handling = root-owned `/opt/ooflowdesk/secrets/neolife.env` + `sudo docker compose --env-file`; migration image verified locally. Image tied to commit `3f535c5`.
+- **Deployment execution plan:** `docs/DEPLOYMENT_EXECUTION_PLAN.md` — **🟨 FINAL SECURITY REVIEW**. `deploy/compose.yaml` added (web/db/tunnel + profiled `seed`; ADMIN_* from secret file). Security finding: container **env vars are inspectable** via `docker inspect`/`docker exec` by any Docker-privileged user (`ooadmin` is in the docker group = root-equivalent); the root-only `neolife.env` protects the *source file* but not container metadata. Awaiting Owner decision on the secret architecture (env-var vs file-secrets vs restrict Docker access).
 
 ## PHASE 1 — TRAFFIC MVP 🔵 IN PROGRESS
 
