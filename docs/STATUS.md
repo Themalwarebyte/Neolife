@@ -43,7 +43,7 @@ Read-only audit (no new features, no deploy, no paid ads). Verified against live
 - **Isolation confirmed additive:** dedicated `neolife` dir + `neolife` network + `neolife-web` (internal 3000) + `neolife-postgres` (internal 5432) + `neolife-tunnel`; no host port needed; no shared resource touched.
 - **Remaining Owner actions:** provision production secrets · create/provide the dedicated Cloudflare Tunnel connector token for `neolife.ooflowdesk.com` (or confirm an existing route) · explicit deployment authorization.
 - **§11.7 ⚪ NOT STARTED · Production deployment NOT AUTHORIZED · Paid advertising NOT AUTHORIZED.**
-- **Deployment execution plan:** `docs/DEPLOYMENT_EXECUTION_PLAN.md` — **🟨 FINAL SECURITY REVIEW**. `deploy/compose.yaml` added (web/db/tunnel + profiled `seed`; ADMIN_* from secret file). Security finding: container **env vars are inspectable** via `docker inspect`/`docker exec` by any Docker-privileged user (`ooadmin` is in the docker group = root-equivalent); the root-only `neolife.env` protects the *source file* but not container metadata. Awaiting Owner decision on the secret architecture (env-var vs file-secrets vs restrict Docker access).
+- **Deployment execution plan:** `docs/DEPLOYMENT_EXECUTION_PLAN.md` — **🟩 READY FOR OWNER DEPLOYMENT DECISION**. Secret architecture **A** (env-var injection) accepted by the Owner. Accurate wording: the root-only `neolife.env` protects the *source file*; because the existing `ooadmin` account has root-equivalent Docker privileges, injected container env is technically inspectable by it; NEOLIFE does not modify this privilege model; Kilo must not intentionally inspect/print/log/expose secrets.
 
 ## PHASE 1 — TRAFFIC MVP 🔵 IN PROGRESS
 

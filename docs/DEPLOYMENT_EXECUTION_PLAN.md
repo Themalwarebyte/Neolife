@@ -236,11 +236,15 @@ sudo docker compose --profile seed --env-file /opt/ooflowdesk/secrets/neolife.en
 | Security | Strong — file root:root 0600, ooadmin cannot read | Weaker — ooadmin-readable (reliance on Kilo discipline) | Strong — daemon-managed |
 | Ownership/permissions | `root:root 0600` under `/opt/ooflowdesk/secrets/` | `ooadmin:ooadmin 0600` | managed by Swarm |
 | Sudo required | Yes — file creation + every secret-bearing `up`/`run` | No | Yes — requires Swarm mode (adds complexity) |
-| Exposed to ooadmin shell/process env? | No (only to containers, via daemon) | Yes (file readable; values in container env inspectable) | No |
+| Exposed to ooadmin shell/process env? | Not in ooadmin's shell env; but inspectable in container metadata (`docker inspect`/`exec env`) — true of any Docker-based scheme while ooadmin has Docker access | Yes (file readable) | No (Swarm-managed) |
 | Docker Compose can consume it? | Yes (`--env-file` interpolation) | Yes (`env_file`) | Yes (Swarm only) |
 | Operational | Heavier — Owner runs secret-bearing deploys; Kilo does non-secret ops | Lighter — Kilo self-serve, but weaker | Heaviest — Swarm migration |
 
-**Recommendation: A.** It keeps secrets out of `ooadmin`'s reach without weakening permissions, and matches "the Owner will execute sudo commands personally." The only cost is that secret-bearing deploy steps are Owner-run.
+**Recommendation: A** (Owner decision, accepted). Accurate wording:
+
+> The secret source file is root-only. Because the existing `ooadmin` account has root-equivalent Docker privileges, secrets injected into container environments are technically inspectable by that account. NEOLIFE does not modify this existing server privilege model. Kilo must not intentionally inspect, print, log, or expose secret values.
+
+The root-only `neolife.env` protects the **source file**; it does **not** hide container-environment values from a Docker-privileged account. NEOLIFE leaves the existing `ooadmin` privilege model unchanged.
 
 ## Final status
 - §11.7 pre-flight: COMPLETE
