@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1
-
 # NEOLIFE Traffic MVP production image.
 # Build stage compiles the app and generates the Prisma client;
 # runtime stage carries everything needed to (a) serve the standalone app and
@@ -23,7 +21,7 @@ ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1
 # Runtime app
 COPY --from=build /app/.next/standalone ./.next/standalone
-COPY --from=build /app/.next/static ./.next/static
+COPY --from=build /app/.next/static ./.next/standalone/.next/static
 # Migration / seed support
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/prisma ./prisma
