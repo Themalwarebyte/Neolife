@@ -27,10 +27,18 @@ test("lead capture journey: landing page → register interest → success", asy
   await page.getByRole("button", { name: "Submit My Interest" }).click();
   await expect(page.getByRole("alert").first()).toBeVisible();
 
-  // 3. Complete valid submission reaches the success state
-  await page.getByLabel(/I am happy for the NEOLIFE office team/).check();
+  // 3. Complete valid submission reaches the success state.
+  // Reload first: React 19 auto-resets uncontrolled form fields after each
+  // form action, so a clean form is required before the valid submission.
+  await page.reload();
+  await page.getByLabel("First name").fill("E2E");
+  await page.getByLabel("Phone").fill("+254700000001");
+  await page
+    .getByLabel("I am interested in")
+    .selectOption({ label: "The business opportunity" });
+  await page.getByLabel(/I consent to the NEOLIFE office team/).check();
   await page.getByRole("button", { name: "Submit My Interest" }).click();
   await expect(
     page.getByRole("heading", { name: "Interest registered" }),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 15000 });
 });

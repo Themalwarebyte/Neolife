@@ -20,6 +20,14 @@ Read-only audit (no new features, no deploy, no paid ads). Verified against live
 
 **Tests/verification:** `pnpm lint`/`typecheck`/`build` PASS · `pnpm test` 43/43 PASS · `/health` 200 · security headers present on `/` · all public routes 200 · `/admin/leads` unauth → 307 · sign-in 200 · authenticated `/admin/leads` 200 (CSP-compatible).
 
+## E2E recovery + deployment preparation — 🟩 DONE (2026-09-08, no deploy)
+
+- **E2E recovered without downloading Chromium:** Playwright now uses the system-installed Google Chrome via `channel: "chrome"` (`playwright.config.ts`). `pnpm exec playwright test` → **1/1 PASS** (lead-capture journey). webServer command corrected to `node .next/standalone/server.js`.
+- **UX finding (🟡, noted for Owner):** React 19 auto-resets uncontrolled form fields after each form action, so a validation error clears the user's entered data. Recommend making the lead form controlled in a later task.
+- **Server inspection (read-only, via `ooflowdesk-remote` SSH):** Docker 29.8.0; per-project compose dirs, `<project>-tunnel` (cloudflared), Caddy gateways, postgres:16. No `neolife.ooflowdesk.com` route exists yet; no conflicting service. `secrets/` and tunnel credential dirs were **not read** (contain credentials).
+- **`docs/DEPLOYMENT.md` created** — production architecture, isolated `neolife` service proposal, production env vars (names only), migration strategy, 17-step runbook, rollback/backup, security notes. **No production secrets included.**
+- `NEXT_PUBLIC_SITE_URL` confirmed unused by application code (0 references).
+
 ## PHASE 1 — TRAFFIC MVP 🔵 IN PROGRESS
 
 ### Task 1.1 — Foundation / scaffolding — 🟩 DONE (2026-09-08)
