@@ -43,6 +43,7 @@ Read-only audit (no new features, no deploy, no paid ads). Verified against live
 - **Isolation confirmed additive:** dedicated `neolife` dir + `neolife` network + `neolife-web` (internal 3000) + `neolife-postgres` (internal 5432) + `neolife-tunnel`; no host port needed; no shared resource touched.
 - **Remaining Owner actions:** provision production secrets · create/provide the dedicated Cloudflare Tunnel connector token for `neolife.ooflowdesk.com` (or confirm an existing route) · explicit deployment authorization.
 - **§11.7 ⚪ NOT STARTED · Production deployment NOT AUTHORIZED · Paid advertising NOT AUTHORIZED.**
+- **Deployment execution plan:** drafted at `docs/DEPLOYMENT_EXECUTION_PLAN.md` (image strategy, compose.yaml, PostgreSQL, env names, Cloudflare, ordering, rollback, smoke tests, sudo boundary, Owner decisions). **Nothing executed.**
 
 ## PHASE 1 — TRAFFIC MVP 🔵 IN PROGRESS
 
