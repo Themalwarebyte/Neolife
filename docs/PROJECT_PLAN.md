@@ -623,7 +623,7 @@ When a phase meets its completion criteria, explicitly report: **"PHASE X IS COM
 | Owner authorization (Phase 1) | 🟩 Recorded 2026-09-08 (`docs/DECISIONS.md`) |
 | Phase 0 completion | 🟩 DONE |
 | Phase 1 (Traffic MVP) | 🔵 IN PROGRESS (foundation/scaffolding) |
-| Application implementation | 🔵 Tasks 1.1 🟩 · 1.2 🟩 · 1.3 🟩 · 1.5 🟩 · 1.4 🟩 · 1.7 🟩 (authenticated CRM live locally) — see `docs/STATUS.md` |
+| Application implementation | 🔵 Tasks 1.1 🟩 · 1.2 🟩 · 1.3 🟩 · 1.5 🟩 · 1.4 🟩 · 1.7 🟩 · 1.8 🟩 (funnel complete: lead → office pipeline) — see `docs/STATUS.md` |
 
 **Next action:** Phase 1 foundation/scaffolding (local-first), then the critical-path build. No production deployment and no paid advertising until §11.4 and the §11.6 launch gate are satisfied.
 

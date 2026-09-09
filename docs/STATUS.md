@@ -149,6 +149,22 @@ Phase/step-by-step implementation status. Authoritative scope lives in `PROJECT_
 - Single role boundary ("admin" vs "staff"); no per-lead ownership — appropriate for a single-office MVP.
 - Playwright Chromium still unavailable — E2E not executed (unchanged).
 
+### Task 1.8 — Office pipeline actions (meetings) — 🟩 DONE (2026-09-08)
+
+**Implemented:**
+- Meeting scheduling in the CRM: `scheduleMeeting` server action + `MeetingForm` (date/time + notes) on the lead detail page; creates a `Meeting` (default `SCHEDULED`) and records a `meeting_scheduled` event.
+- Meeting status/outcome/notes management: `updateMeeting` server action + `MeetingUpdateForm` per meeting (status select, outcome, notes); records a `meeting_status_changed` event.
+- Validation (`src/lib/meetingManagement.ts`, client-safe): status enum membership, datetime parsing, outcome/notes length caps (500). Server-side authorization (admin-only) on both actions; UUID validation; parameterized queries; generic errors.
+
+**Tests / verification performed:**
+- `pnpm lint` PASS · `pnpm typecheck` PASS · `pnpm build` PASS
+- `pnpm test` — **43/43 PASS** (new `tests/meeting-management.test.ts` validators; `tests/meeting-persistence.test.ts` schedule → update status/outcome/notes → event, against real DB)
+- Existing 36 tests all still pass; Task 1.2 smoke test unaffected (Meeting model already exercised by smoke)
+
+**Known limitations:**
+- `updateMeeting` sets status always and outcome/notes from the submitted values (empty clears them); no workflow transition engine (per plan).
+- No meeting reminders/automation (later phases).
+
 ### Next tasks
 
 - 1.2 Local PostgreSQL (Docker) + initial migration — 🟩 DONE (2026-09-08, 11/11 smoke assertions PASS)
@@ -157,7 +173,7 @@ Phase/step-by-step implementation status. Authoritative scope lives in `PROJECT_
 - 1.5 Lead capture (server-side validation, consent + timestamp, PII minimization) — 🟩 DONE (2026-09-08, 14/14 tests PASS; browser E2E written, pending browser install)
 - 1.6 Qualification flow — ⚪ NOT STARTED
 - 1.7 Admin auth (Better Auth) + CRM/admin interface — 🟩 DONE (2026-09-08, 36/36 tests PASS, auth verified live)
-- 1.8 Office pipeline (meeting record/status/outcome) + follow-up — ⚪ NOT STARTED
+- 1.8 Office pipeline (meeting record/status/outcome) + follow-up — 🟩 DONE (2026-09-08, 43/43 tests PASS)
 - 1.9 Funnel events + basic first-party analytics — ⚪ NOT STARTED
 - 1.10 Privacy/Terms/Disclaimer structures (placeholder copy) — ⚪ NOT STARTED
 - 1.11 Tests (unit + E2E critical path) — ⚪ NOT STARTED

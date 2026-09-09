@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/server/db/prisma";
 import { LeadStatusForm } from "@/components/admin/LeadStatusForm";
 import { FollowUpForm } from "@/components/admin/FollowUpForm";
+import { MeetingForm } from "@/components/admin/MeetingForm";
+import { MeetingUpdateForm } from "@/components/admin/MeetingUpdateForm";
 
 export const dynamic = "force-dynamic";
 
@@ -112,15 +114,22 @@ export default async function LeadDetailPage({
                         {meeting.status.replaceAll("_", " ")}
                       </span>
                     </div>
-                    {meeting.outcome ? (
-                      <p className="mt-1 text-sm text-neutral-600">
-                        Outcome: {meeting.outcome}
-                      </p>
+                    {meeting.notes ? (
+                      <p className="mt-1 text-sm text-neutral-600">{meeting.notes}</p>
                     ) : null}
+                    <MeetingUpdateForm
+                      meetingId={meeting.id}
+                      currentStatus={meeting.status}
+                      outcome={meeting.outcome}
+                      notes={meeting.notes}
+                    />
                   </li>
                 ))}
               </ul>
             )}
+            <div className="mt-4 border-t border-neutral-100 pt-4">
+              <MeetingForm leadId={lead.id} />
+            </div>
           </section>
 
           <section className="rounded-2xl border border-neutral-200 bg-white p-6">
