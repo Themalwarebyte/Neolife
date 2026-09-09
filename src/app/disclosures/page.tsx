@@ -7,7 +7,7 @@ export default function DisclosuresPage() {
   return (
     <InfoPageLayout
       title="Disclosures"
-      updatedLabel="DRAFT — pending Owner/legal review. Not final or legally approved text."
+      updatedLabel="MVP legal baseline — subject to future revision. Not legal advice."
     >
       <InfoSection heading="Business relationship disclosure">
         <p>
@@ -62,9 +62,8 @@ export default function DisclosuresPage() {
 
       <InfoSection heading="Status of these disclosures">
         <p>
-          These disclosures are a draft provided for review. Final approved
-          wording will be supplied by the Owner/legal before any advertising
-          launch.
+          These disclosures are the current MVP baseline. They may be revised in
+          future releases following further review.
         </p>
       </InfoSection>
     </InfoPageLayout>

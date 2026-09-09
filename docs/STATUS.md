@@ -2,21 +2,29 @@
 
 Phase/step-by-step implementation status. Authoritative scope lives in `PROJECT_PLAN.md`.
 
-## Launch-Gate Readiness Audit (§11.6 / §11.7) — 🟨 AWAITING OWNER DECISIONS (2026-09-08)
+## FINAL §11.6 reconciliation (2026-09-08)
+
+- **Legal baseline:** 🟩 **MVP LEGAL BASELINE COMPLETE** (Privacy, Terms, Disclosures, business-relationship, earnings/results, product/medical, consent, footer wording). Future-revisable; not legal advice.
+- **E2E:** 🟩 COMPLETE — Playwright 1/1 PASS via system Chrome.
+- **Production preparation:** 🟩 COMPLETE — `docs/DEPLOYMENT.md` runbook + env spec created; server inspected read-only.
+- **Deployment:** ⚪ NOT STARTED · **Paid advertising:** ⚪ NOT AUTHORIZED.
+- **§11.6:** 🟨 OPEN — remaining launch gates are deployment-dependent (hosting/domain config, production secrets, production smoke test, compliance review before ads).
+
+## Launch-Gate Readiness Audit (§11.6 / §11.7) — superseded by reconciliation above
 
 Read-only audit (no new features, no deploy, no paid ads). Verified against live codebase, fresh production build, and live runtime.
 
 - **Verified green:** 43/43 tests PASS · lint/typecheck/build PASS · standalone server serves · all public routes 200 · `/admin/leads` unauthenticated → 307 → `/admin/login` · no third-party tracking/fingerprint/external fetch · `.env` ignored, only placeholder `.env.example` tracked, **no secret/token anywhere in the repo**.
-- **Gaps requiring Owner action:** final legal copy · hosting/domain + DNS/HTTPS/Cloudflare tunnel · production secrets · advertising platform decision.
-- **Recommended pre-launch hardening (not done, no deploy authorized):** security headers · health endpoint (`/health` currently 404) · production `BETTER_AUTH_URL`.
+- **Gaps resolved by Owner decisions (D-012–D-016):** advertising platform (Meta only) · tracking (first-party only) · hosting target (`neolife.ooflowdesk.com`) · legal baseline (COMPLETE) · security headers + `/health` (implemented).
+- **Remaining (deployment-time only):** hosting/domain + DNS/HTTPS/Cloudflare tunnel configuration · production secrets · production smoke test · Owner deployment authorization.
 - **§11.6 and §11.7 remain OPEN.**
 
 ## Pre-launch hardening — 🟩 DONE (2026-09-08, Owner decisions D-012–D-016)
 
 - **Security headers** (`next.config.mjs` `headers()`): X-Frame-Options DENY, X-Content-Type-Options nosniff, Referrer-Policy strict-origin-when-cross-origin, Permissions-Policy, HSTS, and a CSP (`default-src 'self'`; script/style `'unsafe-inline'` for Next inline scripts/Tailwind; `'unsafe-eval'` only in dev; `connect-src 'self'`; `frame-ancestors 'none'`; `object-src 'none'`). Verified live on the production build — CSP correctly omits `'unsafe-eval'` in prod.
 - **`/health` endpoint** (`src/app/health/route.ts`): public, minimal, returns `{"status":"ok"}`, no DB dependency, no secrets/PII. Verified 200.
-- **Legal drafts** (DRAFT, pending Owner/legal): Privacy Notice, Terms of Use, Disclosures (business relationship, earnings/results, product/medical, advertising/tracking), plus footer disclosure and lead-form consent wording. All accurately describe the platform (lead collection, first-party attribution, consent + timestamp, CRM, no Meta Pixel/GA4) and are clearly marked DRAFT.
-- **E2E:** Chromium download still blocked by network restriction (cache has an incompatible older revision). Reported honestly as **pending environment**; no pass fabricated.
+- **Legal documents** = 🟩 **MVP LEGAL BASELINE COMPLETE** (Privacy, Terms, Disclosures, business-relationship, earnings/results, product/medical, consent, footer). Future-revisable; not legal advice.
+- **E2E:** recovered — now runs via system Chrome (`channel: "chrome"`), **1/1 PASS**.
 
 **Tests/verification:** `pnpm lint`/`typecheck`/`build` PASS · `pnpm test` 43/43 PASS · `/health` 200 · security headers present on `/` · all public routes 200 · `/admin/leads` unauth → 307 · sign-in 200 · authenticated `/admin/leads` 200 (CSP-compatible).
 

@@ -7,7 +7,7 @@ export default function TermsPage() {
   return (
     <InfoPageLayout
       title="Terms of Use"
-      updatedLabel="DRAFT — pending Owner/legal review. Not final or legally approved text."
+      updatedLabel="MVP legal baseline — subject to future revision. Not legal advice."
     >
       <InfoSection heading="About this website">
         <p>

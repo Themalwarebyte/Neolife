@@ -5,11 +5,11 @@ import { Container } from "@/components/ui/Section";
 
 /**
  * Shared structure for Privacy / Terms / Disclosures pages.
- * All wording is PLACEHOLDER pending Owner/legal review (docs/PROJECT_PLAN.md §14, §11.6).
+ * These pages are the current MVP legal baseline, subject to future revision.
  */
 export function InfoPageLayout({
   title,
-  updatedLabel = "Content pending Owner/legal review",
+  updatedLabel = "MVP legal baseline — subject to future revision",
   children,
 }: {
   title: string;

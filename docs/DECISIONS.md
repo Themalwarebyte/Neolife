@@ -65,9 +65,13 @@ Owner-approved decisions and their rationale. Every future implementation task m
 
 - **Decision:** Deploy to `neolife.ooflowdesk.com` on the Owner's existing infrastructure via Cloudflare Tunnel. NEOLIFE must remain isolated from ZongFitness. **No production deployment yet.**
 
-### D-015 — Legal copy: Kilo drafts, Owner/legal reviews (2026-09-08)
+### D-015 — Legal copy: Kilo drafts; Owner marks MVP baseline COMPLETE (2026-09-08)
 
-- **Decision:** Kilo drafts neutral, conservative Privacy Notice, Terms of Use, Disclosures, and related disclosure/consent wording. These are DRAFTS for Owner/legal review — not legal advice, not approved text, not official NeoLife policy, not final compliance approval. No income/medical/regulatory claims are invented.
+- **Decision:** Kilo drafted neutral, conservative Privacy Notice, Terms of Use, Disclosures, and related disclosure/consent wording. The Owner has decided these documents are **COMPLETE as the current MVP legal/compliance baseline**. They remain subject to future revision after further Owner/legal review. They are not legal advice and are not a claim of legal certification.
+
+### D-017 — E2E via system Chrome (2026-09-08)
+
+- **Decision:** Run the Playwright suite using the system-installed Google Chrome (`channel: "chrome"`) because the bundled Chromium download is network-blocked. Result: **1/1 PASS**.
 
 ### D-016 — Security headers + `/health` (2026-09-08)
 

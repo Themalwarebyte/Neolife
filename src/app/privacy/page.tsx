@@ -7,7 +7,7 @@ export default function PrivacyPage() {
   return (
     <InfoPageLayout
       title="Privacy Notice"
-      updatedLabel="DRAFT — pending Owner/legal review. Not final or legally approved text."
+      updatedLabel="MVP legal baseline — subject to future revision. Not legal advice."
     >
       <InfoSection heading="Who we are">
         <p>

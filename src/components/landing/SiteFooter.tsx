@@ -15,7 +15,7 @@ export function SiteFooter() {
             NEO<span className="text-brand-600">LIFE</span>
           </p>
           <p className="mt-3 max-w-xs text-sm text-neutral-500">
-            {/* DRAFT — OWNER/LEGAL REVIEW: business-relationship wording */}
+            {/* MVP baseline — subject to future revision: business-relationship wording */}
             This website is operated by an independent NEOLIFE business
             (distributor / business builder). It is not the official NeoLife
             corporate website or the official NeoLife distributor-registration
@@ -72,7 +72,7 @@ export function SiteFooter() {
       <div className="border-t border-neutral-200/70">
         <Container className="py-5">
           <p className="text-xs leading-relaxed text-neutral-400">
-            {/* DRAFT — OWNER/LEGAL REVIEW: no income or health claims permitted. */}
+            {/* MVP baseline — subject to future revision: no income or health claims permitted. */}
             Results in any business vary and depend on individual effort,
             experience and skill. Nothing on this website is a promise,
             guarantee or representation of income or business results, and
