@@ -36,12 +36,13 @@ Read-only audit (no new features, no deploy, no paid ads). Verified against live
 - **`docs/DEPLOYMENT.md` created** — production architecture, isolated `neolife` service proposal, production env vars (names only), migration strategy, 17-step runbook, rollback/backup, security notes. **No production secrets included.**
 - `NEXT_PUBLIC_SITE_URL` confirmed unused by application code (0 references).
 
-## §11.7 Deployment Pre-flight — 🟨 BLOCKED ON SERVER ACCESS (2026-09-08)
+## §11.7 Deployment Pre-flight — 🟨 READY FOR OWNER DEPLOYMENT AUTHORIZATION (2026-09-08)
 
-- **Local release verified:** commit `3994e9d`, working tree clean; `pnpm test` 43/43 · `lint`/`typecheck`/`build` PASS · E2E 1/1 PASS (system Chrome) · standalone `server.js` present.
-- **Server preflight blocked:** the only reachable SSH alias (`ooflowdesk-remote`, Tailscale `100.94.91.17`) now returns **"Permission denied (publickey,password)"** even though the server **accepts** the `ooflowdesk_ed25519` key (verified via `ssh -vv`). `ooflowdesk-lan`/`ooflowdesk-wifi` are unreachable (not on those networks). No server changes were made; no secrets exposed.
-- **Earlier read-only inspection (same session, prior task) remains the baseline** and will be refreshed once access is restored: Docker 29.8.0 · per-project compose dirs under `/opt/ooflowdesk/<project>/` · `<project>-tunnel` (cloudflared) + Caddy gateways + postgres:16 · no `neolife.ooflowdesk.com` route/conflict · secrets under root-only `/opt/ooflowdesk/secrets/`.
-- **§11.7 remains ⚪ NOT STARTED. Paid advertising NOT AUTHORIZED. No deployment performed.**
+- **Local release:** app code at commit `3994e9d` (HEAD `c066473` is docs-only on top). Working tree clean; `pnpm test` 43/43 · lint/typecheck/build PASS · E2E 1/1 PASS · standalone `server.js` present.
+- **Server pre-flight (read-only, access restored):** Docker 29.8.0 · no `neolife` project/network/container/route exists · `/opt/ooflowdesk/neolife` absent · resources: 169G disk free, ~5.9G RAM, 4 cores · `neolife.ooflowdesk.com` **already resolves publicly (A+AAAA)**.
+- **Isolation confirmed additive:** dedicated `neolife` dir + `neolife` network + `neolife-web` (internal 3000) + `neolife-postgres` (internal 5432) + `neolife-tunnel`; no host port needed; no shared resource touched.
+- **Remaining Owner actions:** provision production secrets · create/provide the dedicated Cloudflare Tunnel connector token for `neolife.ooflowdesk.com` (or confirm an existing route) · explicit deployment authorization.
+- **§11.7 ⚪ NOT STARTED · Production deployment NOT AUTHORIZED · Paid advertising NOT AUTHORIZED.**
 
 ## PHASE 1 — TRAFFIC MVP 🔵 IN PROGRESS
 
