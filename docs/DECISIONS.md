@@ -53,6 +53,26 @@ Owner-approved decisions and their rationale. Every future implementation task m
 - **Decision:** Initial admin/office account is provisioned via `scripts/seed-admin.ts` reading `ADMIN_EMAIL` + `ADMIN_PASSWORD` env vars (never committed). Passwords are hashed by Better Auth. Authorization uses a single `role` field (`admin` can access CRM; `staff` default). There is **no public sign-up route**, so only seeded accounts exist.
 - **Consequences:** Safe MVP boundary without an RBAC system. Additional accounts are added by re-running the seed or direct DB access. Flagged for Owner awareness — adjust if a richer role model is required later.
 
+### D-012 — Advertising platform: Meta only for MVP (2026-09-08)
+
+- **Decision:** MVP paid advertising runs on Meta (Facebook + Instagram) only. Google Ads is a later option, not MVP.
+
+### D-013 — Tracking: first-party only for MVP (2026-09-08)
+
+- **Decision:** First-party tracking only — UTM parameters, first-touch attribution, landing-page attribution, and lead/CRM attribution (already implemented). **No Meta Pixel, no GA4, no third-party advertising/analytics trackers for MVP.**
+
+### D-014 — Domain/hosting: `neolife.ooflowdesk.com` via Owner infrastructure + Cloudflare Tunnel (2026-09-08)
+
+- **Decision:** Deploy to `neolife.ooflowdesk.com` on the Owner's existing infrastructure via Cloudflare Tunnel. NEOLIFE must remain isolated from ZongFitness. **No production deployment yet.**
+
+### D-015 — Legal copy: Kilo drafts, Owner/legal reviews (2026-09-08)
+
+- **Decision:** Kilo drafts neutral, conservative Privacy Notice, Terms of Use, Disclosures, and related disclosure/consent wording. These are DRAFTS for Owner/legal review — not legal advice, not approved text, not official NeoLife policy, not final compliance approval. No income/medical/regulatory claims are invented.
+
+### D-016 — Security headers + `/health` (2026-09-08)
+
+- **Decision:** Implement application-level security headers and a minimal public `/health` endpoint now (for production/tunnel/monitoring), and test both.
+
 ## Open / Pending Decisions
 
 - Hosting / domain target (before production deployment only).

@@ -11,6 +11,15 @@ Read-only audit (no new features, no deploy, no paid ads). Verified against live
 - **Recommended pre-launch hardening (not done, no deploy authorized):** security headers · health endpoint (`/health` currently 404) · production `BETTER_AUTH_URL`.
 - **§11.6 and §11.7 remain OPEN.**
 
+## Pre-launch hardening — 🟩 DONE (2026-09-08, Owner decisions D-012–D-016)
+
+- **Security headers** (`next.config.mjs` `headers()`): X-Frame-Options DENY, X-Content-Type-Options nosniff, Referrer-Policy strict-origin-when-cross-origin, Permissions-Policy, HSTS, and a CSP (`default-src 'self'`; script/style `'unsafe-inline'` for Next inline scripts/Tailwind; `'unsafe-eval'` only in dev; `connect-src 'self'`; `frame-ancestors 'none'`; `object-src 'none'`). Verified live on the production build — CSP correctly omits `'unsafe-eval'` in prod.
+- **`/health` endpoint** (`src/app/health/route.ts`): public, minimal, returns `{"status":"ok"}`, no DB dependency, no secrets/PII. Verified 200.
+- **Legal drafts** (DRAFT, pending Owner/legal): Privacy Notice, Terms of Use, Disclosures (business relationship, earnings/results, product/medical, advertising/tracking), plus footer disclosure and lead-form consent wording. All accurately describe the platform (lead collection, first-party attribution, consent + timestamp, CRM, no Meta Pixel/GA4) and are clearly marked DRAFT.
+- **E2E:** Chromium download still blocked by network restriction (cache has an incompatible older revision). Reported honestly as **pending environment**; no pass fabricated.
+
+**Tests/verification:** `pnpm lint`/`typecheck`/`build` PASS · `pnpm test` 43/43 PASS · `/health` 200 · security headers present on `/` · all public routes 200 · `/admin/leads` unauth → 307 · sign-in 200 · authenticated `/admin/leads` 200 (CSP-compatible).
+
 ## PHASE 1 — TRAFFIC MVP 🔵 IN PROGRESS
 
 ### Task 1.1 — Foundation / scaffolding — 🟩 DONE (2026-09-08)

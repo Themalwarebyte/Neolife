@@ -249,8 +249,8 @@ export function LeadForm() {
               htmlFor="consent"
               className="text-sm font-semibold text-neutral-800"
             >
-              I am happy for the NEOLIFE office team to contact me about this
-              opportunity <span aria-hidden="true">*</span>
+              I consent to the NEOLIFE office team contacting me about this
+              opportunity using the details I provide <span aria-hidden="true">*</span>
             </label>
             <p id="consent-help" className="mt-1 text-sm text-neutral-500">
               Your details are used only to respond to your enquiry. See our{" "}

@@ -14,10 +14,12 @@ export function SiteFooter() {
           <p className="text-lg font-extrabold tracking-tight text-neutral-900">
             NEO<span className="text-brand-600">LIFE</span>
           </p>
-          {/* OWNER/LEGAL REVIEW: business-relationship identification wording */}
           <p className="mt-3 max-w-xs text-sm text-neutral-500">
-            This website is operated by an independent NEOLIFE business. It is
-            not the official NeoLife corporate website.
+            {/* DRAFT — OWNER/LEGAL REVIEW: business-relationship wording */}
+            This website is operated by an independent NEOLIFE business
+            (distributor / business builder). It is not the official NeoLife
+            corporate website or the official NeoLife distributor-registration
+            system.
           </p>
         </div>
 
@@ -70,10 +72,13 @@ export function SiteFooter() {
       <div className="border-t border-neutral-200/70">
         <Container className="py-5">
           <p className="text-xs leading-relaxed text-neutral-400">
-            {/* OWNER/LEGAL REVIEW: no income or health claims permitted. */}
+            {/* DRAFT — OWNER/LEGAL REVIEW: no income or health claims permitted. */}
             Results in any business vary and depend on individual effort,
-            experience and skill. Nothing on this website is a promise of
-            income or business results, and nothing here is medical advice.
+            experience and skill. Nothing on this website is a promise,
+            guarantee or representation of income or business results, and
+            running a business can involve costs or expenses. This is a business
+            opportunity, not employment, and nothing here is medical advice. This
+            website does not use third-party advertising trackers.
           </p>
         </Container>
       </div>
