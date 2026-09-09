@@ -49,6 +49,8 @@ Deployment artifact steps (execution phase, after authorization):
 - The compose file does **not** use `env_file:`, so `ooadmin` never needs to read the secret file to run `docker compose` for non-secret operations.
 
 ## 3. Docker compose.yaml design (additive; no host ports; dedicated network)
+Canonical committed file: **`deploy/compose.yaml`** (secret-free; `${VAR}` placeholders only). Summary below (the `seed` service is profiled and does not run on `up -d`):
+
 ```yaml
 name: neolife
 
@@ -96,6 +98,23 @@ services:
       TUNNEL_TOKEN: ${TUNNEL_TOKEN}
     networks: [neolife]
 
+  # One-time admin seed — profiled, never runs on `up -d`.
+  seed:
+    image: neolife-web:3f535c5
+    container_name: neolife-seed
+    profiles: ["seed"]
+    restart: "no"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+    depends_on:
+      db: { condition: service_healthy }
+    networks: [neolife]
+    command: ["pnpm", "exec", "tsx", "scripts/seed-admin.ts"]
+
 networks:
   neolife:
     driver: bridge
@@ -141,7 +160,7 @@ docker compose config | grep -E "container_name|image"   # confirms the neolife 
 Confirms: expected container (`neolife-postgres`), expected database (`neolife`), expected user (`neolife`), and that the connection target is the dedicated NEOLIFE DB. Passwords/connection strings are **never printed**.
 
 ## 5. Production environment (variable NAMES only — values never in Git/logs/chat)
-`DATABASE_URL` · `BETTER_AUTH_SECRET` · `BETTER_AUTH_URL` (`https://neolife.ooflowdesk.com`) · `POSTGRES_PASSWORD` (compose DB) · `TUNNEL_TOKEN` (cloudflared, remotely-managed) · `ADMIN_EMAIL` · `ADMIN_PASSWORD` (one-time seed only).
+`DATABASE_URL` · `BETTER_AUTH_SECRET` · `BETTER_AUTH_URL` (`https://neolife.ooflowdesk.com`) · `POSTGRES_PASSWORD` (compose DB) · `TUNNEL_TOKEN` (cloudflared, remotely-managed) · `ADMIN_EMAIL` · `ADMIN_PASSWORD` (one-time, consumed only by the profiled `seed` service — never the long-running `web` service, never on a CLI).
 All live only in the root-owned `/opt/ooflowdesk/secrets/neolife.env` (0600). Never in `.env.example`, docs, commit messages, or terminal output.
 
 ## 6. Cloudflare
@@ -160,7 +179,7 @@ All live only in the root-owned `/opt/ooflowdesk/secrets/neolife.env` (0600). Ne
 7. **Cloudflare route** (Owner, dashboard): `neolife.ooflowdesk.com` → `http://neolife-web:3000`.
 8. **HTTPS verify** (Kilo, read-only): `curl -I https://neolife.ooflowdesk.com/health`.
 9. **Health check** (Kilo, read-only): `https://neolife.ooflowdesk.com/health` → 200 `{"status":"ok"}`.
-10. **Admin seed** (Owner, sudo): `sudo docker compose --env-file /opt/ooflowdesk/secrets/neolife.env run --rm -e ADMIN_EMAIL -e ADMIN_PASSWORD web pnpm exec tsx scripts/seed-admin.ts`.
+10. **Admin seed** (Owner, sudo): `sudo docker compose --profile seed --env-file /opt/ooflowdesk/secrets/neolife.env run --rm seed` — `ADMIN_EMAIL`/`ADMIN_PASSWORD` are injected from the secret file, never typed on the CLI.
 11. **Application smoke tests** (Kilo): §9 (via the public HTTPS URL and `docker compose exec`).
 12. **First post-init backup** (Kilo, non-sudo): `docker compose exec -T db pg_dump -U neolife neolife > backups/neolife-$(date +%F-%H%M%S).sql`.
 13. **Existing-service health verification** (Kilo, read-only): re-run snapshot; confirm all existing containers unchanged/healthy.
@@ -192,8 +211,8 @@ sudo docker compose --env-file /opt/ooflowdesk/secrets/neolife.env up -d
 # (3) Run migrations (after the §4c identity check)
 sudo docker compose --env-file /opt/ooflowdesk/secrets/neolife.env run --rm web pnpm exec prisma migrate deploy
 
-# (4) Seed the admin account (one-time)
-sudo docker compose --env-file /opt/ooflowdesk/secrets/neolife.env run --rm -e ADMIN_EMAIL -e ADMIN_PASSWORD web pnpm exec tsx scripts/seed-admin.ts
+# (4) Seed the admin account (one-time; ADMIN_* come from the secret file, never typed on the CLI)
+sudo docker compose --profile seed --env-file /opt/ooflowdesk/secrets/neolife.env run --rm seed
 ```
 - **What each changes:** creates NEOLIFE-only secret file, containers, network, volume, database tables, and one admin user.
 - **What it does NOT change:** no existing service/config/network/volume; no other files; does not touch `/opt/ooflowdesk/secrets/` existing files.

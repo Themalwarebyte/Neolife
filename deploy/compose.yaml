@@ -1,0 +1,81 @@
+# NEOLIFE production Compose — contains NO secrets (only ${VAR} placeholders).
+# Copied to /opt/ooflowdesk/neolife/compose.yaml during authorized deployment.
+# Secrets are injected by the Owner via:
+#   sudo docker compose --env-file /opt/ooflowdesk/secrets/neolife.env <command>
+#
+# Isolation: dedicated project (name: neolife), dedicated bridge network,
+# dedicated PostgreSQL volume, NO host ports, NO shared networks, and no
+# dependency on any existing container/service.
+name: neolife
+
+services:
+  web:
+    image: neolife-web:3f535c5
+    container_name: neolife-web
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL}
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks: [neolife]
+
+  db:
+    image: postgres:16-alpine
+    container_name: neolife-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: neolife
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: neolife
+    volumes:
+      - neolife_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U neolife -d neolife"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [neolife]
+
+  tunnel:
+    image: cloudflare/cloudflared:2026.7.3
+    container_name: neolife-tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+    networks: [neolife]
+
+  # One-time admin seed — does NOT run on `up -d` (profiles: ["seed"]).
+  # Invoked explicitly: sudo docker compose --env-file <secretfile> run --rm seed
+  seed:
+    image: neolife-web:3f535c5
+    container_name: neolife-seed
+    profiles: ["seed"]
+    restart: "no"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [neolife]
+    command: ["pnpm", "exec", "tsx", "scripts/seed-admin.ts"]
+
+networks:
+  neolife:
+    driver: bridge
+
+volumes:
+  neolife_pgdata:
