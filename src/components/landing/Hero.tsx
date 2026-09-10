@@ -1,7 +1,8 @@
 import { CtaLink } from "@/components/ui/CtaLink";
 import { Reveal } from "@/components/ui/Reveal";
 import { Container } from "@/components/ui/Section";
-import { BotanicalImage, Leaf, Sprig } from "@/components/ui/Botanical";
+import { Leaf } from "@/components/ui/Botanical";
+import { Photo } from "@/components/ui/Photo";
 
 export function Hero() {
   return (
@@ -42,11 +43,16 @@ export function Hero() {
         </Reveal>
 
         <Reveal delay={150} className="relative hidden lg:block">
-          <div className="relative h-[420px]">
-            <BotanicalImage tone="pale" className="absolute inset-0" />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Sprig className="h-44 w-44 text-forest-700/30" />
-            </div>
+          <Photo
+            tone="botanical"
+            alt="Wellness and botanical lifestyle"
+            className="h-[460px] rounded-[2rem] shadow-xl shadow-forest-900/10"
+          />
+          <div className="absolute -bottom-6 -left-6 w-64 rounded-2xl bg-white p-5 shadow-xl">
+            <p className="font-bold text-neutral-900">People first</p>
+            <p className="mt-1 text-sm text-neutral-600">
+              Training, mentoring and a local team behind you.
+            </p>
           </div>
         </Reveal>
       </Container>

@@ -48,6 +48,23 @@ html {
   background-size: 22px 22px;
 }
 
+/* Photographic-style placeholder lighting + vignette (premium depth) */
+.photo-light {
+  background-image: radial-gradient(
+    circle at 72% 22%,
+    rgba(255, 255, 255, 0.4),
+    transparent 55%
+  );
+}
+
+.photo-vignette {
+  background-image: radial-gradient(
+    ellipse at center,
+    transparent 55%,
+    rgba(10, 30, 20, 0.16) 100%
+  );
+}
+
 /* Respect users who prefer reduced motion */
 @media (prefers-reduced-motion: reduce) {
   html {

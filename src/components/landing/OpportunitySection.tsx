@@ -1,6 +1,6 @@
 import { Reveal } from "@/components/ui/Reveal";
 import { Section, SectionHeading } from "@/components/ui/Section";
-import { BotanicalImage } from "@/components/ui/Botanical";
+import { Photo } from "@/components/ui/Photo";
 
 const pillars = [
   {
@@ -25,20 +25,25 @@ export function OpportunitySection() {
         title="What the NEOLIFE business is really about"
         description="A straightforward, people-driven business built around quality nutrition products and personal development."
       />
-      <div className="mt-14 grid gap-6 md:grid-cols-3">
-        {pillars.map((pillar, index) => (
-          <Reveal key={pillar.title} delay={index * 120}>
-            <article className="h-full overflow-hidden rounded-3xl bg-white shadow-sm transition-shadow hover:shadow-lg">
-              <BotanicalImage tone={index === 1 ? "forest" : "pale"} className="h-36 rounded-none" />
-              <div className="p-7">
+      <div className="relative mt-14">
+        <Photo
+          tone="natural"
+          alt="Wellness lifestyle and community"
+          className="h-[340px] rounded-[2rem] shadow-lg shadow-forest-900/10"
+        />
+        <div className="relative z-10 -mt-14 grid gap-6 md:grid-cols-3 md:px-10">
+          {pillars.map((pillar, index) => (
+            <Reveal key={pillar.title} delay={index * 120}>
+              <article className="h-full rounded-3xl bg-white p-7 shadow-xl">
                 <h3 className="text-lg font-bold text-neutral-900">{pillar.title}</h3>
                 <p className="mt-3 leading-relaxed text-neutral-600">{pillar.body}</p>
-              </div>
-            </article>
-          </Reveal>
-        ))}
+              </article>
+            </Reveal>
+          ))}
+        </div>
       </div>
     </Section>
   );
 }
+
 

@@ -1,6 +1,6 @@
 import { Reveal } from "@/components/ui/Reveal";
 import { Section, SectionHeading } from "@/components/ui/Section";
-import { BotanicalImage } from "@/components/ui/Botanical";
+import { Photo } from "@/components/ui/Photo";
 
 const supports = [
   {
@@ -30,8 +30,13 @@ export function SupportSection() {
         description="Training, mentoring and a local team come with the journey."
       />
       <div className="mt-14 grid items-center gap-10 lg:grid-cols-2">
-        <Reveal className="hidden lg:block">
-          <BotanicalImage tone="pale" className="h-[360px]" />
+        <Reveal>
+          <Photo
+            tone="warm"
+            alt="Supportive community and mentoring"
+            priority={false}
+            className="h-[360px] rounded-[2rem] shadow-xl shadow-forest-900/10 lg:h-[460px]"
+          />
         </Reveal>
         <div className="grid gap-6 sm:grid-cols-2">
           {supports.map((item, index) => (
