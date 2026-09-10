@@ -77,6 +77,11 @@ Owner-approved decisions and their rationale. Every future implementation task m
 
 - **Decision:** Implement application-level security headers and a minimal public `/health` endpoint now (for production/tunnel/monitoring), and test both.
 
+### D-018 — Public website visual/conversion upgrade (Owner-approved direction) (2026-09-10)
+
+- **Decision:** Add a planned public homepage visual redesign — Semrush-inspired UX quality with a NeoLife botanical/wellness visual identity (leaves/herbs/nutrition/nature), varied section backgrounds (not all-white), and a dynamic scroll. Compliance-safe (natural wellness + nutrition + science; no medical/cure claims). Public UI/UX only — no funnel/data/auth/CRM/infra changes.
+- **Consequences:** Recorded as a planned upgrade (⚪ NOT STARTED) in `docs/DESIGN_UPGRADE_PLAN.md`. Implementation is NOT authorized yet; the plan is for Owner review.
+
 ## Open / Pending Decisions
 
 - Hosting / domain target (before production deployment only).

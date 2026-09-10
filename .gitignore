@@ -29,3 +29,7 @@ src/generated/
 # test artifacts
 test-results/
 playwright-report/
+
+# build/transfer artifacts
+*.tar
+*.tar.gz
