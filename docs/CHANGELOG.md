@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Visual polish — Final CTA background + button contrast (🟩 local)
+- Final CTA now renders `final-cta.webp` as a true full-bleed background via `next/image` `fill` with a dark forest-green gradient overlay (fixed a `relative`/`absolute` conflict in the `Photo` wrapper that prevented correct background positioning).
+- Primary CTA buttons darkened from `bg-brand-600` (~3.2:1 white-text contrast) to `bg-brand-700` (~5.5:1, WCAG AA) with `hover:bg-forest-700`; final-CTA button no longer carries conflicting `bg-white`/`text-forest-900` overrides (was rendering white-on-white) and now uses the primary green + white text with a subtle `ring-white/30`.
+- No changes to lead capture, attribution, CRM, auth, database, legal pages, CSP, or deployment config.
+
 ### Visual Pass 2 — Photography (real self-hosted imagery) — 🟩 DONE locally
 Replaced every botanical photographic placeholder on the public landing page with real, self-hosted photography (Unsplash License). Added `src/components/ui/Photo.tsx` (reusable image-presentation system) and wired `src="/images/landing/*.webp"` into the Hero, Opportunity, Products/Wellness, Support, and Final-CTA sections. All five `Photo` slots now render real `<Image>`s.
 

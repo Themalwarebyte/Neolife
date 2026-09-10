@@ -1,24 +1,28 @@
+import Image from "next/image";
 import { CtaLink } from "@/components/ui/CtaLink";
 import { Reveal } from "@/components/ui/Reveal";
 import { Container } from "@/components/ui/Section";
-import { Photo } from "@/components/ui/Photo";
 
 export function CtaSection() {
   return (
     <section
       id="register-interest-cta"
       aria-label="Register your interest"
-      className="relative isolate overflow-hidden"
+      className="relative isolate overflow-hidden bg-forest-900"
     >
-      <Photo
+      <Image
         src="/images/landing/final-cta.webp"
-        overlay
         alt=""
-        className="absolute inset-0 -z-10 h-full w-full"
+        fill
         sizes="100vw"
+        className="object-cover"
+      />
+      <div
+        className="absolute inset-0 bg-linear-to-b from-forest-900/80 via-forest-800/70 to-forest-900/85"
+        aria-hidden="true"
       />
 
-      <Container className="py-20 sm:py-28">
+      <Container className="relative py-20 sm:py-28">
         <Reveal>
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
@@ -33,7 +37,7 @@ export function CtaSection() {
               <CtaLink
                 href="/register-interest"
                 size="lg"
-                className="bg-white text-forest-900 shadow-lg hover:text-forest-800"
+                className="shadow-lg ring-1 ring-white/30"
               >
                 Register Your Interest
               </CtaLink>

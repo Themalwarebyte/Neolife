@@ -80,7 +80,7 @@ export function SiteHeader() {
                 <li>
                   <Link
                     href="/register-interest"
-                    className="mt-1 block rounded-lg bg-brand-600 px-3 py-2 text-center font-semibold text-white hover:bg-brand-700"
+                    className="mt-1 block rounded-lg bg-brand-700 px-3 py-2 text-center font-semibold text-white hover:bg-forest-700"
                   >
                     Register Interest
                   </Link>

@@ -2,6 +2,12 @@
 
 Phase/step-by-step implementation status. Authoritative scope lives in `PROJECT_PLAN.md`.
 
+## Visual polish — Final CTA + button contrast — 🟩 DONE locally (2026-09-10)
+
+- Final CTA uses the real `final-cta.webp` as a full-bleed background with a dark forest-green gradient overlay (fixed `relative`/`absolute` conflict).
+- Primary CTA buttons are now `bg-brand-700` (white text, ~5.5:1 contrast) with `hover:bg-forest-700`; final-CTA button fixed (was white-on-white from conflicting class overrides).
+- Validation: lint/typecheck PASS · 43/43 tests PASS · build PASS · E2E 1/1 PASS. Not deployed.
+
 ## Visual Pass 2 — Photography (real imagery) — 🟩 DONE locally (2026-09-10)
 
 - Replaced all botanical photographic placeholders with real self-hosted WebP photography (Unsplash License) across Hero, Opportunity, Products/Wellness, Support, and Final CTA.
