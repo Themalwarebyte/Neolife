@@ -1,12 +1,22 @@
 @import "tailwindcss";
 
-/* NEOLIFE brand tokens — placeholder palette pending Owner brand decision (see STATUS.md) */
+/* NEOLIFE brand tokens — botanical/wellness palette (Owner-approved direction D-018). */
 @theme {
   --color-brand-50: #ecfdf5;
   --color-brand-100: #d1fae5;
+  --color-brand-200: #a7f3d0;
+  --color-brand-300: #6ee7b7;
+  --color-brand-400: #34d399;
   --color-brand-500: #10b981;
   --color-brand-600: #059669;
   --color-brand-700: #047857;
+  --color-forest-600: #166534;
+  --color-forest-700: #14532d;
+  --color-forest-800: #123524;
+  --color-forest-900: #0c2b1f;
+  --color-cream-50: #fbf8f1;
+  --color-cream-100: #f5efe2;
+  --color-leaf-500: #65a30d;
   --color-ink: #0f172a;
 }
 
@@ -28,6 +38,16 @@ html {
   transform: none;
 }
 
+/* Subtle botanical dot-grid texture for warm/cream sections */
+.botanical-grid {
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    rgba(20, 83, 45, 0.08) 1px,
+    transparent 0
+  );
+  background-size: 22px 22px;
+}
+
 /* Respect users who prefer reduced motion */
 @media (prefers-reduced-motion: reduce) {
   html {
@@ -45,3 +65,4 @@ html {
   outline: 2px solid var(--color-brand-600);
   outline-offset: 2px;
 }
+

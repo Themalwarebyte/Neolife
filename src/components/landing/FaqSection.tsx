@@ -30,7 +30,7 @@ const faqs = [
 
 export function FaqSection() {
   return (
-    <Section id="faq" ariaLabel="Frequently asked questions" className="bg-neutral-50">
+    <Section id="faq" ariaLabel="Frequently asked questions" className="bg-cream-50">
       <SectionHeading
         eyebrow="FAQ"
         title="Honest answers first"

@@ -1,5 +1,6 @@
 import { Reveal } from "@/components/ui/Reveal";
 import { Section, SectionHeading } from "@/components/ui/Section";
+import { Leaf } from "@/components/ui/Botanical";
 
 const steps = [
   {
@@ -22,7 +23,7 @@ const steps = [
 
 export function HowItWorksSection() {
   return (
-    <Section id="how-it-works" ariaLabel="How it works" className="bg-neutral-50">
+    <Section id="how-it-works" ariaLabel="How it works" className="botanical-grid bg-cream-50">
       <SectionHeading
         eyebrow="How it works"
         title="From first question to first step"
@@ -31,17 +32,16 @@ export function HowItWorksSection() {
       <ol className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {steps.map((step, index) => (
           <Reveal key={step.title} delay={index * 100}>
-            <li className="relative h-full rounded-3xl border border-neutral-100 bg-white p-7">
+            <li className="relative h-full rounded-3xl border border-cream-100 bg-white p-7">
               <span
                 aria-hidden="true"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-brand-600 text-sm font-bold text-white"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-forest-700 text-sm font-bold text-white"
               >
                 {index + 1}
               </span>
               <h3 className="mt-4 font-bold text-neutral-900">{step.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-neutral-600">
-                {step.body}
-              </p>
+              <p className="mt-2 text-sm leading-relaxed text-neutral-600">{step.body}</p>
+              <Leaf className="absolute bottom-3 right-3 h-8 w-8 text-brand-600/20" />
             </li>
           </Reveal>
         ))}
@@ -49,3 +49,4 @@ export function HowItWorksSection() {
     </Section>
   );
 }
+

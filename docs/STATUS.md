@@ -45,9 +45,9 @@ Read-only audit (no new features, no deploy, no paid ads). Verified against live
 - **§11.7 ⚪ NOT STARTED · Production deployment NOT AUTHORIZED · Paid advertising NOT AUTHORIZED.**
 - **Deployment execution plan:** `docs/DEPLOYMENT_EXECUTION_PLAN.md` — **🟩 READY FOR OWNER DEPLOYMENT DECISION**. Secret architecture **A** (env-var injection) accepted by the Owner. Accurate wording: the root-only `neolife.env` protects the *source file*; because the existing `ooadmin` account has root-equivalent Docker privileges, injected container env is technically inspectable by it; NEOLIFE does not modify this privilege model; Kilo must not intentionally inspect/print/log/expose secrets.
 
-## Planned visual/conversion upgrade (Owner-approved) — ⚪ NOT STARTED
+## Visual/conversion upgrade (Owner-approved) — 🔵 IN PROGRESS (implemented locally, not deployed/accepted)
 
-Public homepage visual redesign only (Semrush-level UX polish + NeoLife botanical/wellness identity). Detailed plan: `docs/DESIGN_UPGRADE_PLAN.md`. Not implemented; no code/production change. Funnel, attribution, auth, CRM, meetings, security, and legal baseline remain out of scope and untouched.
+Public homepage visual redesign (Semrush-level UX polish + NeoLife botanical/wellness identity). Implemented **locally** per `docs/DESIGN_UPGRADE_PLAN.md`: botanical hero, trust strip, pale-green Opportunity, cream How-It-Works, deep-forest Products/Wellness, image+card Support, FAQ, deep-forest CTA, dark footer. Funnel, attribution, auth, CRM, meetings, security, and legal baseline are untreated/unchanged. **Not marked DONE until Owner review/acceptance.**
 
 ## PHASE 1 — TRAFFIC MVP 🔵 IN PROGRESS
 

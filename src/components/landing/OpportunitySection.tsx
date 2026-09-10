@@ -1,5 +1,6 @@
 import { Reveal } from "@/components/ui/Reveal";
 import { Section, SectionHeading } from "@/components/ui/Section";
+import { BotanicalImage } from "@/components/ui/Botanical";
 
 const pillars = [
   {
@@ -18,7 +19,7 @@ const pillars = [
 
 export function OpportunitySection() {
   return (
-    <Section id="opportunity" ariaLabel="The opportunity">
+    <Section id="opportunity" ariaLabel="The opportunity" className="bg-brand-50">
       <SectionHeading
         eyebrow="The opportunity"
         title="What the NEOLIFE business is really about"
@@ -27,19 +28,12 @@ export function OpportunitySection() {
       <div className="mt-14 grid gap-6 md:grid-cols-3">
         {pillars.map((pillar, index) => (
           <Reveal key={pillar.title} delay={index * 120}>
-            <article className="h-full rounded-3xl border border-neutral-100 bg-white p-8 shadow-sm transition-shadow hover:shadow-lg hover:shadow-neutral-900/5">
-              <span
-                aria-hidden="true"
-                className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-50 text-brand-700"
-              >
-                {index + 1}
-              </span>
-              <h3 className="mt-5 text-lg font-bold text-neutral-900">
-                {pillar.title}
-              </h3>
-              <p className="mt-3 leading-relaxed text-neutral-600">
-                {pillar.body}
-              </p>
+            <article className="h-full overflow-hidden rounded-3xl bg-white shadow-sm transition-shadow hover:shadow-lg">
+              <BotanicalImage tone={index === 1 ? "forest" : "pale"} className="h-36 rounded-none" />
+              <div className="p-7">
+                <h3 className="text-lg font-bold text-neutral-900">{pillar.title}</h3>
+                <p className="mt-3 leading-relaxed text-neutral-600">{pillar.body}</p>
+              </div>
             </article>
           </Reveal>
         ))}
@@ -47,3 +41,4 @@ export function OpportunitySection() {
     </Section>
   );
 }
+
