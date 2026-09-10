@@ -32,9 +32,8 @@ export function SupportSection() {
       <div className="mt-14 grid items-center gap-10 lg:grid-cols-2">
         <Reveal>
           <Photo
-            tone="warm"
-            alt="Supportive community and mentoring"
-            priority={false}
+            src="/images/landing/support.webp"
+            alt="Two people in a supportive conversation"
             className="h-[360px] rounded-[2rem] shadow-xl shadow-forest-900/10 lg:h-[460px]"
           />
         </Reveal>

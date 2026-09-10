@@ -28,8 +28,8 @@ export function ProductsSection() {
         <div className="grid items-center gap-12 lg:grid-cols-2">
           <Reveal>
             <Photo
-              tone="forest"
-              alt="Botanical and natural nutrition"
+              src="/images/landing/wellness.webp"
+              alt="Fresh healthy salad bowl"
               className="h-[420px] rounded-[2rem] shadow-2xl shadow-black/30 ring-1 ring-brand-400/20"
             />
           </Reveal>

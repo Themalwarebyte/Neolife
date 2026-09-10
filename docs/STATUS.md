@@ -2,6 +2,15 @@
 
 Phase/step-by-step implementation status. Authoritative scope lives in `PROJECT_PLAN.md`.
 
+## Visual Pass 2 — Photography (real imagery) — 🟩 DONE locally (2026-09-10)
+
+- Replaced all botanical photographic placeholders with real self-hosted WebP photography (Unsplash License) across Hero, Opportunity, Products/Wellness, Support, and Final CTA.
+- Files: `public/images/landing/{hero,opportunity,wellness,support,final-cta}.webp` + `README.md` asset manifest (source IDs/URLs, license, usage, sizes).
+- `src/components/ui/Photo.tsx` reusable image system now receives `src="/images/landing/*.webp"` in all five slots.
+- Config: `images.unoptimized: true` (pre-optimized WebP served directly; no `sharp` dependency); Dockerfile now copies `public/` into the standalone output.
+- **Validation:** lint PASS · typecheck PASS · 43/43 tests PASS · build PASS · E2E 1/1 PASS · all 5 images serve `image/webp` (HTTP 200) in a disposable Docker container · CSS regression 200 `text/css` · `/health` 200.
+- **Production:** NOT deployed (local-first). Awaiting Owner review before a review deployment.
+
 ## FINAL §11.6 reconciliation (2026-09-08)
 
 - **Legal baseline:** 🟩 **MVP LEGAL BASELINE COMPLETE** (Privacy, Terms, Disclosures, business-relationship, earnings/results, product/medical, consent, footer wording). Future-revisable; not legal advice.

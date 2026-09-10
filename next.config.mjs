@@ -12,6 +12,12 @@ const scriptSrc = `'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`;
 
 const nextConfig = {
   output: "standalone",
+  // Landing photography is self-hosted and pre-optimized WebP; serve it directly
+  // to avoid a native `sharp` dependency (and its alpine platform binaries) in the
+  // standalone image. next/image still provides lazy-loading and layout stability.
+  images: {
+    unoptimized: true,
+  },
   // Better Auth (and its runtime deps) use Node builtins (e.g. node:module) that
   // Turbopack cannot bundle for Server Actions; keep them external at runtime.
   serverExternalPackages: [

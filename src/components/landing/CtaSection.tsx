@@ -11,7 +11,7 @@ export function CtaSection() {
       className="relative isolate overflow-hidden"
     >
       <Photo
-        tone="forest"
+        src="/images/landing/final-cta.webp"
         overlay
         alt=""
         className="absolute inset-0 -z-10 h-full w-full"

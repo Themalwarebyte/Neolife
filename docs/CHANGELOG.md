@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Visual Pass 2 — Photography (real self-hosted imagery) — 🟩 DONE locally
+Replaced every botanical photographic placeholder on the public landing page with real, self-hosted photography (Unsplash License). Added `src/components/ui/Photo.tsx` (reusable image-presentation system) and wired `src="/images/landing/*.webp"` into the Hero, Opportunity, Products/Wellness, Support, and Final-CTA sections. All five `Photo` slots now render real `<Image>`s.
+
+- Added `images.unoptimized: true` to `next.config.mjs` (serve pre-optimized WebP directly; avoids a native `sharp`/alpine dependency; `next/image` still provides lazy-loading + layout stability). No CSP change required (`img-src 'self'`).
+- Added explicit `COPY --from=build /app/public ./.next/standalone/public` to the Dockerfile (Next standalone output does not copy `public/` automatically).
+- Asset manifest: `public/images/landing/README.md` (filename, source photo ID/URL, Unsplash License, usage, sizes).
+- Funnel, attribution, auth, CRM, meetings, security headers, and legal baseline unchanged.
+
 ### Visual/conversion upgrade (Owner-approved direction D-018)
 Implemented locally (public homepage only): botanical/wellness visual identity with varied section backgrounds (cream, pale green, deep forest), decorative botanical SVG motifs (`ui/Botanical.tsx`), new `TrustStrip` + `ProductsSection`, dark footer. Funnel, attribution, auth, CRM, meetings, security, and legal baseline are unchanged. Placeholder imagery (gradient + SVG) used; final photos swap-in ready.
 

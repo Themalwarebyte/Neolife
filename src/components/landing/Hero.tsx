@@ -44,8 +44,9 @@ export function Hero() {
 
         <Reveal delay={150} className="relative hidden lg:block">
           <Photo
-            tone="botanical"
-            alt="Wellness and botanical lifestyle"
+            src="/images/landing/hero.webp"
+            priority
+            alt="Person meditating outdoors in nature"
             className="h-[460px] rounded-[2rem] shadow-xl shadow-forest-900/10"
           />
           <div className="absolute -bottom-6 -left-6 w-64 rounded-2xl bg-white p-5 shadow-xl">

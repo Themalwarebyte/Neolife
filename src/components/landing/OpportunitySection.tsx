@@ -27,8 +27,8 @@ export function OpportunitySection() {
       />
       <div className="relative mt-14">
         <Photo
-          tone="natural"
-          alt="Wellness lifestyle and community"
+          src="/images/landing/opportunity.webp"
+          alt="People collaborating together"
           className="h-[340px] rounded-[2rem] shadow-lg shadow-forest-900/10"
         />
         <div className="relative z-10 -mt-14 grid gap-6 md:grid-cols-3 md:px-10">

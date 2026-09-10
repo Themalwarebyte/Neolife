@@ -22,6 +22,9 @@ ENV NODE_ENV=production \
 # Runtime app
 COPY --from=build /app/.next/standalone ./.next/standalone
 COPY --from=build /app/.next/static ./.next/standalone/.next/static
+# Self-hosted public assets (images/images/landing etc.) — Next standalone output
+# does not copy public/ automatically, so include it explicitly.
+COPY --from=build /app/public ./.next/standalone/public
 # Migration / seed support
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/prisma ./prisma
