@@ -2,6 +2,14 @@
 
 Phase/step-by-step implementation status. Authoritative scope lives in `PROJECT_PLAN.md`.
 
+## Fix — admin seed path-alias resolution — 🟩 DONE locally (2026-09-12)
+
+- Root cause: `tsx` couldn't resolve `@/*` aliases inside the production image (no `tsconfig.json` in the runtime stage).
+- Fix: Dockerfile now copies `tsconfig.json` into the runtime image.
+- Verified end-to-end in a disposable container: migrations applied, `seed-admin.ts` created a fake admin (`role=admin`) with a password credential account.
+- Validation: lint/typecheck PASS · 43/43 tests PASS · build PASS · Docker build PASS · seed-container test PASS.
+- Production: NOT yet redeployed (awaiting Owner deployment authorization).
+
 ## Visual Pass 3 — richer photographic rhythm — 🟩 DONE locally (2026-09-11)
 
 - Added background photography to How It Works (`how-it-works.webp` + cream/green gradient overlay) and FAQ (`faq.webp` + cream overlay), and enlarged the Opportunity and Products photographs with botanical accents.

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Fix — admin seed path-alias resolution (🟩 local)
+The production admin `seed` failed with `ERR_MODULE_NOT_FOUND` because `tsx` could not resolve the `@/*` path alias (`src/lib/auth.ts` → `@/server/db/prisma` → `@/generated/prisma/client`) — the runtime Docker image did not include `tsconfig.json` (which defines `"@/*": ["./src/*"]`). Added `COPY --from=build /app/tsconfig.json ./` to the Dockerfile runtime stage. Verified end-to-end in a disposable container: `prisma migrate deploy` → `scripts/seed-admin.ts` → `Admin account ready (role=admin)` with a password credential account present.
+
 ### Visual Pass 3 — richer photographic rhythm (🟩 local)
 Added immersive background photography to the previously plain sections, while keeping the existing real photography:
 - **How It Works** — subtle full-bleed `how-it-works.webp` background with a cream→green translucent gradient overlay; step cards now have a soft shadow for depth.

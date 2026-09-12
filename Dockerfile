@@ -34,5 +34,8 @@ COPY --from=build /app/package.json ./
 COPY --from=build /app/pnpm-lock.yaml ./
 COPY --from=build /app/pnpm-workspace.yaml ./
 COPY --from=build /app/prisma.config.ts ./
+# tsconfig.json is required by tsx to resolve the "@/*" path aliases used by the
+# admin seed (src/lib/auth.ts -> @/server/db/prisma -> @/generated/prisma/client).
+COPY --from=build /app/tsconfig.json ./
 EXPOSE 3000
 CMD ["node", ".next/standalone/server.js"]
