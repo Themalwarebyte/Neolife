@@ -1,6 +1,7 @@
 import { Reveal } from "@/components/ui/Reveal";
 import { Section, SectionHeading } from "@/components/ui/Section";
 import { Photo } from "@/components/ui/Photo";
+import { Leaf } from "@/components/ui/Botanical";
 
 const pillars = [
   {
@@ -19,7 +20,8 @@ const pillars = [
 
 export function OpportunitySection() {
   return (
-    <Section id="opportunity" ariaLabel="The opportunity" className="bg-brand-50">
+    <Section id="opportunity" ariaLabel="The opportunity" className="relative bg-brand-50">
+      <Leaf className="pointer-events-none absolute -right-10 -top-8 h-40 w-40 text-brand-600/10" />
       <SectionHeading
         eyebrow="The opportunity"
         title="What the NEOLIFE business is really about"
@@ -29,7 +31,7 @@ export function OpportunitySection() {
         <Photo
           src="/images/landing/opportunity.webp"
           alt="People collaborating together"
-          className="h-[340px] rounded-[2rem] shadow-lg shadow-forest-900/10"
+          className="h-[400px] rounded-[2rem] shadow-lg shadow-forest-900/10"
         />
         <div className="relative z-10 -mt-14 grid gap-6 md:grid-cols-3 md:px-10">
           {pillars.map((pillar, index) => (

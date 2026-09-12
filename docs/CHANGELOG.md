@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Visual Pass 3 — richer photographic rhythm (🟩 local)
+Added immersive background photography to the previously plain sections, while keeping the existing real photography:
+- **How It Works** — subtle full-bleed `how-it-works.webp` background with a cream→green translucent gradient overlay; step cards now have a soft shadow for depth.
+- **FAQ** — subtle full-bleed `faq.webp` background with a cream overlay (`/85`); accordion cards remain solid white for readability.
+- **Opportunity** — larger `opportunity.webp` treatment + botanical accent.
+- **Products & Wellness** — larger `wellness.webp` + additional botanical accent.
+- New assets: `public/images/landing/{how-it-works,faq}.webp` (Unsplash License; documented in the asset manifest).
+- No changes to lead capture, attribution, CRM, auth, database, legal pages, CSP, or deployment config.
+
 ### Visual polish — Final CTA background + button contrast (🟩 local)
 - Final CTA now renders `final-cta.webp` as a true full-bleed background via `next/image` `fill` with a dark forest-green gradient overlay (fixed a `relative`/`absolute` conflict in the `Photo` wrapper that prevented correct background positioning).
 - Primary CTA buttons darkened from `bg-brand-600` (~3.2:1 white-text contrast) to `bg-brand-700` (~5.5:1, WCAG AA) with `hover:bg-forest-700`; final-CTA button no longer carries conflicting `bg-white`/`text-forest-900` overrides (was rendering white-on-white) and now uses the primary green + white text with a subtle `ring-white/30`.

@@ -1,4 +1,5 @@
-import { Section, SectionHeading } from "@/components/ui/Section";
+import Image from "next/image";
+import { Container, SectionHeading } from "@/components/ui/Section";
 
 const faqs = [
   {
@@ -30,33 +31,48 @@ const faqs = [
 
 export function FaqSection() {
   return (
-    <Section id="faq" ariaLabel="Frequently asked questions" className="bg-cream-50">
-      <SectionHeading
-        eyebrow="FAQ"
-        title="Honest answers first"
-        description="Straightforward questions, straightforward answers."
+    <section
+      id="faq"
+      aria-label="Frequently asked questions"
+      className="relative isolate overflow-hidden"
+    >
+      <Image
+        src="/images/landing/faq.webp"
+        alt=""
+        fill
+        sizes="100vw"
+        className="object-cover"
       />
-      <div className="mx-auto mt-12 max-w-3xl space-y-3">
-        {faqs.map((faq) => (
-          <details
-            key={faq.question}
-            className="group rounded-2xl border border-neutral-200 bg-white open:border-brand-500/40 open:shadow-sm"
-          >
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-6 py-5 font-semibold text-neutral-900">
-              {faq.question}
-              <span
-                aria-hidden="true"
-                className="shrink-0 text-brand-600 transition-transform group-open:rotate-45"
-              >
-                +
-              </span>
-            </summary>
-            <p className="px-6 pb-6 leading-relaxed text-neutral-600">
-              {faq.answer}
-            </p>
-          </details>
-        ))}
-      </div>
-    </Section>
+      <div className="absolute inset-0 bg-cream-50/85" aria-hidden="true" />
+
+      <Container className="relative py-16 sm:py-24">
+        <SectionHeading
+          eyebrow="FAQ"
+          title="Honest answers first"
+          description="Straightforward questions, straightforward answers."
+        />
+        <div className="mx-auto mt-12 max-w-3xl space-y-3">
+          {faqs.map((faq) => (
+            <details
+              key={faq.question}
+              className="group rounded-2xl border border-neutral-200 bg-white open:border-brand-500/40 open:shadow-md"
+            >
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-6 py-5 font-semibold text-neutral-900">
+                {faq.question}
+                <span
+                  aria-hidden="true"
+                  className="shrink-0 text-brand-600 transition-transform group-open:rotate-45"
+                >
+                  +
+                </span>
+              </summary>
+              <p className="px-6 pb-6 leading-relaxed text-neutral-600">
+                {faq.answer}
+              </p>
+            </details>
+          ))}
+        </div>
+      </Container>
+    </section>
   );
 }

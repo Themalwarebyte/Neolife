@@ -1,7 +1,7 @@
 import { Reveal } from "@/components/ui/Reveal";
 import { Container } from "@/components/ui/Section";
 import { CtaLink } from "@/components/ui/CtaLink";
-import { Leaf } from "@/components/ui/Botanical";
+import { Leaf, Sprig } from "@/components/ui/Botanical";
 import { Photo } from "@/components/ui/Photo";
 
 const pillars = [
@@ -23,6 +23,7 @@ export function ProductsSection() {
   return (
     <section id="products" aria-label="Products and wellness" className="relative overflow-hidden bg-forest-800">
       <Leaf className="pointer-events-none absolute -right-16 -top-10 h-52 w-52 text-brand-500/15" />
+      <Sprig className="pointer-events-none absolute -bottom-10 -left-12 h-48 w-48 text-brand-500/10" />
 
       <Container className="py-16 sm:py-24">
         <div className="grid items-center gap-12 lg:grid-cols-2">
@@ -30,7 +31,7 @@ export function ProductsSection() {
             <Photo
               src="/images/landing/wellness.webp"
               alt="Fresh healthy salad bowl"
-              className="h-[420px] rounded-[2rem] shadow-2xl shadow-black/30 ring-1 ring-brand-400/20"
+              className="h-[480px] rounded-[2rem] shadow-2xl shadow-black/30 ring-1 ring-brand-400/20"
             />
           </Reveal>
 

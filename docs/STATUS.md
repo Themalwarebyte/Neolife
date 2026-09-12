@@ -2,6 +2,12 @@
 
 Phase/step-by-step implementation status. Authoritative scope lives in `PROJECT_PLAN.md`.
 
+## Visual Pass 3 — richer photographic rhythm — 🟩 DONE locally (2026-09-11)
+
+- Added background photography to How It Works (`how-it-works.webp` + cream/green gradient overlay) and FAQ (`faq.webp` + cream overlay), and enlarged the Opportunity and Products photographs with botanical accents.
+- 7 self-hosted photography assets now present; 2 new (Unsplash License, documented in `public/images/landing/README.md`).
+- Validation: lint/typecheck PASS · 43/43 tests PASS · build PASS · E2E 1/1 PASS. Not deployed.
+
 ## Visual polish — Final CTA + button contrast — 🟩 DONE locally (2026-09-10)
 
 - Final CTA uses the real `final-cta.webp` as a full-bleed background with a dark forest-green gradient overlay (fixed `relative`/`absolute` conflict).
