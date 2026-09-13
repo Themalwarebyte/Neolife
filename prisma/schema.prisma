@@ -74,6 +74,7 @@ model Lead {
   events    LeadEvent[]
   meetings  Meeting[]
   followUps FollowUp[]
+  productInterests ProductInterest[]
 
   @@index([status])
   @@index([createdAt])
@@ -186,4 +187,103 @@ model Verification {
   expiresAt  DateTime
   createdAt  DateTime? @default(now())
   updatedAt  DateTime? @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Product Catalogue (Phase 4 precursor — planning: docs/PRODUCT_CATALOGUE_PLAN.md)
+// ---------------------------------------------------------------------------
+
+enum InterestStatus {
+  NEW
+  CONTACTED
+  FOLLOW_UP
+  CONVERTED
+  NOT_INTERESTED
+}
+
+model Category {
+  id           String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String         @unique   // official category name, e.g. "Nutritionals"
+  slug         String         @unique   // URL slug, e.g. "nutritionals"
+  description  String?
+  displayOrder Int            @default(0)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  subcategories Subcategory[]
+  products      ProductCategory[]
+}
+
+model Subcategory {
+  id           String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  categoryId   String         @db.Uuid
+  name         String                     // official subcategory name, e.g. "Core Products"
+  slug         String                     // e.g. "core-products"
+  description  String?
+  displayOrder Int            @default(0)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  category Category              @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  products ProductSubcategory[]
+
+  @@index([categoryId])
+  @@unique([categoryId, slug])
+}
+
+model Product {
+  id           String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String                          // official product name
+  slug         String            @unique        // stable, derived from official URL
+  sku          String?                           // official item number, e.g. "942"
+  description  String?                           // original concise summary
+  imageUrl     String?                           // placeholder until licensed imagery approved
+  displayOrder Int               @default(0)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  categories    ProductCategory[]
+  subcategories ProductSubcategory[]
+  interests     ProductInterest[]
+
+  @@index([slug])
+  @@index([sku])
+}
+
+model ProductCategory {
+  productId String   @db.Uuid
+  categoryId String  @db.Uuid
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, categoryId])
+}
+
+model ProductSubcategory {
+  productId     String      @db.Uuid
+  subcategoryIds String     @db.Uuid
+  product       Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  subcategory   Subcategory  @relation(fields: [subcategoryIds], references: [id], onDelete: Cascade)
+
+  @@unique([productId, subcategoryIds])
+}
+
+model ProductInterest {
+  id            String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId     String         @db.Uuid
+  leadId        String?        @db.Uuid
+  status        InterestStatus @default(NEW)
+  message       String?
+  notificationSent Boolean      @default(false)
+  notificationSentAt DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  lead    Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  @@index([productId])
+  @@index([leadId])
+  @@index([status])
+  @@index([createdAt])
 }
