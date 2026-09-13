@@ -3,7 +3,7 @@ import { Container } from "@/components/ui/Section";
 import { Leaf, Sprig } from "@/components/ui/Botanical";
 import { Photo } from "@/components/ui/Photo";
 import Link from "next/link";
-import { CATALOGUE_CATEGORIES, PRODUCTS_PATH, productsForCategory } from "@/lib/catalogue-meta";
+import { CATALOGUE_CATEGORIES, PRODUCTS_PATH, CATEGORY_IMAGES, productsForCategory } from "@/lib/catalogue-meta";
 
 export function CategoryGrid() {
   return (
@@ -62,7 +62,12 @@ function LinkCard({
       className="group flex h-full flex-col overflow-hidden rounded-3xl border border-neutral-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-xl hover:shadow-forest-900/10"
     >
       <div className="relative aspect-[3/2] overflow-hidden">
-        <Photo alt="" tone="botanical" className="h-full w-full" />
+         <Photo
+           src={CATEGORY_IMAGES[category.slug]}
+           alt={category.name}
+           tone="botanical"
+           className="h-full w-full"
+         />
         <div className="absolute inset-0 bg-linear-to-t from-forest-900/70 via-forest-900/20 to-transparent" />
         <div className="absolute left-4 right-4 bottom-4">
           <h3 className="text-xl font-bold text-white transition-colors group-hover:text-brand-50">
