@@ -70,7 +70,8 @@ export default async function ProductPage({ params }: Props) {
               <Reveal>
                 <div className="relative aspect-[4/3] overflow-hidden rounded-3xl shadow-xl shadow-forest-900/10">
                   <Photo
-                    alt=""
+                    src={product.image}
+                    alt={product.name}
                     tone="botanical"
                     className="h-full w-full"
                   />

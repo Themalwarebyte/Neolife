@@ -165,8 +165,23 @@ it("searchCatalogue returns empty for empty queries", () => {
     expect(searchCatalogue("zzzzzz-not-a-real-product")).toEqual([]);
   });
 
-  it("pricing constant is the approved Contact us label", () => {
+   it("pricing constant is the approved Contact us label", () => {
     expect(PRICE_LABEL).toBe("Contact us");
+  });
+
+  it("every product has an image path", () => {
+    for (const product of CATALOGUE_PRODUCTS) {
+      expect(product.image).toBeDefined();
+      expect(product.image.length).toBeGreaterThan(0);
+      expect(product.image.startsWith("/products/")).toBe(true);
+      expect(product.image.endsWith("/product.webp")).toBe(true);
+    }
+  });
+
+  it("every product image path matches the product slug", () => {
+    for (const product of CATALOGUE_PRODUCTS) {
+      expect(product.image).toBe(`/products/${product.slug}/product.webp`);
+    }
   });
 });
 

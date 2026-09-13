@@ -13,10 +13,6 @@ type ProductCardProps = {
 
 /**
  * Reusable product card.
- *
- * Imagery is a placeholder (Photo botanical tone) until licensed/Owner-approved
- * product imagery is available. The `src` swap-in point is wired through
- * `Photo` — pass a real path later without restructuring the card.
  */
 export function ProductCard({ product, categorySlug, subcategorySlug, index = 0 }: ProductCardProps) {
   const href = productUrl(product, categorySlug, subcategorySlug);
@@ -26,7 +22,8 @@ export function ProductCard({ product, categorySlug, subcategorySlug, index = 0 
       <article className="group flex h-full flex-col overflow-hidden rounded-3xl border border-neutral-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-xl hover:shadow-forest-900/10">
         <div className="relative aspect-[4/3] overflow-hidden">
           <Photo
-            alt=""
+            src={product.image}
+            alt={product.name}
             tone="botanical"
             className="h-full w-full"
           />
