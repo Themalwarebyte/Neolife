@@ -3,6 +3,7 @@ import { CtaLink } from "@/components/ui/CtaLink";
 import { Container } from "@/components/ui/Section";
 
 const navItems = [
+  { href: "/products", label: "Products" },
   { href: "/#opportunity", label: "The Opportunity" },
   { href: "/#how-it-works", label: "How It Works" },
   { href: "/#support", label: "Support" },

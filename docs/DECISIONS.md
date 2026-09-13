@@ -92,15 +92,59 @@ Owner-approved decisions and their rationale. Every future implementation task m
 ## Launch-Gate Record
 
 - §11.6 Paid-traffic launch gate: **NOT PASSED** (not yet applicable — no advertising live).
-## Pending Owner Decisions (recorded 2026-09-13)
+## Pending Owner Decisions (recorded 2026-09-13, APPROVED 2026-09-13)
 
-The following decisions were identified during the NeoLife Product Catalogue planning stage (`docs/PRODUCT_CATALOGUE_PLAN.md`). None have been decided. They do not block the existing Traffic MVP.
+The following decisions were identified during the NeoLife Product Catalogue planning stage (`docs/PRODUCT_CATALOGUE_PLAN.md`). The Owner has approved proceeding with the following choices:
 
-- **D-019 (pending) -- Initial price display:** A) no price · B) "Price coming soon" · C) "Contact us" / "Request a quote" (recommended). KSh price list to be supplied by Owner later.
-- **D-020 (pending) -- Product imagery licensing:** A) Owner supplies licensed imagery · B) placeholder imagery until licensed imagery approved (recommended) · C) reuse official site images (not recommended).
-- **D-021 (pending) -- Email provider for product-interest notifications:** A) SendGrid · B) Mailgun · C) Amazon SES · D) Resend. Architecture is provider-agnostic via a `src/lib/email.ts` wrapper.
-- **D-022 (pending) -- Product description content approach:** A) copy official marketing descriptions verbatim (not recommended) · B) concise original summaries based on official information (recommended) · C) Owner supplies licensed descriptions.
-- **D-023 (pending) -- Catalogue search/filter scope:** A) lightweight name+category+subcategory filter (recommended) · B) full-text search engine · C) none.
-- **D-024 (pending) -- Subcategory route structure:** A) dedicated routes `/products/[category]/[subcategory]` (recommended) · B) client-side filtering.
-- **D-025 (pending) -- Kenyan product list and KSh price list:** A) use Northern Europe product list as interim · B) Owner supplies authoritative Kenyan list (recommended).
-- **D-026 (pending) -- ProductInterest data model:** A) separate `ProductInterest` entity (recommended) · B) attribute on `Lead`.
+### D-019 — Initial price display (APPROVED)
+
+- **Decision:** C) "Contact us" / "Request a quote" — no unapproved pricing displayed.
+- **Rationale:** KSh price list is not yet available; the Owner will supply the authoritative Kenyan catalogue later.
+- **Implementation:** `src/lib/catalogue-meta.ts` exports `PRICE_LABEL = "Contact us"`. Displayed on product cards and detail page.
+
+### D-020 — Product imagery licensing (APPROVED)
+
+- **Decision:** B) Placeholder imagery until licensed imagery is approved.
+- **Rationale:** No official NeoLife imagery is embedded; placeholders use the existing botanical visual language until the Owner supplies licensed imagery.
+- **Implementation:** `Photo` component with `tone="botanical"` used throughout catalogue pages and cards.
+
+### D-021 — Email provider (APPROVED — NOT YET SELECTED)
+
+- **Decision:** KEEP PROVIDER-AGNOSTIC. Do not lock to Resend or another provider.
+- **Rationale:** Architecture is provider-agnostic via `src/lib/email.ts`; the provider can be swapped via `EMAIL_PROVIDER` env var without code changes.
+- **Note:** The default mode is `none`/`dummy` (logs to console). Set `EMAIL_PROVIDER` and provider credentials when deployment requires notifications.
+- **Implementation:** `src/lib/email.ts` — `sendMail()`, `buildInterestEmail()`, `isEmailConfigured()`.
+
+### D-022 — Product description content (APPROVED)
+
+- **Decision:** B) Concise original summaries based on official product information.
+- **Rationale:** Descriptions are original, concise summaries — NOT copied verbatim from official marketing copy.
+- **Implementation:** All 65 product descriptions in `src/lib/catalogue-data.ts` are original summaries.
+
+### D-023 — Catalogue search/filter (APPROVED)
+
+- **Decision:** A) Lightweight implementation.
+- **Rationale:** No external search engine or new infrastructure. In-memory filtering across name, SKU, and description.
+- **Implementation:** `searchCatalogue()` in `catalogue-data.ts`; `CatalogueSearch` component in `search-box.tsx`; `SubcategoryFilter` client component for subcategory filtering.
+
+### D-024 — Subcategory route structure (APPROVED)
+
+- **Decision:** A) Dedicated routes `/products/[category]/[subcategory]`.
+- **Rationale:** SEO-friendly, shareable URLs; server-rendered pages with static generation where possible.
+- **Implementation:** Routes at `src/app/products/[category]/`, `src/app/products/[category]/[subcategory]/`, and `src/app/products/[category]/[subcategory]/[product]/`.
+
+### D-025 — Kenyan product list (APPROVED — NOT YET FINAL)
+
+- **Decision:** B) Owner supplies authoritative Kenyan list — but use Northern Europe list as **temporary development/seed data only**.
+- **Rationale:** The current 65 products are development/seed data sourced from the official NeoLife shop (Northern Europe). They are NOT the final authoritative Kenyan catalogue. The Owner will supply the Kenyan product list and KSh pricing later.
+- **Implementation:** `src/lib/catalogue-data.ts` contains 65 products, 4 categories, 22 subcategories. This is marked as temporary in the file header and documentation.
+
+### D-026 — ProductInterest data model (APPROVED)
+
+- **Decision:** A) Separate `ProductInterest` entity.
+- **Rationale:** Clean separation from Lead lifecycle; supports eventual business flow without coupling to order/e-commerce functionality.
+- **Implementation:** `ProductInterest` model in `prisma/schema.prisma` (fields: productId, leadId, status, message, notificationSent, notificationSentAt). Architecture ready; full capture flow is a subsequent step.
+
+## Resolved Decisions (was "Pending", now "Approved")
+
+All of D-019 through D-026 were **pending** during planning and are now **APPROVED** as of 2026-09-13. The decisions listed above reflect the Owner's explicit approval.

@@ -251,8 +251,8 @@ Public homepage visual redesign (Semrush-level UX polish + NeoLife botanical/wel
 - 1.7 Admin auth (Better Auth) + CRM/admin interface — 🟩 DONE (2026-09-08, 36/36 tests PASS, auth verified live)
 - 1.8 Office pipeline (meeting record/status/outcome) + follow-up — 🟩 DONE (2026-09-08, 43/43 tests PASS)
 - 1.9 Funnel events + basic first-party analytics — ⚪ NOT STARTED
-- 1.10 Privacy/Terms/Disclaimer structures (placeholder copy) — ⚪ NOT STARTED
-- 1.11 Tests (unit + E2E critical path) — ⚪ NOT STARTED
+- 1.10 Privacy/Terms/Disclaimer structures (placeholder copy) — 🟩 DONE (2026-09-13: InfoPageLayout applied to privacy/terms/disclosures)
+- 1.11 Tests (unit + E2E critical path) — 🟩 DONE (2026-09-13, 71/71 PASS: 43 original + 28 catalogue; E2E not run — browser download blocked)
 
 **Pending pre-launch owner decisions (do not block local dev):** hosting/domain, ad platforms & tracking, final legal copy, meeting-model confirmation (§19, `DECISIONS.md`).
 
@@ -260,10 +260,38 @@ Public homepage visual redesign (Semrush-level UX polish + NeoLife botanical/wel
 
 Recorded by Owner (D-010): early production deployment of the landing page/MVP slice is authorized once the landing page passes local checks AND explicit Owner production-deployment authorization is given at that gate. Requires hosting/domain decision (§19 item 5) before the server step.
 
-## Product Catalogue Planning — 🟩 PLANNED (2026-09-13)
+## Product Catalogue — IMPLEMENTED locally (2026-09-13, Owner-approved D-019–D-026)
 
-- Authored `docs/PRODUCT_CATALOGUE_PLAN.md` — complete planning document for the NeoLife Product Catalogue (Phase 4 precursor).
-- Research performed against the official NeoLife shop (`https://neolifeshop.com/i/shop.html`): 4 top-level categories, subcategories, ~70 products with official SKU numbers.
-- Proposed data model, product-interest workflow, email architecture, pricing strategy, UX/SEO/security plans, test plan, and MVP scope documented.
-- 8 Owner decisions identified (D-019–D-026 in `DECISIONS.md`). None decided.
-- **No implementation, database, schema, email, or production changes were made.**
+**Committed (data layer — commit ce7cbcb):**
+
+- `prisma/schema.prisma` — added `Category`, `Subcategory`, `Product`, `ProductCategory`, `ProductSubcategory`, `ProductInterest` models + `InterestStatus` enum; `Lead.productInterests` relation.
+- `prisma/migrations/20260913061907_add_product_catalogue/migration.sql` — applied; DB in sync with schema.
+- `src/lib/catalogue-data.ts` — 65 products, 4 categories, 22 subcategories (Northern Europe catalogue as **temporary development/seed data only**; D-025).
+- `scripts/seed-catalogue.ts` — idempotent seed/upsert script.
+- `src/lib/email.ts` — provider-agnostic email abstraction (D-021: NOT YET SELECTED, default `none`/`dummy`).
+
+**Uncommitted (routes + UI + tests):**
+
+- `src/app/products/*` — 4 route pages (products, category, subcategory, product detail).
+- `src/components/catalogue/` — 6 components (hero, category-grid, ProductCard, search-box, SubcategoryFilter, Breadcrumb).
+- `src/lib/catalogue-meta.ts` — catalogue helpers.
+- `tests/catalogue-data.test.ts` — 28 tests.
+
+**Decisions approved (2026-09-13):**
+
+- D-019: "Contact us" pricing (`PRICE_LABEL = "Contact us"`).
+- D-020: Placeholder imagery (no official imagery embedded).
+- D-021: Email provider REMAINS PROVIDER-AGNOSTIC — NOT YET SELECTED.
+- D-022: Concise original descriptions (not copied verbatim).
+- D-023: Lightweight search/filter (in-memory).
+- D-024: Dedicated subcategory routes.
+- D-025: 65 products are TEMPORARY DEVELOPMENT/SEED DATA — NOT the final Kenyan catalogue.
+- D-026: Separate `ProductInterest` entity (schema model + `Lead` relation committed; capture-action flow is a subsequent step).
+
+**Verification:** Lint ✅ (0 errors) · `tsc --noEmit` ✅ · Build ✅ (9 static + 5 dynamic routes) · Tests ✅ (71/71).
+
+**Pending:**
+- ProductInterest capture action (server action + email notification) — architecture ready, implementation is a subsequent step.
+- Product imagery licensing (Owner to supply licensed imagery).
+- Authoritative Kenyan product list + KSh pricing (Owner to supply).
+- Commit and deploy the uncommitted catalogue work.

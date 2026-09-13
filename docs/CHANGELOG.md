@@ -46,11 +46,44 @@ The production image is tied to commit `3f535c5e565d6f3dd35848b4eb3595f9ee482ef7
 Environment-variable injection, with the root-owned `/opt/ooflowdesk/secrets/neolife.env` (`root:root 0600`) as the source. Accurate security wording (documented): the secret source file is root-only; because the existing `ooadmin` account has root-equivalent Docker privileges, secrets injected into container environments are technically inspectable by that account; NEOLIFE does not modify this existing server privilege model; Kilo must not intentionally inspect, print, log, or expose secret values.
 
 
-### Product catalogue planning (planning only, no implementation)
+### Product catalogue — implementation (🟩 local, Owner-approved D-019–D-026)
 
-Authored `docs/PRODUCT_CATALOGUE_PLAN.md` -- a complete planning document for the NeoLife Product Catalogue (Phase 4 precursor). No code, database, schema, email, or production changes were made. Research was performed against the official NeoLife shop (`https://neolifeshop.com/i/shop.html`).
+The product catalogue planning document (`docs/PRODUCT_CATALOGUE_PLAN.md`) has been superseded by actual implementation. Owner decisions D-019–D-026 approved (2026-09-13).
 
-- Catalogue structure documented: 4 top-level categories (Nutritionals, Weight Management, Personal Care, Home Care) with subcategories and ~70 products carrying official SKU numbers.
-- Proposed data model: `Category`, `Subcategory`, `Product`, `ProductInterest` (+ `InterestStatus` enum and join tables), integrated with the existing `Lead`/`LeadEvent` models.
-- Product-interest workflow, email architecture, pricing strategy, UX/SEO/security plans, test plan, and MVP scope defined.
-- 8 Owner decisions identified and documented (pricing display, imagery licensing, email provider, content approach, search/filter scope, route structure, Kenyan product list, ProductInterest data model).
+**Committed (data layer — commit ce7cbcb):**
+- `prisma/schema.prisma` — added `Category`, `Subcategory`, `Product`, `ProductCategory`, `ProductSubcategory`, `ProductInterest` models + `InterestStatus` enum. `Lead` model extended with `productInterests` relation.
+- `prisma/migrations/20260913061907_add_product_catalogue/migration.sql` — migration for all catalogue tables, indexes, and foreign keys.
+- `src/lib/catalogue-data.ts` — 65 products, 4 categories, 22 subcategories (Northern Europe catalogue as **temporary development/seed data only**).
+- `scripts/seed-catalogue.ts` — idempotent seed/upsert script for categories, subcategories, and products.
+- `src/lib/email.ts` — provider-agnostic email abstraction (Resend/SendGrid/Mailgun/SES/dummy); no provider locked, default `none`/`dummy` mode logs to console.
+
+**Uncommitted (routes + UI + tests):**
+- `src/app/products/` — 4 route pages: `page.tsx`, `[category]/page.tsx`, `[category]/[subcategory]/page.tsx`, `[category]/[subcategory]/[product]/page.tsx`. All with designed backgrounds (forest/cream gradients with botanical accents), breadcrumbs, SEO metadata, responsive grid, product cards, and CTA/interest pathway.
+- `src/components/catalogue/` — `hero.tsx`, `category-grid.tsx`, `ProductCard.tsx`, `search-box.tsx`, `SubcategoryFilter.tsx`, `Breadcrumb.tsx`. All use the existing visual language (Leaf/Sprig botanicals, Reveal animations, Photo placeholders).
+- `src/lib/catalogue-meta.ts` — catalogue helpers (slugs, breadcrumbs, SEO, `productUrl`, `primarySubcategoryForProduct`, `PRICE_LABEL`).
+- `tests/catalogue-data.test.ts` — 28 tests for data integrity + routing.
+- `src/components/landing/SiteHeader.tsx` — added "Products" nav link.
+
+**Decisions (all approved):**
+- D-019: "Contact us" pricing (no prices shown until Owner supplies KSh list)
+- D-020: Placeholder imagery (no official imagery embedded)
+- D-021: Email provider REMAINS PROVIDER-AGNOSTIC (not yet selected)
+- D-022: Concise original descriptions (not copied verbatim)
+- D-023: Lightweight search/filter (in-memory, no external engine)
+- D-024: Dedicated subcategory routes
+- D-025: 65 products are TEMPORARY DEVELOPMENT/SEED DATA (not the final Kenyan catalogue)
+- D-026: Separate `ProductInterest` entity
+
+**Visual quality:**
+- All public-facing pages now have designed backgrounds (cream/forest gradients with botanical SVG motifs, leaf/sprig decorative elements, Reveal scroll animations). Previously plain-white pages (register-interest, InfoPageLayout for legal pages) now match the site's visual identity.
+
+**Fix:**
+- Removed stray duplicate file `src/components/catalogue CatalogueSearch.tsx` (space in filename; valid replacement is `search-box.tsx`).
+- Fixed ProductCard/search-box URL generation: routes now always include the `[subcategory]` segment, preventing 404s when products are accessed from category or search listings.
+- Product detail page now validates that the product belongs to both the specified category and subcategory (notFound() on mismatch).
+
+**Verification:**
+- Lint: PASS (0 errors, 0 warnings)
+- Typecheck: PASS (`tsc --noEmit`)
+- Tests: 71/71 PASS (43 original + 28 catalogue)
+- Build: PASS (9 static + 5 dynamic routes)
