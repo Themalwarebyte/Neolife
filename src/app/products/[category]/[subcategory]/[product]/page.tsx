@@ -5,7 +5,6 @@ import { Container } from "@/components/ui/Section";
 import { Reveal } from "@/components/ui/Reveal";
 import { Leaf, Sprig } from "@/components/ui/Botanical";
 import { Photo } from "@/components/ui/Photo";
-import { CtaLink } from "@/components/ui/CtaLink";
 import {
   categoryBySlug,
   productBySlug,
@@ -13,6 +12,7 @@ import {
   productBreadcrumb,
   PRICE_LABEL,
   absoluteUrl,
+  PRODUCTS_PATH,
 } from "@/lib/catalogue-meta";
 import { BreadcrumbNav } from "@/components/catalogue/Breadcrumb";
 
@@ -145,21 +145,24 @@ export default async function ProductPage({ params }: Props) {
                   </div>
                 </Reveal>
 
-                <Reveal delay={200} className="mt-8">
-                  <form action="/register-interest" method="GET" className="space-y-3">
-                    <p className="text-sm text-neutral-600">
-                      Interested in this product? Tell us a little about yourself
-                      and the office team will get back to you.
-                    </p>
-                    <CtaLink href="/register-interest" size="lg" className="inline-flex">
-                      Interested in this product
-                    </CtaLink>
-                    <input type="hidden" name="product" value={product.name} />
-                    <input type="hidden" name="productSku" value={product.sku ?? ""} />
-                    <input type="hidden" name="source" value={absoluteUrl(`/products/${categorySlug}/${productSlug}`)} />
-                    <input type="hidden" name="submittedAt" value={submittedAt} />
-                  </form>
-                </Reveal>
+                 <Reveal delay={200} className="mt-8">
+                   <form action="/register-interest" method="GET" className="space-y-3">
+                     <p className="text-sm text-neutral-600">
+                       Interested in this product? Tell us a little about yourself
+                       and the office team will get back to you.
+                     </p>
+                     <button
+                       type="submit"
+                       className="inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-colors duration-200 bg-brand-700 text-white hover:bg-forest-700 shadow-sm shadow-brand-700/25 px-7 py-3.5 text-base"
+                     >
+                       Interested in this product
+                     </button>
+                     <input type="hidden" name="product" value={product.name} />
+                     <input type="hidden" name="productSku" value={product.sku ?? ""} />
+                     <input type="hidden" name="source" value={absoluteUrl(`${PRODUCTS_PATH}/${categorySlug}/${subSlug}/${productSlug}`)} />
+                     <input type="hidden" name="submittedAt" value={submittedAt} />
+                   </form>
+                 </Reveal>
               </div>
             </div>
           </Container>
