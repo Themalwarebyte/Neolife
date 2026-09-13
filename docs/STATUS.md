@@ -259,3 +259,11 @@ Public homepage visual redesign (Semrush-level UX polish + NeoLife botanical/wel
 ### Deployment milestone (§11.7) — ⚪ NOT STARTED
 
 Recorded by Owner (D-010): early production deployment of the landing page/MVP slice is authorized once the landing page passes local checks AND explicit Owner production-deployment authorization is given at that gate. Requires hosting/domain decision (§19 item 5) before the server step.
+
+## Product Catalogue Planning — 🟩 PLANNED (2026-09-13)
+
+- Authored `docs/PRODUCT_CATALOGUE_PLAN.md` — complete planning document for the NeoLife Product Catalogue (Phase 4 precursor).
+- Research performed against the official NeoLife shop (`https://neolifeshop.com/i/shop.html`): 4 top-level categories, subcategories, ~70 products with official SKU numbers.
+- Proposed data model, product-interest workflow, email architecture, pricing strategy, UX/SEO/security plans, test plan, and MVP scope documented.
+- 8 Owner decisions identified (D-019–D-026 in `DECISIONS.md`). None decided.
+- **No implementation, database, schema, email, or production changes were made.**

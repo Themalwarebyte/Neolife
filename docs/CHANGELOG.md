@@ -45,3 +45,12 @@ The production image is tied to commit `3f535c5e565d6f3dd35848b4eb3595f9ee482ef7
 ### Secret architecture (Owner decision A — accepted)
 Environment-variable injection, with the root-owned `/opt/ooflowdesk/secrets/neolife.env` (`root:root 0600`) as the source. Accurate security wording (documented): the secret source file is root-only; because the existing `ooadmin` account has root-equivalent Docker privileges, secrets injected into container environments are technically inspectable by that account; NEOLIFE does not modify this existing server privilege model; Kilo must not intentionally inspect, print, log, or expose secret values.
 
+
+### Product catalogue planning (planning only, no implementation)
+
+Authored `docs/PRODUCT_CATALOGUE_PLAN.md` -- a complete planning document for the NeoLife Product Catalogue (Phase 4 precursor). No code, database, schema, email, or production changes were made. Research was performed against the official NeoLife shop (`https://neolifeshop.com/i/shop.html`).
+
+- Catalogue structure documented: 4 top-level categories (Nutritionals, Weight Management, Personal Care, Home Care) with subcategories and ~70 products carrying official SKU numbers.
+- Proposed data model: `Category`, `Subcategory`, `Product`, `ProductInterest` (+ `InterestStatus` enum and join tables), integrated with the existing `Lead`/`LeadEvent` models.
+- Product-interest workflow, email architecture, pricing strategy, UX/SEO/security plans, test plan, and MVP scope defined.
+- 8 Owner decisions identified and documented (pricing display, imagery licensing, email provider, content approach, search/filter scope, route structure, Kenyan product list, ProductInterest data model).

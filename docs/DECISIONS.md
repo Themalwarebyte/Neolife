@@ -92,3 +92,15 @@ Owner-approved decisions and their rationale. Every future implementation task m
 ## Launch-Gate Record
 
 - §11.6 Paid-traffic launch gate: **NOT PASSED** (not yet applicable — no advertising live).
+## Pending Owner Decisions (recorded 2026-09-13)
+
+The following decisions were identified during the NeoLife Product Catalogue planning stage (`docs/PRODUCT_CATALOGUE_PLAN.md`). None have been decided. They do not block the existing Traffic MVP.
+
+- **D-019 (pending) -- Initial price display:** A) no price · B) "Price coming soon" · C) "Contact us" / "Request a quote" (recommended). KSh price list to be supplied by Owner later.
+- **D-020 (pending) -- Product imagery licensing:** A) Owner supplies licensed imagery · B) placeholder imagery until licensed imagery approved (recommended) · C) reuse official site images (not recommended).
+- **D-021 (pending) -- Email provider for product-interest notifications:** A) SendGrid · B) Mailgun · C) Amazon SES · D) Resend. Architecture is provider-agnostic via a `src/lib/email.ts` wrapper.
+- **D-022 (pending) -- Product description content approach:** A) copy official marketing descriptions verbatim (not recommended) · B) concise original summaries based on official information (recommended) · C) Owner supplies licensed descriptions.
+- **D-023 (pending) -- Catalogue search/filter scope:** A) lightweight name+category+subcategory filter (recommended) · B) full-text search engine · C) none.
+- **D-024 (pending) -- Subcategory route structure:** A) dedicated routes `/products/[category]/[subcategory]` (recommended) · B) client-side filtering.
+- **D-025 (pending) -- Kenyan product list and KSh price list:** A) use Northern Europe product list as interim · B) Owner supplies authoritative Kenyan list (recommended).
+- **D-026 (pending) -- ProductInterest data model:** A) separate `ProductInterest` entity (recommended) · B) attribute on `Lead`.
