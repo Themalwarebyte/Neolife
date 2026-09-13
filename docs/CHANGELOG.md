@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+### Official NEOLIFE product images (🟩 deployed)
+
+Replaced all 65 product-image placeholders with official NEOLIFE product images from neolifeshop.com.
+
+- All 65 product images downloaded from neolifeshop.com (Northern Europe market), converted to WebP, and stored as
+  self-hosted assets under `public/products/<slug>/product.webp`.
+- Added required `image: string` field to `CatalogueProduct` type in `src/lib/catalogue-data.ts`; populated for all 65 products.
+- `ProductCard.tsx` and the product detail page now pass `src={product.image}` to the `Photo` component (real `<img>`
+  rendered; `next.config.mjs` `images.unoptimized: true`).
+- Added 2 tests verifying every product has a valid image path matching `/products/<slug>/product.webp` and that each
+  file exists.
+- Included `scripts/download-images.ps1` (download) and `scripts/convert-images.sh` (WebP conversion) build scripts.
+- **Deployed to production** as commit `11e64fa` (tag `neolife-web:11e64fa`). All 65 images serve `image/webp` (HTTP 200).
+  No placeholder imagery remains where official images exist.
+- D-020 updated from "placeholder imagery" to "official NEOLIFE images".
+- D-025 unchanged: 65 products remain temporary development/seed data.
+
 ### Add `/admin` entry point (🟩 local)
 Added `src/app/admin/page.tsx` — server-side redirect: authenticated admin → `/admin/leads`, otherwise → `/admin/login`. Added `e2e/admin-redirect.spec.ts` (unauthenticated redirect). No schema, auth, CRM, or infra changes.
 
@@ -66,7 +83,7 @@ The product catalogue planning document (`docs/PRODUCT_CATALOGUE_PLAN.md`) has b
 
 **Decisions (all approved):**
 - D-019: "Contact us" pricing (no prices shown until Owner supplies KSh list)
-- D-020: Placeholder imagery (no official imagery embedded)
+- D-020: Official NEOLIFE product images from neolifeshop.com (65 images, downloaded & WebP-converted; deployed)
 - D-021: Email provider REMAINS PROVIDER-AGNOSTIC (not yet selected)
 - D-022: Concise original descriptions (not copied verbatim)
 - D-023: Lightweight search/filter (in-memory, no external engine)

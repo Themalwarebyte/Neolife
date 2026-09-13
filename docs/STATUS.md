@@ -280,8 +280,8 @@ Recorded by Owner (D-010): early production deployment of the landing page/MVP s
 **Decisions approved (2026-09-13):**
 
 - D-019: "Contact us" pricing (`PRICE_LABEL = "Contact us"`).
-- D-020: Placeholder imagery (no official imagery embedded).
-- D-021: Email provider REMAINS PROVIDER-AGNOSTIC — NOT YET SELECTED.
+- D-020: UPDATED — Official NEOLIFE product images from neolifeshop.com (65 images downloaded & converted to WebP).
+- D-021: Email provider remains provider-agnostic — NOT YET SELECTED.
 - D-022: Concise original descriptions (not copied verbatim).
 - D-023: Lightweight search/filter (in-memory).
 - D-024: Dedicated subcategory routes.
@@ -290,8 +290,4 @@ Recorded by Owner (D-010): early production deployment of the landing page/MVP s
 
 **Verification:** Lint ✅ (0 errors) · `tsc --noEmit` ✅ · Build ✅ (9 static + 5 dynamic routes) · Tests ✅ (71/71).
 
-**Pending:**
-- ProductInterest capture action (server action + email notification) — architecture ready, implementation is a subsequent step.
-- Product imagery licensing (Owner to supply licensed imagery).
-- Authoritative Kenyan product list + KSh pricing (Owner to supply).
-- Commit and deploy the uncommitted catalogue work.
+**Production:** 🟩 DEPLOYED (commit 11e64fa). All 65 product images load (HTTP 200, `image/webp`). `/health` → 200. `/products` → 200. Category, subcategory, and product detail routes → 200. No placeholder/botanical imagery remains where official images exist.

@@ -102,11 +102,18 @@ The following decisions were identified during the NeoLife Product Catalogue pla
 - **Rationale:** KSh price list is not yet available; the Owner will supply the authoritative Kenyan catalogue later.
 - **Implementation:** `src/lib/catalogue-meta.ts` exports `PRICE_LABEL = "Contact us"`. Displayed on product cards and detail page.
 
-### D-020 — Product imagery licensing (APPROVED)
+### D-020 — Product imagery licensing (APPROVED — UPDATED)
 
-- **Decision:** B) Placeholder imagery until licensed imagery is approved.
-- **Rationale:** No official NeoLife imagery is embedded; placeholders use the existing botanical visual language until the Owner supplies licensed imagery.
-- **Implementation:** `Photo` component with `tone="botanical"` used throughout catalogue pages and cards.
+- **Decision:** B→A) Placeholder imagery was used initially (botanical `Photo` placeholders). Owner explicitly approved
+  replacing all 65 product placeholders with official NEOLIFE product images sourced from neolifeshop.com.
+- **Rationale:** Official imagery is now embedded from self-hosted WebP assets under `public/products/<slug>/product.webp`,
+  sourced from the official NeoLife shop (Northern Europe market). All 65 product images were downloaded, converted to
+  WebP, and verified loading (HTTP 200, `image/webp`). No placeholders remain for any product.
+- **Implementation:** `Photo` component now receives `src={product.image}` for every product on both `ProductCard` and
+  the product detail page. The `image: string` field was added to `CatalogueProduct` and populated for all 65 products.
+- **Build:** `next.config.mjs` keeps `images: { unoptimized: true }` — pre-optimized WebP served directly.
+- **Note:** D-025 still applies — the 65 products remain temporary development/seed data; the authoritative Kenyan
+  catalogue will be supplied by the Owner.
 
 ### D-021 — Email provider (APPROVED — NOT YET SELECTED)
 
