@@ -280,7 +280,7 @@ Recorded by Owner (D-010): early production deployment of the landing page/MVP s
 **Decisions approved (2026-09-13):**
 
 - D-019: "Contact us" pricing (`PRICE_LABEL = "Contact us"`).
-- D-020: UPDATED — Official NEOLIFE product images from neolifeshop.com (65 images downloaded & converted to WebP).
+- D-020: OFFICIAL NEOLIFE product images from neolifeshop.com (65 images) + category images rebuilt from actual catalogue products (D-020 REBUILT, 2026-09-16).
 - D-021: Email provider remains provider-agnostic — NOT YET SELECTED.
 - D-022: Concise original descriptions (not copied verbatim).
 - D-023: Lightweight search/filter (in-memory).
@@ -288,6 +288,8 @@ Recorded by Owner (D-010): early production deployment of the landing page/MVP s
 - D-025: 65 products are TEMPORARY DEVELOPMENT/SEED DATA — NOT the final Kenyan catalogue.
 - D-026: Separate `ProductInterest` entity (schema model + `Lead` relation committed; capture-action flow is a subsequent step).
 
-**Verification:** Lint ✅ (0 errors) · `tsc --noEmit` ✅ · Build ✅ (9 static + 5 dynamic routes) · Tests ✅ (71/71).
+**Verification:** Lint ✅ (0 errors) · `tsc --noEmit` ✅ · Build ✅ (9 static + 5 dynamic routes) · Tests ✅ (64/64 non-DB tests PASS; 9 DB-persistence tests fail pre-existing due to no local PostgreSQL).
 
-**Production:** 🟩 DEPLOYED (commit 11e64fa). All 65 product images load (HTTP 200, `image/webp`). `/health` → 200. `/products` → 200. Category, subcategory, and product detail routes → 200. No placeholder/botanical imagery remains where official images exist.
+**Production:** 🟩 DEPLOYED (commit 11e64fa, images to b371fcf). All 65 product images load (HTTP 200, `image/webp`). `/health` → 200. `/products` → 200. Category, subcategory, and product detail routes → 200. The four Browse by Category cards now show compositions of actual catalogue products (nutritionals, weight-management, personal-care, home-care; `organic-skin-care.webp` removed). Source-product mapping documented in `docs/CATEGORY_IMAGE_SOURCES.md`. Composition script: `scripts/compose-category-images.cjs`.
+
+**Note:** Category images were rebuilt using `sharp` (devDependency) — committed in `b371fcf`. Production image rebuild pending Owner deployment authorization.

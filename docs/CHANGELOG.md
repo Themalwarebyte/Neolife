@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-### Official NEOLIFE product images (🟩 deployed)
+### Official NEOLIFE product images (🟩 local, pending production deploy)
 
 Replaced all 65 product-image placeholders with official NEOLIFE product images from neolifeshop.com.
 
@@ -15,9 +15,30 @@ Replaced all 65 product-image placeholders with official NEOLIFE product images 
   file exists.
 - Included `scripts/download-images.ps1` (download) and `scripts/convert-images.sh` (WebP conversion) build scripts.
 - **Deployed to production** as commit `11e64fa` (tag `neolife-web:11e64fa`). All 65 images serve `image/webp` (HTTP 200).
-  No placeholder imagery remains where official images exist.
+  No placeholder imagery remains for any product.
 - D-020 updated from "placeholder imagery" to "official NEOLIFE images".
 - D-025 unchanged: 65 products remain temporary development/seed data.
+
+### Rebuild category images from actual catalogue products (🟩 local, pending production deploy)
+
+Replaced all four "Browse by Category" images with compositions built from **actual NEOLIFE product photographs**
+in the catalogue — no AI-generated imagery, no generic stock photos, no cross-category substitution.
+
+- **Nutritionals** (5 products): Formula IV, Tre-en-en, Omega-3 Plus, CoQ10, Kal-Mag Plus D
+- **Weight Management** (4 products): NeoLifeShake Rich Chocolate, NeoLifeShake Creamy Vanilla, NeoLifeBar, NeoLifeTea
+- **Personal Care** (5 products): Mild Revitalizing Shampoo, Enriching Conditioner, Rejuvenating Rich Cream, Ultra Moisturizing Cream, Aloe Vera Gel
+- **Home Care** (4 products): G1 Laundry Detergent, Super 10 5L, LDC Hand Soap 1L, Soft Fabric Softener
+
+- Each image: 1200×800, 3:2 aspect ratio (matches `aspect-[3/2]` card), warm cream background, subtle drop shadows.
+  No product packaging labels/logos/colors altered — products composed faithfully from official images.
+- Source-product mapping documented in `docs/CATEGORY_IMAGE_SOURCES.md`.
+- Rebuild script: `scripts/compose-category-images.cjs` (uses `sharp` devDependency; reproducible).
+- Removed `public/categories/organic-skin-care.webp` (was incorrectly mapped to Weight Management as a fallback).
+- Updated `CATEGORY_IMAGES` in `src/lib/catalogue-meta.ts`: `weight-management → /categories/weight-management.webp`.
+- Updated `eslint.config.mjs` to ignore `scripts/**` (build utility scripts).
+- **Production deploy pending Owner authorization** — committed as `b371fcf`, compose files updated in `ab62506`.
+- Audit notes: no misclassifications found; 6 products cross-listed between Nutritionals and Weight Management
+  per `categorySlugs` (correctly assigned to Weight Management image; Nutritionals image uses pure nutritional products).
 
 ### Add `/admin` entry point (🟩 local)
 Added `src/app/admin/page.tsx` — server-side redirect: authenticated admin → `/admin/leads`, otherwise → `/admin/login`. Added `e2e/admin-redirect.spec.ts` (unauthenticated redirect). No schema, auth, CRM, or infra changes.

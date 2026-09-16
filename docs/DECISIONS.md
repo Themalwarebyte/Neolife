@@ -109,8 +109,13 @@ The following decisions were identified during the NeoLife Product Catalogue pla
 - **Rationale:** Official imagery is now embedded from self-hosted WebP assets under `public/products/<slug>/product.webp`,
   sourced from the official NeoLife shop (Northern Europe market). All 65 product images were downloaded, converted to
   WebP, and verified loading (HTTP 200, `image/webp`). No placeholders remain for any product.
-- **Implementation:** `Photo` component now receives `src={product.image}` for every product on both `ProductCard` and
-  the product detail page. The `image: string` field was added to `CatalogueProduct` and populated for all 65 products.
+  - **Implementation:** `Photo` component now receives `src={product.image}` for every product on both `ProductCard` and
+   the product detail page. The `image: string` field was added to `CatalogueProduct` and populated for all 65 products.
+   - **Category images (2026-09-16 REBUILD):** The four "Browse by Category" cards now show compositions of *actual*
+     catalogue product photographs — no generic/AI imagery. `public/categories/{nutritionals,weight-management,
+     personal-care,home-care}.webp` (1200×800, composed from 4–5 real product images each). Removed
+     `organic-skin-care.webp` (was incorrectly mapped to Weight Management). Source-product mapping documented in
+     `docs/CATEGORY_IMAGE_SOURCES.md`. Rebuild script: `scripts/compose-category-images.cjs` (requires `sharp` devDependency).
 - **Build:** `next.config.mjs` keeps `images: { unoptimized: true }` — pre-optimized WebP served directly.
 - **Note:** D-025 still applies — the 65 products remain temporary development/seed data; the authoritative Kenyan
   catalogue will be supplied by the Owner.
