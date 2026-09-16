@@ -19,14 +19,13 @@ export const CATEGORIES_PATH = "/categories";
 /**
  * Owner-approved image mapping for the four Browse by Category cards.
  *
- * Maps category slug → self-hosted WebP path. Three images match their
- * category slug by name (nutritionals, personal-care, home-care). The Owner
- * supplied organic-skin-care.webp (no weight-management image was provided),
- * so it is assigned to the Weight Management card.
+ * Each category image is a composition of actual NEOLIFE product photographs
+ * from the catalogue — real product packaging, no AI-generated or generic imagery.
+ * Source products per category are documented in docs/CATEGORY_IMAGE_SOURCES.md.
  */
 export const CATEGORY_IMAGES: Record<string, string> = {
   nutritionals: `${CATEGORIES_PATH}/nutritionals.webp`,
-  "weight-management": `${CATEGORIES_PATH}/organic-skin-care.webp`,
+  "weight-management": `${CATEGORIES_PATH}/weight-management.webp`,
   "personal-care": `${CATEGORIES_PATH}/personal-care.webp`,
   "home-care": `${CATEGORIES_PATH}/home-care.webp`,
 };

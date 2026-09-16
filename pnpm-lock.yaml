@@ -66,6 +66,9 @@ importers:
       prisma:
         specifier: 7.10.0
         version: 7.10.0(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.9.3)
+      sharp:
+        specifier: ^0.35.4
+        version: 0.35.4(@types/node@22.20.1)
       tailwindcss:
         specifier: ^4.3.3
         version: 4.3.3
@@ -3660,8 +3663,7 @@ snapshots:
 
   '@humanwhocodes/retry@0.4.3': {}
 
-  '@img/colour@1.1.0':
-    optional: true
+  '@img/colour@1.1.0': {}
 
   '@img/sharp-darwin-arm64@0.35.4':
     optionalDependencies:
@@ -6214,7 +6216,6 @@ snapshots:
       '@img/sharp-win32-ia32': 0.35.4
       '@img/sharp-win32-x64': 0.35.4
       '@types/node': 22.20.1
-    optional: true
 
   shebang-command@2.0.0:
     dependencies:
