@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-### Official NEOLIFE product images (🟩 local, pending production deploy)
+### Official NEOLIFE product images (🟩 deployed)
 
 Replaced all 65 product-image placeholders with official NEOLIFE product images from neolifeshop.com.
 
@@ -19,7 +19,7 @@ Replaced all 65 product-image placeholders with official NEOLIFE product images 
 - D-020 updated from "placeholder imagery" to "official NEOLIFE images".
 - D-025 unchanged: 65 products remain temporary development/seed data.
 
-### Rebuild category images from actual catalogue products (🟩 local, pending production deploy)
+### Rebuild category images from actual catalogue products (🟩 deployed)
 
 Replaced all four "Browse by Category" images with compositions built from **actual NEOLIFE product photographs**
 in the catalogue — no AI-generated imagery, no generic stock photos, no cross-category substitution.
@@ -36,9 +36,10 @@ in the catalogue — no AI-generated imagery, no generic stock photos, no cross-
 - Removed `public/categories/organic-skin-care.webp` (was incorrectly mapped to Weight Management as a fallback).
 - Updated `CATEGORY_IMAGES` in `src/lib/catalogue-meta.ts`: `weight-management → /categories/weight-management.webp`.
 - Updated `eslint.config.mjs` to ignore `scripts/**` (build utility scripts).
-- **Production deploy pending Owner authorization** — committed as `b371fcf`, compose files updated in `ab62506`.
+- **Deployed to production** as image `neolife-web:b371fcf` (commits b371fcf, ab62506, 7784de5).
 - Audit notes: no misclassifications found; 6 products cross-listed between Nutritionals and Weight Management
   per `categorySlugs` (correctly assigned to Weight Management image; Nutritionals image uses pure nutritional products).
+- **Production verification:** all 4 category images serve `image/webp` (HTTP 200); old `organic-skin-care.webp` returns 404; all 65 product images intact; `/health` → 200; `/products` → 200; DB/tunnel containers unaffected.
 
 ### Add `/admin` entry point (🟩 local)
 Added `src/app/admin/page.tsx` — server-side redirect: authenticated admin → `/admin/leads`, otherwise → `/admin/login`. Added `e2e/admin-redirect.spec.ts` (unauthenticated redirect). No schema, auth, CRM, or infra changes.
