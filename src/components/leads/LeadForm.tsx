@@ -9,6 +9,7 @@ import {
   deserializeAttribution,
   type Attribution,
 } from "@/lib/attribution";
+import { getOrCreateDeviceId } from "@/lib/funnel-device";
 
 const fieldClass =
   "w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-neutral-900 placeholder:text-neutral-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30";
@@ -29,7 +30,11 @@ export function LeadForm() {
   // Task 1.4 — first-touch attribution captured earlier on this device
   // (first-party localStorage). Values are re-validated server-side.
   const [attribution, setAttribution] = useState<Attribution>({});
+  // Phase D — non-PII device correlation ID for funnel events.
+  const [deviceId, setDeviceId] = useState<string>("");
+
   useEffect(() => {
+    // Task 1.4 attribution
     try {
       setAttribution(
         deserializeAttribution(
@@ -38,6 +43,14 @@ export function LeadForm() {
       );
     } catch {
       setAttribution({});
+    }
+
+    // Phase D — obtain or create the anonymous device ID.
+    try {
+      const id = getOrCreateDeviceId();
+      if (id) setDeviceId(id);
+    } catch {
+      // Non-essential — funnel tracking is best-effort only.
     }
   }, []);
 
@@ -60,11 +73,43 @@ export function LeadForm() {
         <p className="mt-4 text-sm text-neutral-500">
           Results vary. No income or business results are guaranteed.
         </p>
-        <div className="mt-6">
-          <CtaLink href="/" variant="secondary" size="md">
-            Back to home
-          </CtaLink>
-        </div>
+
+        {/* Phase D — optional post-capture qualification (D-030) */}
+        {state.qualificationToken ? (
+          <div className="mt-8 rounded-2xl border border-neutral-100 bg-neutral-50 p-6 text-left">
+            <h3 className="text-sm font-bold uppercase tracking-wide text-neutral-500">
+              Tell us more
+            </h3>
+            <p className="mt-2 text-sm text-neutral-600">
+              Want to share what you're most interested in? Complete the short
+              qualification form — it helps our team give you the most relevant
+              information.
+            </p>
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+              <a
+                href={`/register-interest/qualify?token=${encodeURIComponent(state.qualificationToken)}`}
+                className="inline-flex items-center justify-center rounded-full bg-brand-600 px-7 py-3 text-base font-semibold text-white shadow-sm shadow-brand-600/20 transition-colors hover:bg-brand-700"
+              >
+                Continue to qualification
+              </a>
+              <a
+                href="/"
+                className="inline-flex items-center justify-center rounded-full border border-neutral-300 bg-white px-7 py-3 text-base font-semibold text-neutral-700 transition-colors hover:bg-neutral-50"
+              >
+                Back to home
+              </a>
+            </div>
+            <p className="mt-3 text-xs text-neutral-400">
+              This link expires in 1 hour.
+            </p>
+          </div>
+        ) : (
+          <div className="mt-6">
+            <CtaLink href="/" variant="secondary" size="md">
+              Back to home
+            </CtaLink>
+          </div>
+        )}
       </div>
     );
   }
@@ -105,13 +150,15 @@ export function LeadForm() {
       {attribution.term ? (
         <input type="hidden" name="utmTerm" value={attribution.term} />
       ) : null}
-      {attribution.landingPage ? (
+       {attribution.landingPage ? (
         <input
           type="hidden"
           name="landingPage"
           value={attribution.landingPage}
         />
       ) : null}
+      {/* Phase D — non-PII device correlation for funnel events */}
+      <input type="hidden" name="deviceId" value={deviceId} />
       <div className="grid gap-5 sm:grid-cols-2">
         <div>
           <label htmlFor="firstName" className={labelClass}>

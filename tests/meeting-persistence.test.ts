@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "../src/server/db/prisma";
 
 /**
@@ -6,6 +6,9 @@ import { prisma } from "../src/server/db/prisma";
  * Verifies the office-pipeline meeting flow used by Task 1.8 server actions.
  */
 const phone = "+254711000097";
+
+const DB_AVAILABLE = Boolean(process.env.DATABASE_URL);
+const runIfDb = DB_AVAILABLE ? describe : describe.skip;
 
 async function createLead() {
   return prisma.lead.create({
@@ -19,13 +22,17 @@ async function createLead() {
   });
 }
 
-afterAll(async () => {
-  const lead = await prisma.lead.findFirst({ where: { phone } });
-  if (lead) await prisma.lead.delete({ where: { id: lead.id } });
-  await prisma.$disconnect();
-});
+runIfDb("meeting persistence (office pipeline)", () => {
+  beforeAll(async () => {
+    await prisma.lead.deleteMany({ where: { phone } });
+  });
 
-describe("meeting persistence (office pipeline)", () => {
+  afterAll(async () => {
+    const lead = await prisma.lead.findFirst({ where: { phone } });
+    if (lead) await prisma.lead.delete({ where: { id: lead.id } });
+    await prisma.$disconnect();
+  });
+
   it("schedules a meeting with default SCHEDULED status", async () => {
     const lead = await createLead();
     const meeting = await prisma.meeting.create({

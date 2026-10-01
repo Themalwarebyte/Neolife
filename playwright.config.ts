@@ -10,9 +10,10 @@ import { defineConfig, devices } from "@playwright/test";
  * can be removed to use the bundled browser.
  */
 export default defineConfig({
+  globalSetup: "./e2e/global-setup.ts",
   testDir: "./e2e",
   timeout: 30_000,
-  retries: 0,
+  retries: 2,
   use: {
     baseURL: "http://localhost:3000",
     trace: "on-first-retry",

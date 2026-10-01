@@ -66,19 +66,26 @@ model Lead {
   utmContent       String?
   utmTerm          String?
   landingPage      String?
-  firstTouchSource String?
+   firstTouchSource String?
 
-  createdAt DateTime   @default(now())
+   assignedUserId String? @db.Uuid
+
+   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 
   events    LeadEvent[]
   meetings  Meeting[]
   followUps FollowUp[]
   productInterests ProductInterest[]
+  assignedUser User? @relation("user_assigned_leads", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  funnelEvents FunnelEvent[]
+  qualificationTokens QualificationToken[]
 
   @@index([status])
   @@index([createdAt])
   @@index([utmCampaign])
+  @@index([assignedUserId])
+  @@index([assignedUserId, status])
 }
 
 // First-party funnel events (D-005) — NOT a custom analytics platform.
@@ -87,6 +94,8 @@ model LeadEvent {
   leadId   String? @db.Uuid
   type     String
   metadata Json?
+  userId   String? @db.Uuid
+  user     User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
   lead     Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
@@ -94,6 +103,7 @@ model LeadEvent {
   @@index([leadId])
   @@index([type])
   @@index([createdAt])
+  @@index([userId])
 }
 
 // Office pipeline — deliberately simple (docs/PROJECT_PLAN.md §11.3).
@@ -138,11 +148,15 @@ model User {
   emailVerified Boolean   @default(false)
   image         String?
   role          String    @default("staff")
+  mustChangePassword Boolean @default(false)
+  isActive      Boolean   @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   sessions Session[]
   accounts Account[]
+  assignedLeads Lead[] @relation("user_assigned_leads")
+  events LeadEvent[]
 }
 
 model Session {
@@ -282,8 +296,41 @@ model ProductInterest {
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   lead    Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
 
-  @@index([productId])
+    @@index([productId])
+    @@index([leadId])
+    @@index([status])
+    @@index([createdAt])
+}
+
+model FunnelEvent {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type      String
+  leadId    String?  @db.Uuid
+  attribution Json?
+  deviceId  String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  lead Lead? @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  @@index([type])
   @@index([leadId])
-  @@index([status])
   @@index([createdAt])
+  @@index([deviceId])
+  @@index([deviceId, createdAt])
+}
+
+model QualificationToken {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  leadId     String    @db.Uuid
+  nonce      String    @unique
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([expiresAt])
+  @@index([consumedAt])
 }

@@ -33,3 +33,27 @@ playwright-report/
 # build/transfer artifacts
 *.tar
 *.tar.gz
+
+# local logs
+*.log
+
+# local agent tooling state — contains nested full copies of this repo
+.kilo/
+
+# one-off local debug/scratch scripts (NOT project deliverables).
+# Note: scripts/test-db-integration.js IS a documented deliverable and is
+# intentionally excluded from this list (see docs/ARCHITECTURE.md).
+scripts/check-db.mjs
+scripts/check-db.ts
+scripts/test-db-basic.ts
+scripts/test-db-fk.js
+scripts/test-db-fk2.js
+scripts/test-db-pg.mts
+scripts/test-db-verify.js
+scripts/test-db.mts
+scripts/check-users.ts
+scripts/check-leads.ts
+scripts/delete-staff.ts
+e2e/debug-setup.ts
+e2e/debug-login.ts
+e2e/debug-lead-detail.ts

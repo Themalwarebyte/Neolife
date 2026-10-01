@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import {
   GENERIC_ERROR_MESSAGE,
@@ -9,10 +10,12 @@ import {
   persistLead,
   type SubmitLeadInput,
 } from "@/lib/leads";
+import { generateQualificationToken } from "@/lib/qualification";
+import { recordFunnelEvent } from "@/lib/funnel";
 import { clientKeyFromHeaders, isRateLimited } from "@/lib/rateLimit";
 
 export type SubmitLeadResult =
-  | { status: "success"; message: string }
+  | { status: "success"; message: string; qualificationToken?: string }
   | { status: "error"; message: string; fieldErrors?: Record<string, string> };
 
 /**
@@ -59,6 +62,12 @@ export async function submitLeadAction(
     return { status: "error", message: parsed.message, fieldErrors: parsed.fieldErrors };
   }
 
+  // Phase D: extract deviceId for funnel correlation (non-PII UUID v4).
+  const deviceId =
+    typeof formData.get("deviceId") === "string" && formData.get("deviceId")
+      ? String(formData.get("deviceId"))
+      : null;
+
   try {
     const existing = await findActiveLeadByPhone(parsed.data.phone);
     if (existing) {
@@ -69,11 +78,30 @@ export async function submitLeadAction(
       };
     }
 
-    await persistLead(parsed.data, parseAttributionPayload(input));
+    const attribution = parseAttributionPayload(input);
+    const persisted = await persistLead(parsed.data, attribution);
+
+    // Phase D: record the authoritative lead_created FunnelEvent (server-side only).
+    await recordFunnelEvent({
+      type: "lead_created",
+      leadId: persisted.id,
+      deviceId: deviceId ?? null,
+      attribution: attribution ?? null,
+    });
+
+    // Phase D: generate a qualification continuation token for the post-capture
+    // qualification step (D-030). This is returned to the client so the success
+    // page can offer "Continue to Qualification".
+    const qualificationToken = await generateQualificationToken(persisted.id);
+
+    // Revalidate leads pages so the new lead appears.
+    revalidatePath("/admin/leads");
+
     return {
       status: "success",
       message:
         "Thank you — your interest has been registered. The office team will contact you to answer your questions and, if you would like, arrange a meeting.",
+      qualificationToken,
     };
   } catch {
     // Never expose database or internal errors to the public.

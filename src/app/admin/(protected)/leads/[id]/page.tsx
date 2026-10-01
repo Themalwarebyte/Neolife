@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/server/db/prisma";
+import { requireCrmUser } from "@/server/auth/requireCrmUser";
+import { getCrmUsers } from "@/app/admin/(protected)/actions";
+import { AssignmentForm, type StaffUser } from "@/components/admin/AssignmentForm";
 import { LeadStatusForm } from "@/components/admin/LeadStatusForm";
 import { FollowUpForm } from "@/components/admin/FollowUpForm";
 import { MeetingForm } from "@/components/admin/MeetingForm";
@@ -29,8 +32,15 @@ export default async function LeadDetailPage({
   const { id } = await params;
   if (!UUID.test(id)) notFound();
 
+  const user = await requireCrmUser();
+
+  // Phase A: ownership-scoped lookup.
+  // Owner sees all leads. Staff sees only their assigned leads.
+  const where =
+    user.role === "admin" ? { id } : { id, assignedUserId: user.id };
+
   const lead = await prisma.lead.findUnique({
-    where: { id },
+    where,
     include: {
       meetings: { orderBy: { scheduledAt: "desc" } },
       followUps: { orderBy: { createdAt: "desc" } },
@@ -39,6 +49,19 @@ export default async function LeadDetailPage({
   });
   if (!lead) notFound();
 
+  const isOwner = user.role === "admin";
+
+  // Phase B: Owner-only data for the assignment UI.
+  const staffUsers = isOwner ? (await getCrmUsers()) as StaffUser[] : [];
+  let currentAssignee: StaffUser | null = null;
+  if (isOwner && lead.assignedUserId) {
+    const assigned = await prisma.user.findUnique({
+      where: { id: lead.assignedUserId },
+      select: { id: true, name: true, email: true, role: true },
+    });
+    if (assigned) currentAssignee = assigned as StaffUser;
+  }
+
   return (
     <div>
       <div className="flex items-center gap-3">
@@ -46,7 +69,7 @@ export default async function LeadDetailPage({
           href="/admin/leads"
           className="text-sm font-semibold text-brand-700 hover:underline"
         >
-          ← Back to leads
+          ← Back to contacts
         </Link>
       </div>
 
@@ -79,6 +102,18 @@ export default async function LeadDetailPage({
                     : "No"
                 }
               />
+              {isOwner ? (
+                <Field
+                  label="Assigned to"
+                  value={
+                    currentAssignee
+                      ? `${currentAssignee.name} (${currentAssignee.email})`
+                      : lead.assignedUserId === user.id
+                        ? "You"
+                        : "Unassigned"
+                  }
+                />
+              ) : null}
             </dl>
           </section>
 
@@ -164,6 +199,25 @@ export default async function LeadDetailPage({
             <div className="mt-4">
               <LeadStatusForm leadId={lead.id} currentStatus={lead.status} />
             </div>
+
+            {/* Phase B: Owner-only assignment controls */}
+            {isOwner ? (
+              <div className="mt-6 border-t border-neutral-100 pt-6">
+                <h3 className="text-sm font-bold uppercase tracking-wide text-neutral-500">
+                  Contact assignment
+                </h3>
+                <p className="mt-1 text-xs text-neutral-500">
+                  Staff see only leads assigned to them. The Owner manages assignment.
+                </p>
+                <div className="mt-3">
+                  <AssignmentForm
+                    leadId={lead.id}
+                    currentAssignee={currentAssignee}
+                    staffUsers={staffUsers}
+                  />
+                </div>
+              </div>
+            ) : null}
           </section>
 
           <section className="rounded-2xl border border-neutral-200 bg-white p-6">

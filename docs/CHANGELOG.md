@@ -2,6 +2,158 @@
 
 ## Unreleased
 
+### Admin user management (🟩 local)
+
+Implemented Owner-approved admin user management for Phase P-2 preparation: Staff user creation with forced password change on first login, activation/deactivation toggle, and password-change flow.
+
+**Schema:**
+- `prisma/schema.prisma` — added `mustChangePassword Boolean @default(false)` and `isActive Boolean @default(true)` to the `User` model.
+- `prisma/migrations/20260919000000_add_user_management_fields/migration.sql` — new migration.
+- `src/lib/auth.ts` — registered both fields as Better Auth `additionalFields` (`mustChangePassword` with `input: true`, `isActive` with `input: true`).
+
+**Server actions (`src/app/admin/(protected)/actions.ts`):**
+- `createCrmUser` — Owner-only; creates a Staff user via Better Auth `signUpEmail`, then sets `role: "staff"` and `mustChangePassword: true` via Prisma. Rejects duplicate emails.
+- `toggleUserActive` — Owner-only; toggles `isActive` on a user. Owner accounts cannot be deactivated.
+- `changePasswordAction` — any authenticated user with `mustChangePassword`; calls Better Auth `changePassword`, then clears `mustChangePassword`.
+
+**Pages:**
+- `src/app/admin/(protected)/users/page.tsx` — Admin Users page (server-rendered table + client create-user form).
+- `src/app/admin/(protected)/users/create-user-form.tsx` — client form with `useActionState` for error/success feedback.
+- `src/app/admin/change-password/page.tsx` — change-password page (outside `(protected)` to avoid redirect loop).
+- `src/app/admin/change-password/change-password-form.tsx` — client form with `useActionState`, current/new/confirm password fields.
+
+**Auth guard:**
+- `src/server/auth/requireCrmUser.ts` — `getCrmUser`/`requireCrmUser` now return `mustChangePassword`; inactive users are treated as unauthenticated (return null).
+- `src/app/admin/(protected)/layout.tsx` — redirects users with `mustChangePassword: true` to `/admin/change-password`; added "Users" nav link for Owner accounts.
+
+**Tests:**
+- `tests/user-management.test.ts` — 13 pure schema validation tests.
+- `tests/user-management-db.test.ts` — 4 DB integration tests (skipped without local PostgreSQL).
+
+**Verification:**
+- Lint: PASS (0 errors, 0 warnings)
+- Typecheck: PASS (`tsc --noEmit`)
+- Tests: 167 passed, 55 skipped (DB-only) · E2E 10/10 PASS
+
+### Phase P-1 — Registration / business-interest flow (🟩 local)
+
+Implemented the Owner-approved registration/business-interest capture flow (D-026 full capture step; D-032 meeting-model decision).
+
+**New files:**
+- `src/lib/registration.ts` — pure validation for registration input (productId UUID, meetingPreference enum, additionalContext optional ≤1000 chars). Client-safe (no Prisma import).
+- `src/lib/funnel-device.ts` — shared first-party device-ID utility (`getOrCreateDeviceId`); consolidates previously duplicated logic from `FunnelTracker.tsx` and `LeadForm.tsx`.
+- `src/app/actions/register-interest.ts` — Server Action handling optional post-capture registration: validates qualification token (non-consuming via `validateQualificationToken`), validates input, verifies product existence, persists `ProductInterest` + `registration_complete` FunnelEvent in a transaction.
+- `src/components/leads/RegistrationForm.tsx` — client component with product dropdown, meeting-preference radios, context textarea. Emits `registration_start` client-side on mount (via `recordFunnelEventClient`).
+- `tests/registration-validation.test.ts` — 16 pure validation tests.
+- `tests/registration-persistence.test.ts` — 5 DB integration tests + 2 pure tests.
+
+**Modified files:**
+- `src/lib/funnel.ts` — added `registration_start` and `registration_complete` to `VALID_FUNNEL_EVENT_TYPES` and `FunnelEventType`.
+- `src/lib/funnel-client.ts` — extended `ClientFunnelEventInput` type to allow `registration_start` from clients (was `visitor_landing` only).
+- `src/app/api/funnel/route.ts` — API route now accepts `registration_start` (in addition to `visitor_landing`) from clients; `registration_complete` remains server-side only.
+- `src/components/tracking/FunnelTracker.tsx` — refactored to use shared `getOrCreateDeviceId` from `funnel-device.ts`.
+- `src/components/leads/LeadForm.tsx` — refactored to use shared `getOrCreateDeviceId`.
+- `src/app/register-interest/qualify/page.tsx` — added RegistrationForm section with featured products fetched from DB.
+- `tests/funnel-events.test.ts` — updated valid event-type set to include all five types; added DB tests for `registration_start`/`registration_complete` persistence.
+
+**Funnel event semantics:**
+- `registration_start` — emitted client-side when the RegistrationForm mounts (entry into the registration step). Anonymous (deviceId only, no leadId).
+- `registration_complete` — emitted server-side only, after successful `ProductInterest` persistence within the DB transaction.
+- The server action does NOT record `registration_start` — it is client-side only.
+
+**Security:**
+- Qualification token validated server-side via `validateQualificationToken` (HMAC-SHA256 + DB nonce + expiration check).
+- Token NOT consumed by registration (non-consuming validation) — remains valid for the optional QualificationForm.
+- Lead ID derived exclusively from the verified token — never from client form input.
+- Product IDs verified against DB (`prisma.product.findUnique`).
+- Registration remains rate-limited (5 req/min/IP via existing `rateLimit.ts`).
+- No PII added to FunnelEvent (D-031 preserved).
+
+**Meetings:** Registration does NOT create a Meeting (D-032 Owner decision). `meetingPreference` is captured as metadata on `registration_complete` for CRM follow-up. Meeting creation remains an authenticated CRM operation.
+
+**Documentation:**
+- `docs/DECISIONS.md` — added D-032: Registration/business-interest flow — no Meeting creation during public registration.
+- `docs/CHANGELOG.md` — this entry.
+- `docs/STATUS.md` — Phase P-1 section added.
+
+**Verification:**
+- Lint: PASS (all new/modified files)
+- Typecheck: PASS (`tsc --noEmit`)
+- Build: PASS (Next.js production build)
+- Tests: 167 passed, 55 skipped (DB-only) (was 206/206; 16 new tests added) · E2E 10/10 PASS via system Chrome
+
+### Phase B — Owner-controlled lead assignment (🟩 local)
+
+Implemented the Owner-approved Option A two-user CRM assignment model.
+
+**Schema & migration:**
+- `Lead.assignedUserId` nullable UUID FK to `User.id` (`ON DELETE SET NULL`) + indexes (`@@index([assignedUserId])`, `@@index([assignedUserId, status])`) — Phase A migration `20260917000000_add_lead_ownership/migration.sql`.
+- `User.assignedLeads` back-relation added.
+
+**New files:**
+- `src/lib/assignment.ts` — pure authorization helpers: `canAssignLeads`, `isAssignableRole`, `canViewLead`, `leadVisibilityWhere`, `OWNER_ROLE`, `STAFF_ROLE`.
+- `src/server/auth/requireCrmUser.ts` — role-aware auth module (`getCrmUser`, `requireCrmUser`, `requireAdmin`, `isAdminSession`, `CrmUser`).
+- `src/components/admin/AssignmentForm.tsx` — Owner-only dropdown (assign/reassign/unassign) with live result feedback.
+- `scripts/seed-staff.ts` — development/test Staff account provisioning (env-var based, no hard-coded secrets).
+- `prisma/migrations/20260917000000_add_lead_ownership/migration.sql`.
+- `tests/assignment-authorization.test.ts` — 15 pure-logic authorization tests (no DB required).
+- `tests/assignment-integration.test.ts` — 4 DB-integration tests (skipped without local PostgreSQL).
+
+**Modified files:**
+- `src/app/admin/(protected)/actions.ts` — `assignLead` (owner-only via `requireAdmin`, target-user validation, audit events); `getCrmUsers` helper; existing actions refactored from `isAdminAuthorized` → `requireCrmUser` + `verifyLeadOwnership`.
+- `src/app/admin/(protected)/leads/page.tsx` — ownership-scoped `findMany` (Owner: all; Staff: assigned-only) + "Assigned" column.
+- `src/app/admin/(protected)/leads/[id]/page.tsx` — ownership-scoped `findUnique`; Owner-only AssignmentForm in Manage section; assignee name displayed.
+- `src/app/admin/(protected)/layout.tsx` — role-aware badge (Owner/Colleague).
+- `src/app/admin/page.tsx` — `getCrmUser` redirect (any authenticated user → `/admin/leads`).
+- `.env.example` — added `STAFF_EMAIL`/`STAFF_PASSWORD`/`STAFF_NAME`.
+
+**Security:**
+- Only the Owner can assign/reassign leads (server-side enforced via `requireAdmin`).
+- Staff assignment attempts rejected (404 on detail, no action available).
+- `assignedUserId` validated server-side; target must be `role = "staff"`.
+- Audit events: `lead_assigned` and `lead_unassigned` recorded with `by`/`from`/`to` metadata.
+- No credentials, passwords, or secrets committed.
+
+**Documentation:**
+- `docs/DECISIONS.md` — D-027: Owner-controlled lead assignment model recorded.
+- `docs/STATUS.md` — Phase B status updated.
+- `docs/CHANGELOG.md` — this entry.
+- `docs/ARCHITECTURE.md` — auth/authorization flow documented.
+- `docs/RECOVERY.md` — created (recovery procedures for auth/CRM schema).
+
+### Phase C — Canonical audit actor on LeadEvent (🟩 local)
+
+Completed the Owner-approved audit-actor tracking requirement.
+
+**Schema & migration:**
+- `LeadEvent.userId` nullable TEXT FK to `User.id` (`ON DELETE SET NULL`) + index (`@@index([userId])`) — migration `20260917120000_add_leadevent_actor/migration.sql`.
+- `LeadEvent.type` kept as `String` (not migrated to PostgreSQL enum) per D-028.
+- Existing audit records preserved (null userId for legacy events).
+
+**Server Actions updated:**
+- `updateLeadStatus` — `status_changed` event now sets `userId` from the authenticated CRM user.
+- `addFollowUp` — `follow_up_added` event now sets `userId`.
+- `scheduleMeeting` — `meeting_scheduled` event now sets `userId`.
+- `updateMeeting` — `meeting_status_changed` event now sets `userId`.
+- `assignLead` — `lead_assigned` and `lead_unassigned` events now set `userId` (the Owner/admin performing the assignment).
+
+**Security:**
+- `LeadEvent.userId` is always populated from the server-side authenticated session — never from client-supplied actor IDs.
+- Existing `metadata.by` field retained and kept consistent with `userId`.
+- Staff cannot forge `LeadEvent.userId` — all actions use `requireCrmUser()` and set the actor from the session.
+
+**New tests:**
+- `tests/assignment-reassignment.test.ts` — 13 tests (9 pure + 4 DB): verifies unassigned→Staff, Staff A→Staff B reassignment, Staff→unassigned, and null userId for legacy events.
+- `tests/staff-status-authorization.test.ts` — 16 tests (10 pure + 6 DB): verifies Staff updates own lead with correct audit actor, Staff cannot update unassigned/another-Staff lead, forged `assignedUserId` ignored, forged actor ID rejected, Owner can update any lead.
+
+**Modified tests:**
+- `tests/assignment-integration.test.ts` — "Audit event recorded on manual assignment" test updated to set and verify `userId` alongside `metadata.by`.
+
+**Documentation:**
+- `docs/DECISIONS.md` — D-028: Canonical audit actor on LeadEvent recorded.
+- `docs/STATUS.md` — Phase C status updated.
+- `docs/ARCHITECTURE.md` — LeadEvent model updated with `userId` field.
+
 ### Official NEOLIFE product images (🟩 deployed)
 
 Replaced all 65 product-image placeholders with official NEOLIFE product images from neolifeshop.com.
@@ -41,7 +193,47 @@ in the catalogue — no AI-generated imagery, no generic stock photos, no cross-
   per `categorySlugs` (correctly assigned to Weight Management image; Nutritionals image uses pure nutritional products).
 - **Production verification:** all 4 category images serve `image/webp` (HTTP 200); old `organic-skin-care.webp` returns 404; all 65 product images intact; `/health` → 200; `/products` → 200; DB/tunnel containers unaffected.
 
-### Add `/admin` entry point (🟩 local)
+### Phase D — Funnel events + qualification tokens (🟩 local)
+
+Implemented D-029 (first-party funnel event tracking), D-030 (qualification continuation tokens), and D-031 (no IP/user-agent in FunnelEvent).
+
+**Schema & migration:**
+- `FunnelEvent` model — first-party funnel/traffic measurement table, separate from `LeadEvent`. Columns: `id`, `type`, `leadId` (FK to Lead, `ON DELETE SET NULL`), `attribution` (JSONB), `deviceId` (random UUID), `metadata` (JSONB), `createdAt`. **No `ipAddress`, `userAgent`, `firstName`, `phone`, or `userId` columns** (D-031). Indexes on type, leadId, createdAt, deviceId, (deviceId, createdAt).
+- `QualificationToken` model — DB-backed single-use token. Columns: `id`, `leadId` (FK to Lead, `ON DELETE CASCADE`), `nonce` (UNIQUE), `expiresAt`, `consumedAt`, `createdAt`. Indexes on leadId, expiresAt, consumedAt.
+- Migration: `prisma/migrations/20260918000000_add_funnel_events/migration.sql`.
+
+**New files:**
+- `src/lib/qualification.ts` — server-side token functions: `generateQualificationToken`, `consumeQualificationToken` (atomic DB `updateMany` with `consumedAt IS NULL AND expiresAt > NOW()`), `validateQualificationToken`, `sign`, `getTokenSecret`. Uses dynamic `import()` for Prisma and `node:crypto`.
+- `src/lib/qualification-client.ts` — client-safe token functions: `parseToken`, `verifyTokenSignature`, `isTokenStructurallyValid`, `parseQualificationInput`. No Prisma, no `node:crypto`.
+- `src/lib/funnel.ts` — server-side `recordFunnelEvent`: validates event type, re-validates attribution, sanitizes metadata/deviceId.
+- `src/lib/funnel-client.ts` — client-safe `recordFunnelEventClient`: delegates to `/api/funnel` API route via fetch, type-restricted to `visitor_landing`.
+- `src/app/api/funnel/route.ts` — API Route Handler (POST) accepting only `visitor_landing` from clients.
+- `src/app/actions/qualify.ts` — `qualifyLeadAction` Server Action.
+- `src/app/register-interest/qualify/page.tsx` — qualification page.
+- `src/components/leads/QualificationForm.tsx` — client form with structural token check.
+- `src/components/tracking/FunnelTracker.tsx` — client-side `visitor_landing` tracker.
+- `tests/funnel-events.test.ts` — 14 tests (5 pure + 9 DB skipped without PostgreSQL).
+- `tests/qualification.test.ts` — 27 tests (16 pure + 11 DB skipped without PostgreSQL).
+- `scripts/test-db-integration.js` — 30 DB integration tests.
+
+**Modified files:**
+- `src/app/actions/lead.ts` — generates qualification token on lead creation; records `lead_created` FunnelEvent.
+- `src/app/layout.tsx` — adds `FunnelTracker` component for landing event tracking.
+- `src/components/leads/LeadForm.tsx` — passes `deviceId` hidden field for funnel correlation.
+- `prisma/schema.prisma` — added `FunnelEvent` and `QualificationToken` models.
+
+**Security:**
+- D-031: FunnelEvent stores NO PII (no IP, no user-agent, no firstName/phone/userId). Anonymous device correlation via client-generated UUID.
+- D-030: Token binds to one Lead; leadId extracted from verified token (not client input); single-use enforced atomically; no Lead PII in token; HMAC-SHA256 signature.
+- Client components use only structural token validation (UX); server always re-validates signature + DB nonce.
+- Rate limiting (5 req/min/IP) on both lead capture and qualification.
+
+**Verification:**
+- Lint: PASS (all Phase D files)
+- Typecheck: PASS
+- Build: PASS (`/api/funnel`, `/register-interest/qualify` routes)
+- Pure tests: 37/37 PASS (27 qualification + 14 funnel-events, 20 DB tests skip without PostgreSQL)
+- DB integration: 30/30 PASS from WSL (schema, token lifecycle, replay prevention, qualification workflow)
 Added `src/app/admin/page.tsx` — server-side redirect: authenticated admin → `/admin/leads`, otherwise → `/admin/login`. Added `e2e/admin-redirect.spec.ts` (unauthenticated redirect). No schema, auth, CRM, or infra changes.
 
 ### Fix — admin seed path-alias resolution (🟩 local)

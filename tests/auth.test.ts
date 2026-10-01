@@ -9,12 +9,15 @@ import {
 const email = "auth-test@neolife.local";
 const password = "correct-horse-battery-staple";
 
-afterAll(async () => {
-  await prisma.user.deleteMany({ where: { email } });
-  await prisma.$disconnect();
-});
+const DB_AVAILABLE = Boolean(process.env.DATABASE_URL);
+const runIfDb = DB_AVAILABLE ? describe : describe.skip;
 
-describe("Better Auth (email/password + role boundary)", () => {
+runIfDb("Better Auth (email/password + role boundary)", () => {
+  afterAll(async () => {
+    await prisma.user.deleteMany({ where: { email } });
+    await prisma.$disconnect();
+  });
+
   it("signs up a user with the default 'staff' role (not admin)", async () => {
     await auth.api.signUpEmail({
       body: { name: "Auth Test", email, password },
@@ -46,11 +49,11 @@ describe("Better Auth (email/password + role boundary)", () => {
   it("rejects a wrong password", async () => {
     await expect(
       auth.api.signInEmail({ body: { email, password: "wrong-password" } }),
-    ).rejects.toBeTruthy();
+    ).rejects.toThrow();
   });
 });
 
-describe("lead status + follow-up validation", () => {
+describe("lead status + follow-up validation (pure, no DB)", () => {
   it("accepts valid lifecycle statuses", () => {
     expect(parseStatusChange("CONTACTED")).toBe("CONTACTED");
     expect(parseStatusChange("MEETING_ATTENDED")).toBe("MEETING_ATTENDED");

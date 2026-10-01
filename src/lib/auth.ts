@@ -23,6 +23,16 @@ export const auth = betterAuth({
         defaultValue: "staff",
         input: false,
       },
+      mustChangePassword: {
+        type: "boolean",
+        defaultValue: false,
+        input: true,
+      },
+      isActive: {
+        type: "boolean",
+        defaultValue: true,
+        input: false,
+      },
     },
   },
 });

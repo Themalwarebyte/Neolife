@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "../src/server/db/prisma";
 import {
   findActiveLeadByPhone,
@@ -15,14 +15,23 @@ import {
 const testPhone = "+254711000099";
 const testPhoneAttributed = "+254711000098";
 
-afterAll(async () => {
-  await prisma.lead.deleteMany({
-    where: { phone: { in: [testPhone, testPhoneAttributed] } },
-  });
-  await prisma.$disconnect();
-});
+const DB_AVAILABLE = Boolean(process.env.DATABASE_URL);
+const runIfDb = DB_AVAILABLE ? describe : describe.skip;
 
-describe("lead persistence (public → PostgreSQL)", () => {
+runIfDb("lead persistence (public → PostgreSQL)", () => {
+  beforeAll(async () => {
+    await prisma.lead.deleteMany({
+      where: { phone: { in: [testPhone, testPhoneAttributed] } },
+    });
+  });
+
+  afterAll(async () => {
+    await prisma.lead.deleteMany({
+      where: { phone: { in: [testPhone, testPhoneAttributed] } },
+    });
+    await prisma.$disconnect();
+  });
+
   it("persists a validated lead with consent, timestamp and default status", async () => {
     const parsed = parseLeadInput({
       firstName: "Integration",
@@ -77,6 +86,13 @@ describe("lead persistence (public → PostgreSQL)", () => {
     expect(row?.firstTouchSource).toBe("facebook");
   });
 
+  it("duplicate-submission guard finds the active lead by phone", async () => {
+    const existing = await findActiveLeadByPhone(testPhone);
+    expect(existing).not.toBeNull();
+  });
+});
+
+describe("unsafe attribution is dropped (pure, no DB)", () => {
   it("drops unsafe attribution instead of persisting it", async () => {
     const unsafe = parseAttributionPayload({
       utmSource: "<script>alert(1)</script>",
@@ -85,10 +101,5 @@ describe("lead persistence (public → PostgreSQL)", () => {
     expect(unsafe.source).toBeUndefined();
     expect(unsafe.campaign).toBe("safe_campaign");
     expect(unsafe.firstTouchSource).toBeUndefined();
-  });
-
-  it("duplicate-submission guard finds the active lead by phone", async () => {
-    const existing = await findActiveLeadByPhone(testPhone);
-    expect(existing).not.toBeNull();
   });
 });

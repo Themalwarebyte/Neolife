@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AttributionCapture } from "@/components/tracking/AttributionCapture";
+import { FunnelTracker } from "@/components/tracking/FunnelTracker";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -15,6 +16,7 @@ export default function RootLayout({
     <html lang="en">
       <body className="bg-white text-neutral-900 antialiased">
         <AttributionCapture />
+        <FunnelTracker />
         {children}
       </body>
     </html>

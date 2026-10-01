@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/server/db/prisma";
+import { requireCrmUser } from "@/server/auth/requireCrmUser";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,16 @@ function StatusPill({ status }: { status: string }) {
 }
 
 export default async function LeadsPage() {
+  const user = await requireCrmUser();
+
+  // Phase A: ownership-scoped query.
+  // - Owner (admin) sees all leads.
+  // - Staff (colleague) sees only leads assigned to them.
+  const where =
+    user.role === "admin" ? {} : { assignedUserId: user.id };
+
   const leads = await prisma.lead.findMany({
+    where,
     orderBy: { createdAt: "desc" },
     select: {
       id: true,
@@ -30,6 +40,7 @@ export default async function LeadsPage() {
       city: true,
       interestType: true,
       status: true,
+      assignedUserId: true,
       createdAt: true,
       utmSource: true,
       utmCampaign: true,
@@ -38,22 +49,30 @@ export default async function LeadsPage() {
     },
   });
 
+  const isOwner = user.role === "admin";
+
   return (
     <div>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-neutral-900">Leads</h1>
+          <h1 className="text-2xl font-bold text-neutral-900">
+            {isOwner ? "All Contacts" : "My Contacts"}
+          </h1>
           <p className="text-sm text-neutral-500">
-            {leads.length} lead{leads.length === 1 ? "" : "s"}
+            {leads.length} contact{leads.length === 1 ? "" : "s"}
           </p>
         </div>
       </div>
 
       {leads.length === 0 ? (
         <div className="mt-8 rounded-3xl border border-dashed border-neutral-300 bg-white p-12 text-center">
-          <p className="font-semibold text-neutral-700">No leads yet</p>
+          <p className="font-semibold text-neutral-700">
+            {isOwner ? "No contacts yet" : "No contacts assigned to you"}
+          </p>
           <p className="mt-1 text-sm text-neutral-500">
-            New registrations will appear here.
+            {isOwner
+              ? "New registrations will appear here."
+              : "The Owner will assign contacts to you."}
           </p>
         </div>
       ) : (
@@ -66,6 +85,7 @@ export default async function LeadsPage() {
                   <th className="px-4 py-3">Contact</th>
                   <th className="px-4 py-3">Interest</th>
                   <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Assigned</th>
                   <th className="px-4 py-3">Source</th>
                   <th className="px-4 py-3">Created</th>
                   <th className="px-4 py-3">Activity</th>
@@ -99,6 +119,15 @@ export default async function LeadsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <StatusPill status={lead.status} />
+                    </td>
+                    <td className="px-4 py-3 text-neutral-600">
+                      {isOwner && !lead.assignedUserId ? (
+                        <span className="text-neutral-400">Unassigned</span>
+                      ) : lead.assignedUserId === user.id ? (
+                        <span className="text-neutral-600">You</span>
+                      ) : (
+                        <span className="text-neutral-600">Assigned</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-neutral-600">
                       {lead.utmSource ?? "—"}

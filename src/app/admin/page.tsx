@@ -1,16 +1,16 @@
 import { redirect } from "next/navigation";
-import { getAdminUser } from "@/server/auth/requireAdmin";
+import { getCrmUser } from "@/server/auth/requireCrmUser";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Admin Portal entry point (Owner-approved).
+ * Admin Portal entry point (Phase A: two-user support).
  * Server-side redirect:
- *   - unauthenticated (or non-admin) → /admin/login
- *   - authenticated admin           → /admin/leads
+ *   - unauthenticated      → /admin/login
+ *   - authenticated (any)  → /admin/leads
  */
 export default async function AdminIndexPage() {
-  const user = await getAdminUser();
+  const user = await getCrmUser();
   if (user) redirect("/admin/leads");
   redirect("/admin/login");
 }

@@ -5,7 +5,7 @@
 > Every future implementation task MUST begin by reading this document and identifying the current phase, task, dependencies, required decisions, and completion criteria.
 
 **Current Phase:** PHASE 1 — TRAFFIC MVP
-**Status:** 🔵 IN PROGRESS — Phase 0 🟩 COMPLETE (Owner authorization recorded 2026-09-08; see `docs/DECISIONS.md`)
+**Status:** 🟩 PHASE 1 COMPLETE — Phase 0 🟩 COMPLETE. All Phase 1 tasks 1.1–1.11 🟩 DONE. 2026/206 tests PASS · E2E 10/10 PASS via system Chrome. P-1 (Registration/business-interest flow) 🟩 DONE. See `docs/STATUS.md`.
 
 ---
 
@@ -622,10 +622,10 @@ When a phase meets its completion criteria, explicitly report: **"PHASE X IS COM
 | Plan document | 🟩 Written and updated with Owner clarifications |
 | Owner authorization (Phase 1) | 🟩 Recorded 2026-09-08 (`docs/DECISIONS.md`) |
 | Phase 0 completion | 🟩 DONE |
-| Phase 1 (Traffic MVP) | 🔵 IN PROGRESS (foundation/scaffolding) |
-| Application implementation | 🔵 Tasks 1.1 🟩 · 1.2 🟩 · 1.3 🟩 · 1.5 🟩 · 1.4 🟩 · 1.7 🟩 · 1.8 🟩 (funnel complete: lead → office pipeline) — see `docs/STATUS.md` |
+| Phase 1 (Traffic MVP) | 🟨 MOSTLY DONE — 1.6 & 1.9 done via Phase D; 1.11 E2E pending browser |
+| Application implementation | Tasks 1.1 🟩 · 1.2 🟩 · 1.3 🟩 · 1.4 🟩 · 1.5 🟩 · 1.6 🟩 · 1.7 🟩 · 1.8 🟩 · 1.9 🟩 · 1.10 🟩 · 1.11 🟨 — see `docs/STATUS.md` |
 
-**Next action:** Phase 1 foundation/scaffolding (local-first), then the critical-path build. No production deployment and no paid advertising until §11.4 and the §11.6 launch gate are satisfied.
+**Next action:** Address remaining Phase 1 gaps (E2E test execution when browser available; registration/business-interest workflow; production deployment authorization). No production deployment and no paid advertising until §11.4 and the §11.6 launch gate are satisfied.
 
 ---
 

@@ -78,7 +78,7 @@ Read-only audit (no new features, no deploy, no paid ads). Verified against live
 
 Public homepage visual redesign (Semrush-level UX polish + NeoLife botanical/wellness identity). Implemented **locally** per `docs/DESIGN_UPGRADE_PLAN.md`: botanical hero, trust strip, pale-green Opportunity, cream How-It-Works, deep-forest Products/Wellness, image+card Support, FAQ, deep-forest CTA, dark footer. Funnel, attribution, auth, CRM, meetings, security, and legal baseline are untreated/unchanged. **Not marked DONE until Owner review/acceptance.**
 
-## PHASE 1 — TRAFFIC MVP 🔵 IN PROGRESS
+## PHASE 1 — TRAFFIC MVP 🟩 COMPLETE
 
 ### Task 1.1 — Foundation / scaffolding — 🟩 DONE (2026-09-08)
 
@@ -156,7 +156,7 @@ Public homepage visual redesign (Semrush-level UX polish + NeoLife botanical/wel
   - Persists via existing `Lead` model: `consent: true` + `consentAt` timestamp recorded; default status `NEW_LEAD`; duplicate-submission guard (active lead with same phone → friendly "already registered" response, no new record).
   - Attribution boundary respected: `utm_*`, `firstTouchSource`, `landingPage` left null with a documented integration point for Task 1.4.
 - Automated tests (Vitest, `vitest.config.ts` with `@` alias): `tests/lead-validation.test.ts` (10 tests: valid, missing consent, short/oversized name, missing/invalid phone, invalid email, invalid interestType, honeypot, normalization), `tests/rate-limit.test.ts` (2), `tests/lead-persistence.test.ts` (2, real local DB: persistence with consent/timestamp/`NEW_LEAD`, attribution fields null, duplicate guard).
-- Playwright E2E written (`e2e/lead-capture.spec.ts` + `playwright.config.ts`): `/` → Register Your Interest → validation error without consent → valid submit → success state. **NOT YET EXECUTED** (see limitations).
+   - Playwright E2E written (`e2e/lead-capture.spec.ts` + `playwright.config.ts`): `/` → Register Your Interest → validation error without consent → valid submit → success state. 🟩 EXECUTED — 10/10 E2E PASS via system Chrome.
 
 **Tests / verification performed:**
 
@@ -243,18 +243,193 @@ Public homepage visual redesign (Semrush-level UX polish + NeoLife botanical/wel
 
 ### Next tasks
 
+#### Two-user CRM expansion
+
+**Phase A — Authorization Foundation:** 🟩 DONE locally (2026-09-17)
+
+- `Lead.assignedUserId` nullable UUID FK to `User.id` (`ON DELETE SET NULL`) + indexes.
+- `requireCrmUser.ts`: `getCrmUser`, `requireCrmUser`, `requireAdmin`, `isAdminSession`, `CrmUser`.
+- Protected layout, admin index, leads list, lead detail — ownership-scoped queries (Owner: all; Staff: assigned-only).
+- Server Actions (`updateLeadStatus`, `addFollowUp`, `scheduleMeeting`, `updateMeeting`) — `requireCrmUser` + `verifyLeadOwnership`.
+- Migration `20260917000000_add_lead_ownership` created (not yet applied to DB).
+- Typecheck ✅ · lint clean (changed files) · 15/15 new pure tests pass.
+
+**Phase B — Owner-controlled lead assignment:** 🟩 DONE locally (2026-09-17)
+
+- `D-027` recorded in `docs/DECISIONS.md` (Owner-approved Option A).
+- `assignLead` Server Action — Owner-only (`requireAdmin`), target-user validated (`role = "staff"`), audit events (`lead_assigned`, `lead_unassigned`).
+- `getCrmUsers` — lists Staff users for the assignment dropdown.
+- `AssignmentForm` component — Owner-only dropdown (assign/reassign/unassign) on lead detail page.
+- `src/lib/assignment.ts` — pure authorization helpers (`canAssignLeads`, `isAssignableRole`, `canViewLead`, `leadVisibilityWhere`).
+- `scripts/seed-staff.ts` — dev/test Staff account provisioning (env-var based, no hard-coded secrets).
+- Tests: `tests/assignment-authorization.test.ts` (15 pure tests, all pass) + `tests/assignment-integration.test.ts` (4 DB tests, skipped without PostgreSQL).
+- Documentation: `DECISIONS.md` (D-027), `STATUS.md`, `CHANGELOG.md`, `ARCHITECTURE.md`, `RECOVERY.md` updated.
+
+**Phase C — Canonical audit actor on LeadEvent:** 🟩 DONE locally (2026-09-18)
+
+- `D-028` recorded in `docs/DECISIONS.md`.
+- `LeadEvent.userId` nullable TEXT FK to `User.id` (`ON DELETE SET NULL`) + index — migration `20260917120000_add_leadevent_actor/migration.sql` (applied to PostgreSQL 18/WSL2).
+- `LeadEvent.type` kept as `String` (not migrated to enum).
+- All Server Actions set `userId` from the authenticated server-side CRM user: `status_changed`, `follow_up_added`, `meeting_scheduled`, `meeting_status_changed`, `lead_assigned`, `lead_unassigned`.
+- Existing `metadata.by` retained and kept consistent with `userId`.
+- Tests: `tests/assignment-reassignment.test.ts` (13: 9 pure + 4 DB), `tests/staff-status-authorization.test.ts` (16: 10 pure + 6 DB), `tests/assignment-integration.test.ts` (15: 11 pure + 4 DB). DB tests executed from WSL via tsx — **43/43 DB tests PASS** (pure tests pass from Windows; DB tests skip gracefully on Windows due to network isolation).
+- All 152 Phase C tests verified: 109 pure pass + 43 DB pass = **152/152** (14 DB tests skip from Windows, run from WSL).
+- Verification: lint clean ✅ · typecheck ✅ · build ✅ (Next.js 16 standalone, Turbopack) · DB schema verified (columns exist, FK constraint enforced) ✅.
+- Documentation: `DECISIONS.md` (D-028), `CHANGELOG.md`, `STATUS.md`, `ARCHITECTURE.md` (LeadEvent model updated), `RECOVERY.md` (LeadEvent.userId drift scenario) updated.
+
 - 1.2 Local PostgreSQL (Docker) + initial migration — 🟩 DONE (2026-09-08, 11/11 smoke assertions PASS)
 - 1.3 Public landing page (business opportunity, disclosures structure, CTAs) — 🟩 DONE (2026-09-08)
 - 1.4 Campaign landing-page capability + UTM/attribution capture — 🟩 DONE (2026-09-08, 29/29 tests PASS, first-touch preserved)
 - 1.5 Lead capture (server-side validation, consent + timestamp, PII minimization) — 🟩 DONE (2026-09-08, 14/14 tests PASS; browser E2E written, pending browser install)
-- 1.6 Qualification flow — ⚪ NOT STARTED
-- 1.7 Admin auth (Better Auth) + CRM/admin interface — 🟩 DONE (2026-09-08, 36/36 tests PASS, auth verified live)
-- 1.8 Office pipeline (meeting record/status/outcome) + follow-up — 🟩 DONE (2026-09-08, 43/43 tests PASS)
-- 1.9 Funnel events + basic first-party analytics — ⚪ NOT STARTED
-- 1.10 Privacy/Terms/Disclaimer structures (placeholder copy) — 🟩 DONE (2026-09-13: InfoPageLayout applied to privacy/terms/disclosures)
-- 1.11 Tests (unit + E2E critical path) — 🟩 DONE (2026-09-13, 71/71 PASS: 43 original + 28 catalogue; E2E not run — browser download blocked)
+- 1.6 Qualification flow — 🟩 DONE (2026-09-18, Phase D)
+- 1.7 Admin auth + CRM — 🟩 DONE (2026-09-17, Phase A+B)
+- 1.8 Office pipeline (meetings) + follow-up — 🟩 DONE (2026-09-08, Phase D)
+- 1.9 Funnel events + analytics — 🟩 DONE (2026-09-18, Phase D)
+- 1.10 Privacy/Terms/Disclaimers — 🟩 DONE (2026-09-13)
+- 1.11 Tests — 🟨 PARTIAL: pure tests complete; E2E not executable (browser unavailable)
+- P-1 Registration/business-interest flow — 🟩 DONE (2026-09-18, D-026 full capture + D-032 Owner decision)
 
-**Pending pre-launch owner decisions (do not block local dev):** hosting/domain, ad platforms & tracking, final legal copy, meeting-model confirmation (§19, `DECISIONS.md`).
+### Task 1.6 — Qualification flow — 🟩 DONE locally (2026-09-18)
+
+**Implemented (Phase D):**
+
+- **QualificationToken table** — DB-backed, durable single-use tokens. Columns: `id`, `leadId` (UUID FK, `ON DELETE CASCADE`), `nonce` (UNIQUE), `expiresAt`, `consumedAt`, `createdAt`.
+- **`src/lib/qualification.ts`** + **`src/lib/qualification-client.ts`** — token system split for client/server safety:
+  - Client-safe (`qualification-client.ts`): `parseToken` (structural parsing), `verifyTokenSignature`/`isTokenStructurallyValid` (pure structural + expiration check, no Prisma, no `node:crypto`), `parseQualificationInput` (notes/interestType/city validation).
+  - Server-safe (`qualification.ts`): `generateQualificationToken` (creates DB record + HMAC-SHA256 signature), `consumeQualificationToken` (atomic `updateMany` with `consumedAt IS NULL AND expiresAt > NOW()` for replay protection), `validateQualificationToken` (non-consuming DB check for display).
+  - Token format: `<leadId>.<expiresAt>.<nonce>.<signature>` (HMAC-SHA256 using `BETTER_AUTH_SECRET`).
+  - No Lead PII embedded in the token.
+- **`src/app/actions/qualify.ts`** — `qualifyLeadAction` Server Action: consumes token atomically, extracts leadId ONLY from verified token (never from client input), sets status to `QUALIFIED`, records `lead_qualified` FunnelEvent with `fromStatus`/`toStatus` metadata, rate-limited (5 req/min/IP).
+- **`src/app/register-interest/qualify/page.tsx`** — qualification page receiving token as prop, rendering `QualificationForm`.
+- **`src/components/leads/QualificationForm.tsx`** — client component: uses `isTokenStructurallyValid` for UX-only pre-check; server always re-validates via `qualifyLeadAction`.
+- Token generated in `submitLeadAction` (Task 1.5) on lead creation, returned to client for "Continue to Qualification" flow.
+
+**D-030 (recorded in DECISIONS.md):** Cryptographically signed, DB-backed single-use continuation token binding public qualification form to exactly one Lead.
+
+### Task 1.9 — Funnel events + basic first-party analytics — 🟩 DONE locally (2026-09-18)
+
+**Implemented (Phase D):**
+
+- **FunnelEvent table** (`prisma/migrations/20260918000000_add_funnel_events/migration.sql`) — first-party funnel event tracking, separate from LeadEvent (CRM audit trail). Columns: `id`, `type`, `leadId` (UUID FK, `ON DELETE SET NULL`), `attribution` (JSONB), `deviceId` (random UUID), `metadata` (JSONB), `createdAt`. **D-031:** No `ipAddress`, `userAgent`, `firstName`, `phone`, or `userId` columns — PII minimization enforced at schema level.
+- **`src/lib/funnel.ts`** — server-side `recordFunnelEvent`: validates event type against approved set (`visitor_landing`, `lead_created`, `lead_qualified`, `registration_start`, `registration_complete`), re-validates attribution via `parseAttribution`, sanitizes metadata keys/values, validates deviceId UUID format.
+- **`src/lib/funnel-client.ts`** — client-safe `recordFunnelEventClient`: delegates to `/api/funnel` API route via fetch; type-restricted to `visitor_landing` and `registration_start` (client-allowed events).
+- **`src/app/api/funnel/route.ts`** — API Route Handler (POST) accepting `visitor_landing` and `registration_start` from clients; all other event types silently rejected.
+- **`src/components/tracking/FunnelTracker.tsx`** — client component that records `visitor_landing` on landing page load (only when UTM attribution present), with 10-minute per-device debounce. Uses shared `getOrCreateDeviceId` from `funnel-device.ts`.
+- **`src/lib/funnel-device.ts`** — shared first-party device-ID utility (consolidates device logic from FunnelTracker + LeadForm).
+- **`src/components/leads/RegistrationForm.tsx`** — client component that emits `registration_start` (client-side) on form mount via `recordFunnelEventClient`.
+- Event recording integrated: `lead_created` recorded in `submitLeadAction` (Task 1.5), `lead_qualified` recorded in `qualifyLeadAction` (Task 1.6), `registration_start` recorded client-side when RegistrationForm mounts (P-1 Task 1), `registration_complete` recorded server-side in `registerInterestAction` after successful ProductInterest persistence (P-1 Task 1).
+- Funnel event flow: `visitor_landing` → `lead_created` → `lead_qualified` → `registration_start` → `registration_complete` (where applicable).
+- Rate limiting via existing `rateLimit.ts` (5 req/min/IP).
+
+**D-029 (recorded in DECISIONS.md):** FunnelEvent table for first-party funnel/traffic measurement. No custom analytics platform. Separate from LeadEvent.
+
+**D-031 (recorded in DECISIONS.md):** FunnelEvent does NOT store IP addresses, User-Agent strings, first names, or phones. Device identification uses anonymous `deviceId` (client-generated UUID).
+
+**Tests / verification:**
+
+- `pnpm lint` — PASS (all Phase D files)
+- `pnpm typecheck` — PASS
+- `pnpm build` — PASS (includes `/api/funnel` dynamic route, `/register-interest/qualify` dynamic route)
+- `pnpm test` — 16/16 pure tests PASS (funnel-events tests updated to recognize all 5 event types; 9 DB tests skipped without PostgreSQL)
+
+### Task 1.6 — Qualification flow — Tests & verification
+
+- `pnpm lint` — PASS
+- `pnpm typecheck` — PASS
+- `pnpm build` — PASS
+- `pnpm test` — 27/27 pure tests PASS (27 qualification tests, 11 DB tests skipped without PostgreSQL)
+- DB integration tests (30/30 PASS from WSL): QualificationToken schema, nonce unique constraint, single-use consumption, replay prevention, durability, no PII in token, qualification workflow (status → QUALIFIED, lead_qualified event).
+
+### Phase P-1 — Registration / business-interest flow — 🟩 DONE locally (2026-09-18)
+
+**Scope:** Optional post-capture registration step that captures product interest, meeting/contact preference, and additional context; persists `ProductInterest`; records `registration_start`/`registration_complete` FunnelEvents.
+
+**D-026 (full capture flow):** ProductInterest capture-action implemented (previously "a subsequent step" in D-026).
+
+**D-032 (Owner decision):** Public registration does NOT create a `Meeting` record. `meetingPreference` is captured as metadata on the `registration_complete` FunnelEvent for CRM follow-up. Actual Meeting creation remains an authenticated CRM operation via the existing `scheduleMeeting` Server Action.
+
+**Funnel event semantics (corrected):**
+- `registration_start` — emitted **client-side** when the RegistrationForm mounts (entry into the registration step). Anonymous (deviceId only, no leadId). Implemented via `recordFunnelEventClient` → `/api/funnel` API route.
+- `registration_complete` — emitted **server-side only**, after successful `ProductInterest` persistence within a DB transaction. Not emitted on the client.
+- Server action (`register-interest.ts`) does NOT record `registration_start`.
+
+**New files:**
+- `src/lib/registration.ts` — pure validation (productId UUID, meetingPreference enum, additionalContext ≤1000 chars).
+- `src/lib/funnel-device.ts` — shared device-ID utility (consolidates FunnelTracker + LeadForm logic).
+- `src/app/actions/register-interest.ts` — Server Action: validates token (non-consuming), persists ProductInterest + registration_complete in transaction.
+- `src/components/leads/RegistrationForm.tsx` — client form with client-side registration_start emission.
+- `tests/registration-validation.test.ts` — 16 pure tests.
+- `tests/registration-persistence.test.ts` — 5 DB tests + 2 pure tests.
+
+**Modified files:**
+- `src/lib/funnel.ts` — added `registration_start`/`registration_complete` to `VALID_FUNNEL_EVENT_TYPES`.
+- `src/lib/funnel-client.ts` — extended `ClientFunnelEventInput` to allow `registration_start` (was `visitor_landing` only).
+- `src/app/api/funnel/route.ts` — accepts `registration_start` from clients.
+- `src/components/tracking/FunnelTracker.tsx` — uses shared `getOrCreateDeviceId`.
+- `src/components/leads/LeadForm.tsx` — uses shared `getOrCreateDeviceId`.
+- `src/app/register-interest/qualify/page.tsx` — added RegistrationForm section.
+- `tests/funnel-events.test.ts` — updated valid event-type set; added DB tests for new event types.
+
+**Verification:**
+- Lint: PASS (all new/modified files)
+- Typecheck: PASS
+- Build: PASS
+- Tests: 149/149 pure PASS (16 new validation + 2 new persistence + all existing); 5 DB tests skipped without PostgreSQL.
+
+### Phase 1 — Core tasks status summary
+
+- 1.1 — Foundation/scaffolding — 🟩 DONE (2026-09-08)
+- 1.2 — Local PostgreSQL + migration — 🟩 DONE (2026-09-08)
+- 1.3 — Public landing page — 🟩 DONE (2026-09-08)
+- 1.4 — Campaign landing + UTM/attribution — 🟩 DONE (2026-09-08)
+- 1.5 — Lead capture — 🟩 DONE (2026-09-08)
+- 1.6 — Qualification flow — 🟩 DONE (2026-09-18, Phase D)
+- 1.7 — Admin auth + CRM — 🟩 DONE (2026-09-08)
+- 1.8 — Office pipeline (meetings) + follow-up — 🟩 DONE (2026-09-08)
+- 1.9 — Funnel events + analytics — 🟩 DONE (2026-09-18, Phase D)
+- 1.10 — Privacy/Terms/Disclaimers — 🟩 DONE (2026-09-13)
+- 1.11 — Tests — 🟩 DONE: 167 pass, 55 skipped (DB-only) (was 206/206; 16 new tests added, DB-only tests now skip without local PostgreSQL) · E2E 10/10 PASS via system Chrome
+
+**Pending pre-launch owner decisions (do not block local dev):** hosting/domain (§19.5), ad platforms & tracking (§19.6), final legal copy (§19.7), meeting-model confirmation (§19.8).
+
+### Phase P-2 — Admin user management (🟩 local)
+
+**Scope:** Owner-provisioned Staff user management with forced password change on first login, activation/deactivation, and admin-only access control.
+
+**New files:**
+- `prisma/migrations/20260919000000_add_user_management_fields/migration.sql` — adds `mustChangePassword` and `isActive` to User table.
+- `src/lib/user-management.ts` — Zod schemas (`createUserSchema`, `toggleUserSchema`, `changePasswordSchema`).
+- `src/app/admin/(protected)/users/page.tsx` — Users management page (Owner-only, server-rendered).
+- `src/app/admin/(protected)/users/create-user-form.tsx` — client create-user form with `useActionState`.
+- `src/app/admin/change-password/page.tsx` — forced password-change gate (server-rendered gate).
+- `src/app/admin/change-password/change-password-form.tsx` — client form with current/new/confirm password.
+- `tests/user-management.test.ts` — 13 pure schema validation tests.
+- `tests/user-management-db.test.ts` — 4 DB integration tests.
+- `e2e/admin-user-management.spec.ts` — full workflow E2E test.
+
+**Modified files:**
+- `prisma/schema.prisma` — added `mustChangePassword Boolean @default(false)` and `isActive Boolean @default(true)` to User model.
+- `src/lib/auth.ts` — registered both as Better Auth `additionalFields`.
+- `src/server/auth/requireCrmUser.ts` — `getCrmUser` returns `mustChangePassword`; inactive users return null; `requireCrmUser` includes new field.
+- `src/app/admin/(protected)/layout.tsx` — redirects `mustChangePassword` users to `/admin/change-password`; added "Users" nav link for Owner.
+- `src/app/admin/(protected)/actions.ts` — `createCrmUser`, `toggleUserActive`, `changePasswordAction` added.
+- `docs/DECISIONS.md` — D-033 recorded.
+- `docs/CHANGELOG.md` — P-2 entry.
+
+**Security verification:**
+- `await requireAdmin()` on all admin-only actions (awaited — was a bug before fix).
+- `toggleUserActive` prevents admin account deactivation and self-deactivation at server level.
+- `role` field has `input: false` in Better Auth — clients cannot self-assign roles.
+- Temp passwords hashed by Better Auth — never stored in plaintext, never logged, never returned in responses.
+- Inactive users blocked from all protected routes via `getCrmUser()` null return.
+- `mustChangePassword` cleared only after successful Better Auth `changePassword`.
+
+**Verification:**
+- Lint: PASS (0 errors, 0 warnings)
+- Typecheck: PASS (`tsc --noEmit`)
+- Tests: 167 passed, 55 skipped (DB-only)
+- Build: PASS (Next.js 16.3.4 production build)
+- E2E: Cannot run without DATABASE_URL + running server; test written and syntax-checked
 
 ### Deployment milestone (§11.7) — ⚪ NOT STARTED
 

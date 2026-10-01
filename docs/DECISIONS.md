@@ -82,6 +82,32 @@ Owner-approved decisions and their rationale. Every future implementation task m
 - **Decision:** Add a planned public homepage visual redesign — Semrush-inspired UX quality with a NeoLife botanical/wellness visual identity (leaves/herbs/nutrition/nature), varied section backgrounds (not all-white), and a dynamic scroll. Compliance-safe (natural wellness + nutrition + science; no medical/cure claims). Public UI/UX only — no funnel/data/auth/CRM/infra changes.
 - **Consequences:** Recorded as a planned upgrade (⚪ NOT STARTED) in `docs/DESIGN_UPGRADE_PLAN.md`. Implementation is NOT authorized yet; the plan is for Owner review.
 
+### D-029 — First-party funnel event tracking (2026-09-18)
+
+- **Decision:** Implement a `FunnelEvent` table for first-party funnel/traffic measurement, separate from `LeadEvent` (which serves as the CRM audit trail). FunnelEvent stores only `type`, `leadId` (UUID FK), `attribution` (JSONB), `deviceId` (random client UUID), `metadata` (JSONB), and `createdAt`. FunnelEvent.leadId has a foreign key to `Lead(id)` with `ON DELETE SET NULL` so that lead deletions do not destroy funnel measurements.
+- **Rationale:** First-party funnel events power the §6 Core Funnel journey tracking (landing → capture → qualification → registration → office pipeline → follow-up) without a custom analytics platform. Separating FunnelEvent from LeadEvent keeps marketing/analytics queries decoupled from CRM audit-trail semantics and avoids polluting LeadEvent with anonymous visitor events (events where leadId is null).
+- **Consequences:** `src/lib/funnel.ts` records server-side events (`lead_created`, `lead_qualified`, `registration_complete`); `src/app/api/funnel/route.ts` accepts `visitor_landing` and `registration_start` from clients (proxy pattern); client-side `visitor_landing` events are sent via `FunnelTracker` and `registration_start` via `RegistrationForm` through the API route with rate limiting (5 req/min/IP) and first-party UTM attribution.
+
+### D-030 — Qualification continuation token (2026-09-18)
+
+- **Decision:** Implement a cryptographically signed, DB-backed single-use continuation token that binds a public qualification form to exactly one Lead. Token format: `<leadId>.<expiresAt>.<nonce>.<signature>` (HMAC-SHA256 using BETTER_AUTH_SECRET). Single-use is enforced durably via an atomic DB `updateMany` (set `consumedAt = NOW()` only where `consumedAt IS NULL AND expiresAt > NOW()`). Client components use a pure structural/expiration check for UX; the server action (`qualifyLeadAction`) re-validates the signature + DB nonce and consumes the token atomically. No Lead PII is embedded in the token.
+- **Consequences:** `src/lib/qualification.ts` is split so that `parseToken` and `isTokenStructurallyValid` are client-safe (no Prisma, no `node:crypto`), while `generateQualificationToken`, `consumeQualificationToken`, and `validateQualificationToken` use dynamic `import()` for Prisma and `node:crypto` so they are server-only. DB integration tests are skipped when no PostgreSQL is available.
+
+### D-031 — FunnelEvent data minimization: no IP/user-agent storage (2026-09-18)
+
+- **Decision:** The `FunnelEvent` table MUST NOT store `ipAddress`, `userAgent`, `firstName`, `phone`, or `userId`. Device identification uses a client-generated `deviceId` (random UUID) only. This decision is enforced at the schema level (no such columns exist) and at the application layer (`src/lib/funnel.ts` and `src/app/api/funnel/route.ts` never accept or record these fields).
+- **Rationale:** D-006 data-protection baseline requires PII minimization. IP addresses and user-agent strings are classified as personal data under Kenya's Data Protection Act. First-party funnel tracking for the MVP must not collect or persist this data — only deviceId (anonymous, client-generated) and validated first-party attribution are stored.
+
+### D-032 — Registration/business-interest flow: no Meeting creation during public registration (2026-09-18)
+
+- **Decision:** The public registration/business-interest step (Phase P-1 Task 1) captures `meetingPreference` (video_call / in_person / phone_call) as registration metadata for CRM follow-up. It does NOT create a `Meeting` record. Actual `Meeting` creation/scheduling remains an authenticated CRM operation performed by the Owner/Staff through the existing `scheduleMeeting` Server Action.
+- **Rationale:** The public registration form is a business-interest capture step, not a booking system. Meetings require an authenticated CRM user (Owner/Staff), a definite `scheduledAt`, and audit-trail recording (`LeadEvent`). Creating a placeholder `Meeting` with a fake `scheduledAt` or `SCHEDULED` status would pollute the office pipeline. The captured `meetingPreference` is stored in the `registration_complete` FunnelEvent metadata and is available for CRM staff to use when scheduling.
+- **Consequences:**
+  - `src/app/actions/register-interest.ts` does NOT call `prisma.meeting.create`.
+  - `meetingPreference` is persisted as metadata on `registration_complete` FunnelEvent only.
+  - `registration_start` is emitted client-side when the form mounts (first-party, anonymous deviceId); `registration_complete` is server-side only after successful `ProductInterest` persistence.
+  - The existing CRM Meeting workflow (`src/app/admin/(protected)/actions.ts` `scheduleMeeting`) is unchanged.
+
 ## Open / Pending Decisions
 
 - Hosting / domain target (before production deployment only).
@@ -157,6 +183,52 @@ The following decisions were identified during the NeoLife Product Catalogue pla
 - **Rationale:** Clean separation from Lead lifecycle; supports eventual business flow without coupling to order/e-commerce functionality.
 - **Implementation:** `ProductInterest` model in `prisma/schema.prisma` (fields: productId, leadId, status, message, notificationSent, notificationSentAt). Architecture ready; full capture flow is a subsequent step.
 
+### D-027 — Owner-controlled lead assignment model (APPROVED — 2026-09-17)
+
+- **Decision:** OPTION A — Owner-controlled lead assignment.
+  - The **Owner** (role `admin`) can view all leads, assign leads to Staff, reassign leads between Staff, and leave leads unassigned (null = Owner's pool).
+  - **Staff** (role `staff`) can view and work only on leads explicitly assigned to them. Staff cannot assign, reassign, or unassign leads. Staff cannot change `assignedUserId` through crafted requests/API calls.
+  - The Owner remains solely responsible for lead allocation.
+- **Rationale:** Owner approved Option A on 2026-09-17 for the two-user CRM expansion. This is the minimal viable assignment model — no per-lead workflows, no self-service assignment, no cross-tenant complexity (single-tenant office CRM).
+- **Enforcement:**
+  - Server-side: `assignLead` Server Action calls `requireAdmin()` — only the Owner can invoke it; non-Admin requests are rejected before any data mutation.
+  - Target-user validation: the target user must exist and have `role = "staff"`; Admin users and arbitrary IDs are rejected.
+  - Ownership scoping: Staff lead-list and lead-detail queries filter on `assignedUserId` (Phase A). Staff accessing an unassigned or other-user's lead receives 404.
+  - Audit trail: `lead_assigned` and `lead_unassigned` events are recorded in `LeadEvent` with `metadata.by`, `from`, and `to`.
+- **Implementation:** `src/lib/assignment.ts` (pure authorization helpers), `src/app/admin/(protected)/actions.ts` (`assignLead`, `getCrmUsers`), `src/components/admin/AssignmentForm.tsx`, `src/app/admin/(protected)/leads/[id]/page.tsx` (Owner-only UI).
+- **Schema change:** `Lead.assignedUserId` (nullable String/TEXT, FK to `User.id`, `ON DELETE SET NULL`) + indexes — Phase A migration `20260917000000_add_lead_ownership`.
+- **No new Owner decision required.**
+
+### D-028 — Canonical audit actor on LeadEvent (APPROVED — 2026-09-17)
+
+- **Decision:**
+  - Keep `LeadEvent.type` as a `String` (not a PostgreSQL enum). Documentation updated to match.
+  - Add nullable `LeadEvent.userId TEXT` as the **canonical** audit actor field (FK to `User.id`, `ON DELETE SET NULL`, indexed).
+  - `LeadEvent.userId` is populated from the authenticated server-side CRM user — never from client-supplied actor IDs.
+  - Existing audit records are preserved (null userId for legacy/backfilled events).
+  - If existing `metadata.by` is retained, it must remain consistent with `userId`.
+- **Enforcement:**
+  - All Server Actions (`updateLeadStatus`, `addFollowUp`, `scheduleMeeting`, `updateMeeting`, `assignLead`) set `userId` from the server-side session.
+  - Staff cannot forge `LeadEvent.userId` — server always uses the authenticated user's ID.
+- **Implementation:** `prisma/schema.prisma` (`LeadEvent.userId`), migration `20260917120000_add_leadevent_actor/migration.sql`, `src/app/admin/(protected)/actions.ts`.
+- **No new Owner decision required.**
+
 ## Resolved Decisions (was "Pending", now "Approved")
 
 All of D-019 through D-026 were **pending** during planning and are now **APPROVED** as of 2026-09-13. The decisions listed above reflect the Owner's explicit approval.
+
+### D-033 — Admin user management for Phase P-2 (APPROVED — 2026-09-19)
+
+- **Decision:** Add `mustChangePassword` and `isActive` boolean fields to the `User` model. Owner (admin) can create Staff users with a temporary password that is enforced to change on first login. Owner can deactivate/reactivate Staff users. Inactive users cannot authenticate or access CRM routes.
+- **Rationale:** Two-user CRM requires the Owner to provision Staff accounts and be able to revoke access. Forced password change on first login ensures the Owner-chosen temp password is not retained.
+- **Enforcement:**
+  - `createCrmUser` Server Action calls `await requireAdmin()` before any user creation; Staff users cannot invoke it.
+  - The `role` field has `input: false` in Better Auth config — clients cannot self-assign roles. New Staff accounts are hardcoded `role: "staff"` via Prisma after sign-up.
+  - `toggleUserActive` Server Action calls `await requireAdmin()`; additionally prevents deactivating admin accounts and prevents self-deactivation at the server level.
+  - `getCrmUser()` returns `null` for inactive users — they cannot access any protected CRM route.
+  - The protected layout redirects users with `mustChangePassword: true` to `/admin/change-password`; that page is outside the `(protected)` route group to avoid redirect loops.
+  - `mustChangePassword` is cleared only after successful password change via Better Auth's `changePassword` API.
+- **Password security:**
+  - Passwords are hashed by Better Auth's `signUpEmail`/`changePassword` APIs — never stored in plaintext by the application.
+  - Temp passwords are not logged or returned in API responses.
+- **Implementation:** `prisma/schema.prisma`, `prisma/migrations/20260919000000_add_user_management_fields/`, `src/lib/auth.ts`, `src/lib/user-management.ts`, `src/server/auth/requireCrmUser.ts`, `src/app/admin/(protected)/actions.ts` (`createCrmUser`, `toggleUserActive`, `changePasswordAction`), `src/app/admin/(protected)/users/page.tsx`, `src/app/admin/(protected)/users/create-user-form.tsx`, `src/app/admin/change-password/page.tsx`, `src/app/admin/change-password/change-password-form.tsx`.
