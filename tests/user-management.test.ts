@@ -64,9 +64,28 @@ describe("User management schemas (pure, no DB)", () => {
       ).toBe(true);
     });
 
-    it("rejects a non-UUID string", () => {
+    it("accepts a Better Auth-style user ID (opaque alphanumeric, non-UUID)", () => {
+      // Better Auth generates ~31-char alphanumeric IDs (see
+      // @better-auth/core generateId). These are the IDs actually stored in
+      // the User table and bound into the deactivation form.
+      const betterAuthStyleId = "aB3xK9mQ2vR7wL5pT0yZ8cD4fG6hJ1n";
+      expect(betterAuthStyleId).toMatch(/^[A-Za-z0-9]{31}$/);
+      expect(
+        toggleUserSchema.safeParse({ userId: betterAuthStyleId }).success,
+      ).toBe(true);
+    });
+
+    it("rejects a short garbage string", () => {
       const result = toggleUserSchema.safeParse({
         userId: "not-a-uuid",
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("rejects a string with disallowed characters", () => {
+      // Long enough to pass a length-only check — must still fail on charset.
+      const result = toggleUserSchema.safeParse({
+        userId: "<script>alert(1)</script>____padding",
       });
       expect(result.success).toBe(false);
     });

@@ -29,5 +29,10 @@ export default defineConfig({
     url: "http://localhost:3000",
     reuseExistingServer: true,
     timeout: 60_000,
+    // Opt out of Better Auth's default sign-in rate limit (3 per 10s/IP) for
+    // E2E runs only: the suite performs five sign-ins from one IP within a
+    // few seconds (global setup + P-2 workflow), which the production default
+    // throttles with 429s. See src/lib/auth.ts. Production is unaffected.
+    env: { E2E_DISABLE_AUTH_RATE_LIMIT: "1" },
   },
 });
