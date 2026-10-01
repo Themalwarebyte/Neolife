@@ -9,7 +9,7 @@ Implemented Owner-approved admin user management for Phase P-2 preparation: Staf
 **Schema:**
 - `prisma/schema.prisma` — added `mustChangePassword Boolean @default(false)` and `isActive Boolean @default(true)` to the `User` model.
 - `prisma/migrations/20260919000000_add_user_management_fields/migration.sql` — new migration.
-- `src/lib/auth.ts` — registered both fields as Better Auth `additionalFields` (`mustChangePassword` with `input: true`, `isActive` with `input: true`).
+- `src/lib/auth.ts` — registered both fields as Better Auth `additionalFields` (`mustChangePassword` with `input: true`; `isActive` with **`input: false`**, so a client can never set its own activation state).
 
 **Server actions (`src/app/admin/(protected)/actions.ts`):**
 - `createCrmUser` — Owner-only; creates a Staff user via Better Auth `signUpEmail`, then sets `role: "staff"` and `mustChangePassword: true` via Prisma. Rejects duplicate emails.
@@ -33,7 +33,7 @@ Implemented Owner-approved admin user management for Phase P-2 preparation: Staf
 **Verification:**
 - Lint: PASS (0 errors, 0 warnings)
 - Typecheck: PASS (`tsc --noEmit`)
-- Tests: 167 passed, 55 skipped (DB-only) · E2E 10/10 PASS
+- Tests: 167 passed, 55 skipped (DB-only) — **222 total** · E2E 11 tests (the P-2 `admin-user-management` spec is 🟨 failing at the deactivation step; see `docs/STATUS.md`)
 
 ### Phase P-1 — Registration / business-interest flow (🟩 local)
 
@@ -80,7 +80,7 @@ Implemented the Owner-approved registration/business-interest capture flow (D-02
 - Lint: PASS (all new/modified files)
 - Typecheck: PASS (`tsc --noEmit`)
 - Build: PASS (Next.js production build)
-- Tests: 167 passed, 55 skipped (DB-only) (was 206/206; 16 new tests added) · E2E 10/10 PASS via system Chrome
+- Tests: 167 passed, 55 skipped (DB-only) — 222 total (was 206/206; 16 new tests added) · E2E via system Chrome (see `docs/STATUS.md` for current E2E state)
 
 ### Phase B — Owner-controlled lead assignment (🟩 local)
 

@@ -14,10 +14,16 @@ application serves two audiences:
 - **Framework:** Better Auth 1.7.2 with Prisma adapter (`@better-auth/prisma-adapter`).
 - **Provider:** Email/password (`better-auth` `emailAndPassword.enabled = true`).
 - **Session:** Cookie-based; verified server-side on each request.
-- **User model:** `User` table with `id`, `name`, `email`, `role`.
+- **User model:** `User` table with `id`, `name`, `email`, `role`, `mustChangePassword`, `isActive`.
   - `role` field: `"admin"` (Owner) or `"staff"` (Colleague). Default: `"staff"`.
   - `input: false` in Better Auth config — clients cannot self-assign role.
-  - No public sign-up route; accounts are provisioned via seed scripts or direct DB access.
+  - `mustChangePassword Boolean @default(false)` — forces a password change on next login.
+  - `isActive Boolean @default(true)` — deactivated accounts cannot authenticate.
+  - Both are registered as Better Auth `additionalFields`: `mustChangePassword` with
+    `input: true` (server sets it), `isActive` with **`input: false`** so a client can
+    never set its own activation state.
+  - No public sign-up route; accounts are provisioned via `scripts/seed-admin.ts`,
+    `scripts/seed-staff.ts`, or the Owner-only `/admin/users` page.
 
 ## Authorization
 
@@ -48,6 +54,55 @@ application serves two audiences:
   - Target user is validated: must exist and have `role === "staff"`.
   - `assignedUserId` is never trusted from client input alone — the action re-validates the target user server-side.
 - **Pure helpers** in `src/lib/assignment.ts` (`canAssignLeads`, `isAssignableRole`, `canViewLead`, `leadVisibilityWhere`) encapsulate the authorization policy for testability.
+- **Pure helpers** in `src/lib/user-management.ts` encapsulate the user-management input policy (name, email, temporary-password strength) for testability.
+
+### Admin user management (P-2)
+
+Owner-only account lifecycle: create Staff users, force a password change on first
+login, and activate/deactivate accounts.
+
+**Routes**
+
+| Route | Access | Purpose |
+|---|---|---|
+| `/admin/users` | Owner only (`requireAdmin`) | Create Staff users; list all users; activate/deactivate |
+| `/admin/change-password` | Any authenticated user | Complete a forced password change |
+| `/admin/leads`, `/admin/leads/[id]` | Owner + Staff | Ownership-scoped CRM (unchanged) |
+
+> `/admin/change-password` is deliberately **outside** the `(protected)` route group.
+> The protected layout redirects users with `mustChangePassword: true` to this
+> route; if the page were inside the group the redirect would loop.
+
+**Server actions** (`src/app/admin/(protected)/actions.ts`)
+
+| Action | Guard | Behaviour |
+|---|---|---|
+| `createCrmUser` | `requireAdmin()` | Creates the account via Better Auth `signUpEmail` (password hashed, never plaintext), then sets `role: "staff"` and `mustChangePassword: true` server-side. Rejects duplicate emails. |
+| `toggleUserActive` | `requireAdmin()` | Flips `isActive`. Refuses to deactivate `admin` accounts and refuses self-deactivation. |
+| `changePasswordAction` | `requireCrmUser()` + `mustChangePassword` | Calls Better Auth `changePassword`, then clears `mustChangePassword`. |
+
+**Authorization controls**
+
+- **Staff cannot create users or change roles.** `createCrmUser` calls
+  `requireAdmin()` before any mutation. The `role` field is `input: false` in the
+  Better Auth config, so role cannot be supplied by a client; new Staff accounts are
+  hardcoded `role: "staff"` via Prisma after sign-up.
+- **Inactive accounts are fully locked out.** `getCrmUser()` returns `null` when
+  `isActive` is false, so `requireCrmUser()` treats them as unauthenticated and
+  redirects to `/admin/login`. Every protected route is affected, not just CRM reads.
+- **Owner accounts cannot be deactivated**, and the Owner cannot deactivate their own
+  account — both enforced in `toggleUserActive` after `requireAdmin()`.
+- **Forced password change cannot be bypassed.** The `(protected)` layout redirects
+  any user with `mustChangePassword: true` to `/admin/change-password`, so direct
+  navigation to CRM routes is intercepted. `mustChangePassword` is cleared only after
+  a successful password change.
+- **Owner-only pages reject Staff.** Navigating to `/admin/users` as Staff redirects
+  away, since the page calls `requireAdmin()`.
+
+**Provenance:** `prisma/migrations/20260919000000_add_user_management_fields/`,
+`src/lib/auth.ts`, `src/lib/user-management.ts`, `src/server/auth/requireCrmUser.ts`,
+`src/app/admin/(protected)/users/`, `src/app/admin/change-password/`,
+`src/app/admin/(protected)/actions.ts`, `scripts/seed-staff.ts`.
 
 ## Data model (CRM)
 
@@ -101,12 +156,15 @@ model User {
   emailVerified Boolean   @default(false)
   image         String?
   role          String    @default("staff")
+  mustChangePassword Boolean @default(false)
+  isActive      Boolean   @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  sessions      Session[]
-  accounts      Account[]
-  assignedLeads Lead[]    @relation("user_assigned_leads")
+  sessions Session[]
+  accounts Account[]
+  assignedLeads Lead[] @relation("user_assigned_leads")
+  events LeadEvent[]
 }
 ```
 
@@ -211,26 +269,51 @@ Prospect → /register-interest/qualify?token=<token>
 ### Office CRM
 
 ```
-Owner/Staff → /admin (redirect: authenticated → /admin/leads, else → /admin/login)
-          → /admin/leads (ownership-scoped list)
+Visitor → /admin (redirect: authenticated → /admin/leads, else → /admin/login)
+Owner   → /admin/users (Owner only)
+          → create-user-form → createCrmUser   (Staff account + mustChangePassword)
+          → toggleUserActive                   (activate / deactivate Staff)
+Owner/Staff → /admin/leads (ownership-scoped list)
           → /admin/leads/[id] (ownership-scoped detail)
             → LeadStatusForm → updateLeadStatus (status_changed event)
             → FollowUpForm → addFollowUp (follow_up_added event)
             → MeetingForm → scheduleMeeting (meeting_scheduled event)
             → MeetingUpdateForm → updateMeeting (meeting_status_changed event)
             → AssignmentForm → assignLead (lead_assigned / lead_unassigned event, Owner-only)
+
+Any user with mustChangePassword = true
+       → (protected) layout intercepts → /admin/change-password
+         → changePasswordAction (Better Auth changePassword, then clears the flag)
+       → /admin/leads
 ```
 
 ## Deployment architecture
 
 - **Local dev:** Docker Compose (`docker-compose.yml`) — PostgreSQL 16 on port 5433.
-- **Production:** Docker standalone + Compose (`deploy/compose.yaml`) — isolated `neolife` project/network, Caddy gateway, Cloudflare Tunnel.
-- **Migration strategy:** `prisma migrate deploy` in the Docker entrypoint (see `docs/DEPLOYMENT.md`).
-- **Secrets:** Root-owned env file injected as container environment variables; never committed.
+- **Production:** 🟩 **LIVE** at `https://neolife.ooflowdesk.com`. Docker standalone +
+  Compose (`compose.production.yaml`, mirrored to the server as `deploy/compose.yaml`) —
+  isolated `neolife` project, dedicated bridge network, dedicated PostgreSQL volume,
+  Cloudflare Tunnel. Services are `neolife-web`, `neolife-postgres`, `neolife-tunnel`,
+  and a profiled one-shot `neolife-seed`. There is **no gateway/proxy service** in the
+  current topology: TLS termination and origin routing are handled by Cloudflare
+  directly in front of `neolife-web`.
+- **Migration strategy:** `prisma migrate deploy` against the production `DATABASE_URL`
+  (never `migrate dev`); migrations are forward-only, so rollback is app-only.
+- **Secrets:** Root-owned env file injected as container environment variables at run
+  time via `docker compose --env-file`; never committed, never in `compose.production.yaml`
+  (which contains only `${VAR}` placeholders). See `docs/DEPLOYMENT.md` §0.
 
 ## Testing
 
+- **Official totals:** the suite contains **222 tests** — **167** run without
+  `DATABASE_URL`, plus **55** DB-enabled tests that require local PostgreSQL. Tests gate
+  on `const DB_AVAILABLE = Boolean(process.env.DATABASE_URL)`, so a run without that
+  variable legitimately reports fewer tests. See `docs/PROJECT_PLAN.md`.
 - **Unit/pure:** Vitest (`pnpm test`) — no DB required.
-- **Integration:** Vitest with DB — `tests/*-persistence.test.ts` and `tests/qualification.test.ts`, `tests/funnel-events.test.ts` (require `docker compose up -d`).
+- **Integration:** Vitest with DB — `tests/*-persistence.test.ts`, `tests/qualification.test.ts`,
+  `tests/funnel-events.test.ts`, `tests/user-management-db.test.ts`,
+  `tests/assignment-{integration,reassignment}.test.ts`, `tests/lead-persistence.test.ts`
+  (require `docker compose up -d`).
 - **DB integration:** `scripts/test-db-integration.js` — 30 tests validating FunnelEvent schema (D-031 no-PII), QualificationToken schema, single-use consumption, replay prevention, durability, and qualification workflow. Run from WSL (Windows node has WSL PostgreSQL networking issues).
-- **E2E:** Playwright with system Chrome (`pnpm exec playwright test`).
+- **E2E:** Playwright with system Chrome (`pnpm exec playwright test`) — 11 tests across
+  5 specs. `e2e/global-setup.ts` creates shared Owner and Staff sessions before the run.

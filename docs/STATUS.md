@@ -2,6 +2,77 @@
 
 Phase/step-by-step implementation status. Authoritative scope lives in `PROJECT_PLAN.md`.
 
+---
+
+## 📍 CURRENT STATE SUMMARY
+
+> **Read this first.** Everything below this line is a dated, historical milestone
+> entry. Those entries keep the test counts, deployment states, and prerequisites
+> that were true *at the time they were written* — they are a log, not a status
+> page. This summary is authoritative. Where the two disagree, this summary wins.
+
+**As of: 2026-10-01**
+
+| | |
+|---|---|
+| **Current phase** | PHASE 1 — Traffic MVP · 🟩 COMPLETE (deployed) |
+| **Production** | 🟩 **LIVE** at `https://neolife.ooflowdesk.com` |
+| **Production image** | `neolife-web:b371fcf` |
+| **Branch** | `master` |
+| **Official test count** | **222 total** = 167 (no `DATABASE_URL`) + 55 (DB-enabled) |
+| **E2E** | 11 tests across 5 specs · 10 passing · 1 failing (see below) |
+| **Database** | 10 Prisma migrations, all reconciled and applied |
+
+### 🟩 Completed
+
+- **Phase 0** — project foundation and planning
+- **Phase 1 (Traffic MVP)** — all tasks 1.1–1.11; landing page, lead capture,
+  attribution, CRM, meetings, follow-ups, audit trail
+- **CRM phases A–D** — ownership scoping, Owner-controlled lead assignment,
+  role-aware authorization, staff status changes
+- **P-1 — Registration / business-interest flow** (2026-09-18, D-026 + D-032) —
+  single-use qualification tokens, registration capture, transactional persistence
+- **Funnel tracking** — first-party `FunnelEvent` capture (D-029), no-PII device
+  identity (D-031), full funnel flow `visitor_landing` → `lead_created` →
+  `lead_qualified` → `registration_start` → `registration_complete`
+- **Deployed functionality** — two production releases recorded in `docs/CHANGELOG.md`
+  (`neolife-web:11e64fa`, `neolife-web:b371fcf`), including the D-020 official
+  product/category image rebuild. Production currently serves `b371fcf`.
+
+### 🟨 In progress
+
+- **P-2 — Admin user management**: implementation 🟩 complete (schema, migration,
+  Better Auth fields, `createCrmUser`, `toggleUserActive`, `changePasswordAction`,
+  `/admin/users`, `/admin/change-password`, `requireCrmUser` guards). **E2E
+  validation is not complete** — `e2e/admin-user-management.spec.ts` fails at the
+  "Owner deactivates the Staff user" step: the `Deactivate` Server Action runs and
+  `revalidatePath` fires, but the row does not update to "Deactivated" in time for
+  the assertion. Unit and DB-layer coverage for this feature passes.
+- **Documentation reconciliation** — completed 2026-10-01 (see `docs/CHANGELOG.md`).
+
+### ⚪ Not started / not authorized
+
+- **Paid advertising** — NOT AUTHORIZED; still gated behind the §11.6 launch gate
+  (`PROJECT_PLAN.md` D-001, `DEPLOYMENT_EXECUTION_PLAN.md`).
+- **Phase 2 — Conversion & CRM Deepening**, and Phases 3–8.
+- **D-021 email provider** — still provider-agnostic, NOT YET SELECTED
+  (`src/lib/email.ts`, default `none`/`dummy`).
+
+### Superseded historical claims
+
+These were true when written and are retained below as history. Do not re-use them:
+
+- "Deployment NOT STARTED" / "no hostname/route for `neolife.ooflowdesk.com`" —
+  superseded; production is live.
+- "Local PostgreSQL is NOT yet provisioned/migrated" and "Better Auth auth tables
+  intentionally NOT in the application schema" — superseded; 10 migrations applied.
+- "Playwright browser download is blocked in this environment" — superseded; E2E runs
+  on system Chrome.
+- Test counts such as `43/43`, `29/29`, `36/36`, `167 pass` — historical baselines.
+  The official total is **222**.
+
+---
+
 ## Fix — admin seed path-alias resolution — 🟩 DONE locally (2026-09-12)
 
 - Root cause: `tsx` couldn't resolve `@/*` aliases inside the production image (no `tsconfig.json` in the runtime stage).
@@ -36,7 +107,7 @@ Phase/step-by-step implementation status. Authoritative scope lives in `PROJECT_
 - **Legal baseline:** 🟩 **MVP LEGAL BASELINE COMPLETE** (Privacy, Terms, Disclosures, business-relationship, earnings/results, product/medical, consent, footer wording). Future-revisable; not legal advice.
 - **E2E:** 🟩 COMPLETE — Playwright 1/1 PASS via system Chrome.
 - **Production preparation:** 🟩 COMPLETE — `docs/DEPLOYMENT.md` runbook + env spec created; server inspected read-only.
-- **Deployment:** ⚪ NOT STARTED · **Paid advertising:** ⚪ NOT AUTHORIZED.
+- **Deployment:** ⚪ NOT STARTED · **Paid advertising:** ⚪ NOT AUTHORIZED. *(Deployment figure superseded 2026-10-01 — production is live. Paid advertising remains NOT AUTHORIZED.)*
 - **§11.6:** 🟨 OPEN — remaining launch gates are deployment-dependent (hosting/domain config, production secrets, production smoke test, compliance review before ads).
 
 ## Launch-Gate Readiness Audit (§11.6 / §11.7) — superseded by reconciliation above
@@ -71,7 +142,7 @@ Read-only audit (no new features, no deploy, no paid ads). Verified against live
 - **Server pre-flight (read-only, access restored):** Docker 29.8.0 · no `neolife` project/network/container/route exists · `/opt/ooflowdesk/neolife` absent · resources: 169G disk free, ~5.9G RAM, 4 cores · `neolife.ooflowdesk.com` **already resolves publicly (A+AAAA)**.
 - **Isolation confirmed additive:** dedicated `neolife` dir + `neolife` network + `neolife-web` (internal 3000) + `neolife-postgres` (internal 5432) + `neolife-tunnel`; no host port needed; no shared resource touched.
 - **Remaining Owner actions:** provision production secrets · create/provide the dedicated Cloudflare Tunnel connector token for `neolife.ooflowdesk.com` (or confirm an existing route) · explicit deployment authorization.
-- **§11.7 ⚪ NOT STARTED · Production deployment NOT AUTHORIZED · Paid advertising NOT AUTHORIZED.**
+- **§11.7 ⚪ NOT STARTED · Production deployment NOT AUTHORIZED · Paid advertising NOT AUTHORIZED.** *(Deployment figures superseded 2026-10-01 — the deployment was executed and production is live. Paid advertising remains NOT AUTHORIZED.)*
 - **Deployment execution plan:** `docs/DEPLOYMENT_EXECUTION_PLAN.md` — **🟩 READY FOR OWNER DEPLOYMENT DECISION**. Secret architecture **A** (env-var injection) accepted by the Owner. Accurate wording: the root-only `neolife.env` protects the *source file*; because the existing `ooadmin` account has root-equivalent Docker privileges, injected container env is technically inspectable by it; NEOLIFE does not modify this privilege model; Kilo must not intentionally inspect/print/log/expose secrets.
 
 ## Visual/conversion upgrade (Owner-approved) — 🔵 IN PROGRESS (implemented locally, not deployed/accepted)
@@ -100,8 +171,8 @@ Public homepage visual redesign (Semrush-level UX polish + NeoLife botanical/wel
 **Notes:**
 
 - Schema keeps the CRM lifecycle as the Owner-approved initial model (D-003) — statuses are enum-backed and extensible.
-- Better Auth auth tables intentionally NOT in the application schema (ecosystem convention); admin authentication is a later Phase 1 task.
-- Local PostgreSQL is NOT yet provisioned/migrated — next prerequisite.
+- Better Auth auth tables intentionally NOT in the application schema (ecosystem convention); admin authentication is a later Phase 1 task. *(Superseded — auth tables and admin authentication were both implemented.)*
+- Local PostgreSQL is NOT yet provisioned/migrated — next prerequisite. *(Superseded — local PostgreSQL is provisioned and all 10 migrations are applied.)*
 
 ### Task 1.2 — Local PostgreSQL + initial migration + data-layer smoke test — 🟩 DONE (2026-09-08)
 
@@ -167,7 +238,7 @@ Public homepage visual redesign (Semrush-level UX polish + NeoLife botanical/wel
 
 **Known limitations:**
 
-- Playwright browser download is blocked in this environment (revision 1243 unavailable locally, download fails) → the E2E spec is written but not yet executed. Compensating verification: unit tests + real-DB integration test + smoke test + live HTTP/content checks. Run `pnpm exec playwright install chromium` when network allows, then `pnpm exec playwright test`.
+- Playwright browser download is blocked in this environment (revision 1243 unavailable locally, download fails) → the E2E spec is written but not yet executed. Compensating verification: unit tests + real-DB integration test + smoke test + live HTTP/content checks. Run `pnpm exec playwright install chromium` when network allows, then `pnpm exec playwright test`. *(Superseded — E2E now runs against system Chrome via `channel: "chrome"`; see the Current State Summary above.)*
 - Rate limiter is in-memory (per-process) — adequate for single-instance MVP; revisit with production topology.
 - Consent wording is conservative placeholder pending Owner/legal review (§11.6 launch gate).
 
@@ -251,7 +322,7 @@ Public homepage visual redesign (Semrush-level UX polish + NeoLife botanical/wel
 - `requireCrmUser.ts`: `getCrmUser`, `requireCrmUser`, `requireAdmin`, `isAdminSession`, `CrmUser`.
 - Protected layout, admin index, leads list, lead detail — ownership-scoped queries (Owner: all; Staff: assigned-only).
 - Server Actions (`updateLeadStatus`, `addFollowUp`, `scheduleMeeting`, `updateMeeting`) — `requireCrmUser` + `verifyLeadOwnership`.
-- Migration `20260917000000_add_lead_ownership` created (not yet applied to DB).
+- Migration `20260917000000_add_lead_ownership` created (not yet applied to DB). *(Superseded — applied and reconciled; see the Current State Summary above.)*
 - Typecheck ✅ · lint clean (changed files) · 15/15 new pure tests pass.
 
 **Phase B — Owner-controlled lead assignment:** 🟩 DONE locally (2026-09-17)
@@ -431,7 +502,11 @@ Public homepage visual redesign (Semrush-level UX polish + NeoLife botanical/wel
 - Build: PASS (Next.js 16.3.4 production build)
 - E2E: Cannot run without DATABASE_URL + running server; test written and syntax-checked
 
-### Deployment milestone (§11.7) — ⚪ NOT STARTED
+### Deployment milestone (§11.7) — ✅ REACHED — production is LIVE
+
+> **Superseded (2026-10-01).** This milestone has been reached: production is live at
+> `https://neolife.ooflowdesk.com` serving `neolife-web:b371fcf`. The original gate text
+> is retained below as history. See `docs/DEPLOYMENT.md` §0 for the production record.
 
 Recorded by Owner (D-010): early production deployment of the landing page/MVP slice is authorized once the landing page passes local checks AND explicit Owner production-deployment authorization is given at that gate. Requires hosting/domain decision (§19 item 5) before the server step.
 

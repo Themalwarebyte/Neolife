@@ -2,155 +2,276 @@
 
 ## Overview
 
-This document describes how to recover from failures during Phase B
-(Owner-controlled lead assignment) and how to verify the system is healthy
-after recovery.
+How to recover from common failures, and how to verify the system is healthy
+afterwards. Covers local development and the live production deployment
+(`https://neolife.ooflowdesk.com`).
+
+> **Production context.** Production is **live** and runs as an isolated Docker
+> Compose project (`neolife`) on the Owner's server, reached through a dedicated
+> Cloudflare Tunnel. Production secrets live only in a root-owned secret file and
+> are injected as container environment variables at run time. **Never** read,
+> print, log, or commit production secret values, and never place them in this
+> document. See `docs/DEPLOYMENT.md` §0 and §6.
 
 ## Prerequisites
 
-- Docker 29.x installed
-- Access to the Owner's server infrastructure (`ooadmin` account)
-- Project source at `/opt/ooflowdesk/neolife/`
+**Local development**
+
+- Node.js 24+, pnpm 10+
+- Docker (for the local PostgreSQL 16 instance): `docker compose up -d`
+- Repository at the project root; `.env` present (copy from `.env.example`)
+
+**Production**
+
+- Docker on the Owner server
+- SSH access to the Owner server (`ssh ooflowdesk-remote`)
+- Deployment authorization from the Owner for any production change
+
+## Commands
+
+This project uses **pnpm** (see `pnpm-lock.yaml` / `pnpm-workspace.yaml`).
+
+| Purpose | Command |
+|---|---|
+| Install dependencies | `pnpm install` |
+| Lint | `pnpm lint` |
+| Type-check | `pnpm typecheck` |
+| Unit + DB tests | `pnpm test` |
+| E2E tests | `pnpm exec playwright test` (requires a running server + PostgreSQL) |
+| Dev server | `pnpm dev` → <http://localhost:3000> |
+| Production build | `pnpm build` |
+| Regenerate Prisma client | `pnpm prisma:generate` |
+| Migration status | `pnpm exec prisma migrate status` |
+| Apply migrations | `pnpm exec prisma migrate deploy` |
+
+## Migration inventory
+
+Ten migrations, in order. Applied with `prisma migrate deploy` (never
+`migrate dev` against a shared or production database).
+
+| # | Migration | Purpose |
+|---|---|---|
+| 1 | `20260908191429_init` | Initial schema (Lead, LeadEvent, Meeting, FollowUp, ProductInterest) |
+| 2 | `20260908203316_add_better_auth` | Better Auth tables (User, Session, Account, Verification) |
+| 3 | `20260908204036_add_user_password` | Temporary user password column |
+| 4 | `20260908204326_add_account_issuer_subject` | Account issuer/subject columns |
+| 5 | `20260908204415_drop_user_password` | Dropped the temporary column (Better Auth owns credentials) |
+| 6 | `20260913061907_add_product_catalogue` | Product catalogue |
+| 7 | `20260917000000_add_lead_ownership` | `Lead.assignedUserId` + ownership indexes |
+| 8 | `20260917120000_add_leadevent_actor` | `LeadEvent.userId` (canonical audit actor) |
+| 9 | `20260918000000_add_funnel_events` | `FunnelEvent` + `QualificationToken` |
+| 10 | `20260919000000_add_user_management_fields` | `User.mustChangePassword`, `User.isActive` |
 
 ## Recovery scenarios
 
-### 1. Lost or corrupted admin credentials
+### 1. Lost or corrupted Owner (admin) credentials
 
-1. Reset the admin password via the database:
-   ```bash
-   # Connect to PostgreSQL
-   psql $DATABASE_URL -c "SELECT id, email, role FROM \"User\" WHERE role = 'admin';"
+`scripts/seed-admin.ts` is idempotent on **role**, but it does **not** reset an
+existing account's password. Choose one:
 
-   # Reset password via Better Auth (programmatic):
-   # The password column is on the Account table, not User. Use:
-   pnpm exec tsx -e "
-   import { auth } from './src/lib/auth';
-   auth.api.resetPassword({ body: { email: 'office@example.com' } });
-   "
-   ```
-2. **Do NOT** hard-code passwords. Use `scripts/seed-admin.ts` with env vars:
-   ```bash
-   ADMIN_EMAIL=office@example.com ADMIN_PASSWORD=<12+ char password> \
-     pnpm exec tsx scripts/seed-admin.ts
-   ```
+**Option A — re-provision (destroys the existing account and its sessions):**
+
+```bash
+# 1. Remove the existing Owner account (cascades sessions/accounts)
+psql "$DATABASE_URL" -c 'DELETE FROM "User" WHERE email = '\''office@example.com'\'';'
+
+# 2. Recreate with a new password (hashed by Better Auth)
+ADMIN_EMAIL='office@example.com' \
+ADMIN_PASSWORD='<12+ char password>' \
+  pnpm exec tsx scripts/seed-admin.ts
+```
+
+**Option B — reset via Better Auth's `changePassword`** (requires knowing the
+current password; does not work for a forgotten password):
+
+```bash
+pnpm exec tsx -e "
+  import { auth } from './src/lib/auth';
+  await auth.api.changePassword({
+    body: { newPassword: '<12+ char password>', currentPassword: '<current>', revokeOtherSessions: true },
+  });
+"
+```
+
+> Do **not** hand-write plaintext passwords or password hashes into the database.
+> Better Auth owns credential storage on the `Account` table, not `User`.
 
 ### 2. Lost or corrupted Staff credentials
 
-1. Re-provision via the dev seed script:
-   ```bash
-   STAFF_EMAIL=colleague@neolife.local STAFF_PASSWORD=<12+ char password> \
-     STAFF_NAME="Colleague" pnpm exec tsx scripts/seed-staff.ts
-   ```
-2. If the Staff account already exists, the script updates it idempotently.
-3. Reset password via Better Auth if needed (see scenario 1).
+```bash
+STAFF_EMAIL='colleague1@neolife.local' \
+STAFF_PASSWORD='<12+ char password>' \
+STAFF_NAME='Colleague One' \
+  pnpm exec tsx scripts/seed-staff.ts
+```
 
-### 3. Database schema drift (assignedUserId column missing)
-
-If the migration `20260917000000_add_lead_ownership` was not applied:
-
-1. Verify migration status:
-   ```bash
-   pnpm prisma migrate status
-   ... prisma migrate deploy
-   ```
-
-### 3. Database schema drift (assignedUserId column missing)
-
-If the migration `20260917000000_add_lead_ownership` was not applied:
-
-1. Verify migration status:
-   ```bash
-   pnpm prisma migrate status
-   ... prisma migrate deploy
-   ```
-
-### 4. Database schema drift (LeadEvent.userId missing)
-
-If the Phase C migration `20260917120000_add_leadevent_actor` was not applied:
-
-1. Verify migration status:
-   ```bash
-   pnpm prisma migrate status
-   pnpm prisma migrate dev --name add_leadevent_actor
-   ```
-
-2. The `userId` column is nullable — existing LeadEvent rows are preserved with `userId = NULL`.
-
-### 5. Database schema drift (FunnelEvent / QualificationToken missing)
-
-If the Phase D migration `20260918000000_add_funnel_events` was not applied:
-
-1. Verify migration status:
-   ```bash
-   pnpm prisma migrate status
-   pnpm prisma migrate deploy
-   ```
-
-2. If the tables already exist (manual creation), mark the migration as applied:
-   ```bash
-   pnpm prisma db execute --file prisma/migrations/20260918000000_add_funnel_events/migration.sql
-   ```
-
-### 6. Prisma client out of sync
+- The script is idempotent on `role` — it will not reset an existing password.
+- Use the same delete-then-seed approach as scenario 1 if the password is lost.
+- To **deactivate** rather than delete, set `isActive = false` (or use the Owner-only
+  `/admin/users` page). `getCrmUser()` returns `null` for inactive users, so a
+  deactivated account cannot authenticate or reach any protected CRM route.
+- A Staff account stuck on `mustChangePassword = true` is redirected to
+  `/admin/change-password` and cannot reach the CRM until the change is completed.
+  Clear it server-side if the account is otherwise valid:
 
 ```bash
-pnpm prisma generate
+psql "$DATABASE_URL" -c 'UPDATE "User" SET "mustChangePassword" = false WHERE email = '\''colleague@neolife.local'\'';'
+```
+
+### 3. A migration was not applied / schema drift
+
+1. Check what the database thinks is applied:
+
+```bash
+pnpm exec prisma migrate status
+```
+
+2. Apply anything outstanding (safe and idempotent):
+
+```bash
+pnpm exec prisma migrate deploy
+```
+
+3. If the tables/columns already exist because they were created manually, mark the
+   migration applied rather than re-running it:
+
+```bash
+pnpm exec prisma migrate resolve --applied 20260918000000_add_funnel_events
+```
+
+Per-migration notes:
+
+- **#7 `add_lead_ownership`** — adds the nullable `Lead.assignedUserId` plus indexes;
+  existing rows are preserved with `assignedUserId = NULL`.
+- **#8 `add_leadevent_actor`** — adds nullable `LeadEvent.userId`; existing audit rows
+  are preserved with `userId = NULL`.
+- **#9 `add_funnel_events`** — creates `FunnelEvent` and `QualificationToken`. If these
+  tables were created by hand, resolve as applied (step 3) instead of executing the SQL.
+- **#10 `add_user_management_fields`** — adds `mustChangePassword` (default `false`) and
+  `isActive` (default `true`) to `User`. Existing users stay active and are not forced
+  to change passwords.
+
+### 4. Prisma client out of sync with the schema
+
+```bash
+pnpm prisma:generate
 pnpm typecheck
 ```
 
-### 5. Tests failing (DB connectivity)
+Re-run this after any `prisma/schema.prisma` change, and restart a running dev server
+so it picks up the new client.
 
-The DB-dependent tests (`tests/auth.test.ts`, `tests/lead-persistence.test.ts`,
-`tests/meeting-persistence.test.ts`, `tests/assignment-integration.test.ts`,
-`tests/qualification.test.ts`, `tests/funnel-events.test.ts`)
-require a local PostgreSQL instance:
+### 5. Tests failing
+
+The suite contains **222 tests**: **167** run with no database, plus **55** DB-enabled
+tests that are gated on `const DB_AVAILABLE = Boolean(process.env.DATABASE_URL)`. A run
+without `DATABASE_URL` legitimately reports fewer tests — that is expected, not a failure.
+
+DB-enabled test files: `assignment-integration`, `assignment-reassignment`, `auth`,
+`funnel-events`, `lead-persistence`, `meeting-persistence`, `qualification`,
+`registration-persistence`, `staff-status-authorization`, `user-management-db`.
 
 ```bash
-docker compose up -d
-pnpm test
+docker compose up -d          # start local PostgreSQL
+pnpm test                     # expect 222 tests
+pnpm exec vitest run tests/assignment-authorization.test.ts   # single file
 ```
 
-Pure-logic tests (`tests/assignment-authorization.test.ts`,
-`tests/attribution.test.ts`, `tests/lead-validation.test.ts`,
-`tests/rate-limit.test.ts`, `tests/catalogue-data.test.ts`,
-`tests/meeting-management.test.ts`, `tests/qualification.test.ts` pure tests,
-`tests/funnel-events.test.ts` pure tests) run without a database.
+`.env` is loaded by Next.js automatically but **not** by `vitest`/`tsx`. To run the
+DB-enabled tests from a bare shell, export the variable explicitly:
 
-For DB integration validation when Windows Node.js cannot reach WSL PostgreSQL:
 ```bash
-cd /home/gman/neolife-dbtest
-node integration.js
+DATABASE_URL="postgresql://<user>:<password>@localhost:5433/neolife?schema=public" pnpm test
 ```
-This runs 30 DB integration tests directly against PostgreSQL via the `pg` library from within WSL.
 
-### 6. Assignment authorization broken
+For end-to-end DB validation when Windows Node cannot reach the database directly:
 
-If Staff users can see or assign leads they shouldn't:
+```bash
+pnpm exec node scripts/test-db-integration.js
+```
 
-1. Verify `requireAdmin()` is called at the top of `assignLead` (not just `requireCrmUser`).
-2. Verify `getCrmUsers` is owner-only (calls `requireAdmin`).
-3. Verify lead detail page uses `requireCrmUser` + `where` scoping.
-4. Verify leads list page uses `requireCrmUser` + ownership filter.
-5. Run `pnpm test -- tests/assignment-authorization.test.ts` — all 15 tests must pass.
-6. Check `LeadEvent` table for unauthorized `lead_assigned`/`lead_unassigned` events.
+This runs 30 DB integration tests covering `FunnelEvent` schema (D-031 no-PII),
+`QualificationToken` schema, single-use consumption, replay prevention, durability, and
+the qualification workflow.
 
-### 7. Lint or typecheck failures
+### 6. E2E tests failing
+
+E2E runs against **system Chrome** (`channel: "chrome"` in `playwright.config.ts`) — no
+browser download is required.
+
+```bash
+pnpm dev                     # terminal 1 — server must be running
+pnpm exec playwright test    # terminal 2
+```
+
+`e2e/global-setup.ts` runs first and creates shared Owner and Staff session files in
+`test-results/`. Requirements:
+
+- local PostgreSQL running, migrations applied
+- seeded Owner and Staff accounts (see scenarios 1 and 2)
+- `TEST_EMAIL` / seeded accounts must not be locked out by `isActive = false`
+
+`test-results/` is gitignored; if session files are missing, delete the directory and
+re-run so `global-setup.ts` regenerates them.
+
+### 7. Authorization broken (Staff sees too much, or can assign)
+
+1. `assignLead` must call `await requireAdmin()` — not merely `requireCrmUser()`.
+2. `getCrmUsers` and `createCrmUser` must be Owner-only (`requireAdmin()`).
+3. `createCrmUser` must hardcode `role: "staff"` server-side; the `role` field is
+   `input: false` in the Better Auth config so clients cannot self-assign a role.
+4. `toggleUserActive` must refuse to deactivate `admin` accounts and refuse
+   self-deactivation.
+5. Lead list and detail queries must scope by `{ assignedUserId: user.id }` for non-admins.
+6. The `(protected)` layout must redirect `mustChangePassword: true` users to
+   `/admin/change-password`.
+7. Run `pnpm exec vitest run tests/assignment-authorization.test.ts` — all 15 must pass.
+8. Inspect the `LeadEvent` table for unauthorized `lead_assigned` / `lead_unassigned` rows.
+
+### 8. Lint or typecheck failures
 
 ```bash
 pnpm lint
 pnpm typecheck
 ```
 
-All changed files must pass lint and typecheck. Pre-existing errors in
-`.kilo/worktrees/` are unrelated to the application source.
+Both must pass with zero errors and zero warnings before commit.
+
+### 9. Production incident
+
+1. Confirm the live site and health endpoint:
+
+```bash
+curl -sS -o /dev/null -w '%{http_code}\n' https://neolife.ooflowdesk.com/health
+```
+
+2. SSH to the Owner server and inspect container status and recent logs for the
+   `neolife` project (`neolife-web`, `neolife-postgres`, `neolife-tunnel`).
+3. If the application is at fault, **roll back to the previous image tag** — migrations
+   are forward-only, so rollback is application-only:
+
+```bash
+sudo docker compose --env-file <secret-file> up -d
+```
+
+4. If the database is at fault, restore from the most recent dump in the project's
+   `backups/` directory.
+5. Take a `pg_dump` backup **before** any production migration.
+6. After recovery, re-run the smoke tests in `docs/DEPLOYMENT.md` §6 steps 9–15.
+
+> Do not change production server configuration, run migrations against production, or
+> redeploy without explicit Owner authorization for that specific action.
 
 ## Health checks
 
-After any recovery operation:
-1. `pnpm prisma validate` — schema valid
-2. `pnpm prisma generate` — client generated
-3. `pnpm lint` — 0 errors (excluding `.kilo/worktrees/`)
-4. `pnpm typecheck` — 0 errors
-5. `pnpm test -- tests/assignment-authorization.test.ts` — 15/15 pass
-6. `pnpm build` — builds successfully (all routes render)
-7. (With PostgreSQL) `cd /home/gman/neolife-dbtest && node integration.js` — 30/30 DB tests pass
+Run after any recovery operation:
+
+1. `pnpm exec prisma validate` — schema is valid
+2. `pnpm prisma:generate` — client generated
+3. `pnpm exec prisma migrate status` — no pending migrations
+4. `pnpm lint` — 0 errors, 0 warnings
+5. `pnpm typecheck` — 0 errors
+6. `pnpm test` — 222/222 pass (167 non-DB + 55 DB-enabled, with PostgreSQL running)
+7. `pnpm build` — builds successfully, all routes render
+8. `pnpm exec node scripts/test-db-integration.js` — 30/30 DB tests pass
+9. `pnpm exec playwright test` — E2E suite (see `docs/STATUS.md` for current state)

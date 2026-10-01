@@ -1,11 +1,34 @@
 # NEOLIFE — Deployment Runbook & Production Environment Specification
 
-> **PREPARATION ONLY — NO DEPLOYMENT AUTHORIZED.**
-> This document is a runbook for a future, explicitly-authorized deployment.
-> It contains no production secrets. Production values must never be committed
-> to Git, documentation, `.env.example`, test fixtures, or logs.
+> **STATUS: 🟩 PRODUCTION IS LIVE** at **`https://neolife.ooflowdesk.com`**.
+> NEOLIFE is deployed and managed through the Owner's existing infrastructure
+> (Docker Compose + Cloudflare Tunnel), isolated from all other services.
 >
-> Status: §11.6 🟨 NOT COMPLETE · §11.7 ⚪ NOT STARTED.
+> This document contains **no production secrets**. Production values must never
+> be committed to Git, documentation, `.env.example`, test fixtures, or logs.
+> Production secrets are held in a root-owned secret file on the server and are
+> injected as container environment variables at run time.
+>
+> For redeploying an existing release, or for deploying a new release, see §6.
+> For the record of what has actually been deployed, see §2 and `docs/CHANGELOG.md`.
+
+## 0. Current production record
+
+| Item | Value |
+|---|---|
+| Live origin | `https://neolife.ooflowdesk.com` |
+| Current production image | `neolife-web:b371fcf` |
+| Application container | `neolife-web` (Next.js standalone, internal port 3000) |
+| Database container | `neolife-postgres` (postgres:16-alpine, dedicated named volume) |
+| Tunnel container | `neolife-tunnel` (`cloudflare/cloudflared`, remotely-managed) |
+| One-shot seed service | `neolife-seed` (profile `seed`; never runs on `up -d`) |
+| Compose project / network | `neolife` — dedicated, isolated |
+| Origin public | Internet → Cloudflare → Tunnel → `neolife-web:3000` |
+
+Evidence of deployment is recorded in `docs/CHANGELOG.md` (entries marked 🟩
+deployed, including the `neolife-web:11e64fa` and `neolife-web:b371fcf`
+releases) and in the committed `compose.production.yaml` / `deploy/compose.yaml`
+files, which pin the production image tag and origin.
 
 ## 1. Approved production architecture
 
@@ -20,20 +43,29 @@ NEOLIFE must remain isolated from ZongFitness and all other existing services.
 
 ## 2. Owner server findings (read-only inspection, 2026-09-08)
 
-- Docker **29.8.0** on the owner server (reachable via the `ooflowdesk-remote` SSH alias).
-- Existing conventions: per-project compose dirs under `/opt/ooflowdesk/<project>/`; per-project Cloudflare tunnels (`<project>-tunnel` running `cloudflare/cloudflared`); Caddy gateways (`<project>-gateway`, 80/443); PostgreSQL containers named `<project>-postgres` / `<project>-fitness-db` (postgres:16 used by zongfitness).
-- Secrets are stored under `/opt/ooflowdesk/secrets/` (root-only) and tunnel credentials under `/opt/ooflowdesk/cloudflare-tunnel/`. **These were not read** (they contain credentials).
-- No hostname/route for `neolife.ooflowdesk.com` exists yet. It would be added as a new Cloudflare Tunnel route.
-- No conflicting service for `neolife.ooflowdesk.com` was observed.
+> Superseded in part: the inspection below was performed **before** NEOLIFE was
+> deployed. Items describing the pre-deployment state are retained as historical
+> record. The current state is in §0.
 
-## 3. Proposed isolated NEOLIFE service (to be created at deployment time)
+- Docker **29.8.0** on the owner server (reachable via the `ooflowdesk-remote` SSH alias).
+- Existing conventions: per-project compose dirs under `/opt/ooflowdesk/<project>/`; per-project Cloudflare tunnels (`<project>-tunnel` running `cloudflare/cloudflared`); PostgreSQL containers named `<project>-postgres` / `<project>-fitness-db` (postgres:16 used by zongfitness).
+- Secrets are stored under `/opt/ooflowdesk/secrets/` (root-only) and tunnel credentials under `/opt/ooflowdesk/cloudflare-tunnel/`. **These were not read** (they contain credentials).
+- *(Pre-deployment finding, now obsolete)*: no hostname/route for `neolife.ooflowdesk.com` existed at the time of inspection. A Cloudflare Tunnel route now exists and serves the live origin.
+- No conflicting service for `neolife.ooflowdesk.com` was observed. NEOLIFE remains isolated from ZongFitness and all other existing services.
+
+## 3. Deployed isolated NEOLIFE service
+
+The following layout **exists in production** (it was created at deployment time
+and is now the live arrangement):
 
 ```
 /opt/ooflowdesk/neolife/
-  compose.yaml            # neolife-web (standalone Next.js) + neolife-postgres + neolife-tunnel (cloudflared)
-  .env                    # production secrets (NOT committed; root-only, like /opt/ooflowdesk/secrets)
+  compose.yaml            # neolife-web (standalone Next.js) + neolife-postgres + neolife-tunnel (cloudflared) + neolife-seed (profiled)
   backups/                # PostgreSQL dumps
 ```
+
+Production secret values are **not** stored in this directory; they live in the
+root-only secret file referenced by the deploy command (see §6 step 2).
 
 - `neolife-web`: runs `node .next/standalone/server.js` (Next.js standalone output), listens on an internal port (e.g. 3000) on a **dedicated Docker network** (e.g. `neolife`) — NOT the host network.
 - `neolife-postgres`: postgres:16, dedicated named volume.
@@ -44,12 +76,14 @@ NEOLIFE must remain isolated from ZongFitness and all other existing services.
 
 | Variable | Purpose | Required |
 |---|---|---|
-| `DATABASE_URL` | Production PostgreSQL connection string | Yes (runtime) |
+| `DATABASE_URL` | Production PostgreSQL connection string (injected into `web` and `seed`) | Yes (runtime) |
 | `BETTER_AUTH_SECRET` | Better Auth signing/encryption secret (`openssl rand -base64 32`) | Yes (runtime) |
-| `BETTER_AUTH_URL` | Production origin, e.g. `https://neolife.ooflowdesk.com` | Yes (runtime) |
+| `BETTER_AUTH_URL` | Production origin, i.e. `https://neolife.ooflowdesk.com` | Yes (runtime) |
+| `POSTGRES_PASSWORD` | Password for the `neolife-postgres` container | Yes (runtime) |
+| `TUNNEL_TOKEN` | Cloudflare Tunnel connector token (`neolife-tunnel`) — a production credential | Yes (runtime) |
 | `ADMIN_EMAIL` | Admin account email for `scripts/seed-admin.ts` | Yes (one-time seed) |
 | `ADMIN_PASSWORD` | Admin account password (≥12 chars) for the seed | Yes (one-time seed) |
-| `NEXT_PUBLIC_SITE_URL` | Public site origin (informational) | Optional (not referenced by code at this time) |
+| `NEXT_PUBLIC_SITE_URL` | Public site origin | Baked into `compose.production.yaml` as a literal |
 
 > `NODE_ENV=production` and `PORT`/`HOSTNAME` are set by the container runtime as needed.
 
@@ -60,16 +94,21 @@ NEOLIFE must remain isolated from ZongFitness and all other existing services.
 - Migrations are additive/forward-only; a backup is taken before each migration run.
 - Admin account is provisioned once via `scripts/seed-admin.ts` with production `ADMIN_EMAIL`/`ADMIN_PASSWORD`.
 
-## 6. Deployment runbook (EXECUTE ONLY WHEN AUTHORIZED)
+## 6. Deployment runbook (for redeploying a new release)
 
-1. **Database preparation** — create the production PostgreSQL database and user; grant minimal privileges.
-2. **Environment configuration** — place production `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` (and seed `ADMIN_EMAIL`/`ADMIN_PASSWORD`) in the server's secret store / root-only `.env` (never in Git).
-3. **Build/image preparation** — `pnpm build` produces `.next/standalone/`; package `server.js`, `.next/static`, `.next/standalone`, and `public/` (if any) into the `neolife-web` image.
-4. **Prisma migrate** — run `pnpm exec prisma migrate deploy` against the production `DATABASE_URL`.
+> This runbook is retained from the original pre-deployment plan and is now the
+> procedure for shipping an **update** to the live production service. It is
+> executed only when a release is explicitly authorized by the Owner. It does not
+> describe initial infrastructure creation, which is already complete (§3).
+
+1. **Database preparation** — confirm the production PostgreSQL database and user exist with minimal privileges (already provisioned).
+2. **Environment configuration** — production `DATABASE_URL`, `POSTGRES_PASSWORD`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `TUNNEL_TOKEN` (and seed `ADMIN_EMAIL`/`ADMIN_PASSWORD`) live only in the root-owned secret file; they are injected at run time via `--env-file` and are never in Git.
+3. **Build/image preparation** — `pnpm build` produces `.next/standalone/`; package `server.js`, `.next/static`, `.next/standalone`, and `public/` into a `neolife-web:<RELEASE_SHA>` image.
+4. **Prisma migrate** — run `pnpm exec prisma migrate deploy` against the production `DATABASE_URL` (never `migrate dev`).
 5. **Start the dedicated NEOLIFE service** — `docker compose up -d` for the `neolife` project (isolated network).
-6. **Cloudflare Tunnel routing** — add/configure the `neolife-tunnel` route for `neolife.ooflowdesk.com` → `neolife-web:3000`.
+6. **Cloudflare Tunnel routing** — the `neolife-tunnel` route for `neolife.ooflowdesk.com` → `neolife-web:3000` already exists; confirm it is healthy after each release.
 7. **Hostname/HTTPS verification** — confirm `https://neolife.ooflowdesk.com` serves over HTTPS via Cloudflare; verify `/health`.
-8. **Admin provisioning** — run `scripts/seed-admin.ts` once with production credentials; then remove those env values if appropriate.
+8. **Admin provisioning** — `scripts/seed-admin.ts` is required only when a new Owner account must be created; it runs via the `seed` profile and never on the long-running `web` service.
 9. **Production health check** — `GET https://neolife.ooflowdesk.com/health` → 200 `{"status":"ok"}`.
 10. **Public-route smoke tests** — `/`, `/campaign/launch`, `/register-interest`, `/privacy`, `/terms`, `/disclosures` all 200.
 11. **Lead submission test** — submit a test lead; verify it reaches the CRM.
@@ -78,7 +117,7 @@ NEOLIFE must remain isolated from ZongFitness and all other existing services.
 14. **CRM test** — view a lead, update status, add a follow-up note.
 15. **Meeting workflow smoke test** — schedule a meeting, set attendance/outcome, verify events.
 16. **Rollback procedure** — redeploy the previous `neolife-web` image tag and re-run the health check; migrations are forward-only so rollback is app-only.
-17. **Database backup/restore** — schedule `pg_dump` backups to `neolife/backups/`; restore procedure documented and tested before first production data is committed.
+17. **Database backup/restore** — `pg_dump` backups to `neolife/backups/`; restore procedure documented and tested before first production data is committed.
 
 ## 7. Security notes
 

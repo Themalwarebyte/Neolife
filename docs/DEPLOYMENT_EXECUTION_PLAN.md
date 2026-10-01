@@ -1,20 +1,27 @@
-# NEOLIFE — §11.7 Deployment Execution Plan (DRAFT — not executed)
+# NEOLIFE — §11.7 Deployment Execution Plan
 
+> **STATUS: EXECUTED — production is LIVE** at `https://neolife.ooflowdesk.com`.
+>
+> This plan was written and executed on **2026-09-08** to stand up the initial
+> NEOLIFE production deployment. It is retained as the authoritative historical
+> record of how that deployment was performed, and as the reference for future
+> releases. The live arrangement and the current redeploy procedure are in
+> `docs/DEPLOYMENT.md` (§0 and §6).
+>
+> Paid advertising remains **NOT AUTHORIZED** and gated behind the §11.6 launch gate.
+>
 > Authoritative reference: `docs/DEPLOYMENT.md` (architecture + runbook). This plan
 > details the **exact** execution steps, resource boundaries, and Owner decisions.
->
-> **Nothing in this plan has been executed.** §11.7 = ⚪ NOT STARTED.
-> Production deployment = NOT AUTHORIZED. Paid advertising = NOT AUTHORIZED.
 >
 > Cloudflare routing decision (Owner, accepted): **Option A — dedicated NEOLIFE tunnel**
 > (Option B only if a tunnel is confirmed dedicated to NEOLIFE; Option C — modify a
 > shared tunnel — NOT approved; Option D — alternative gateway — requires further review).
 
 ## 0. Verified baseline
-- Approved app commit: `3994e9d` (43/43 tests, lint/typecheck/build, E2E 1/1).
-- Server (read-only pre-flight): Docker 29.8.0; `ooadmin` has Docker access (no sudo for docker);
+- Approved app commit at time of deployment: `3994e9d`. (Test counts in this section are historical — the current suite total is **222**; see `docs/PROJECT_PLAN.md`.)
+- Server (read-only pre-flight, pre-deployment): Docker 29.8.0; `ooadmin` has Docker access (no sudo for docker);
   `/opt/ooflowdesk/` owned by `ooadmin`; secrets under root-owned `/opt/ooflowdesk/secrets/`;
-  no `neolife` project/network/container/volume exists; `neolife.ooflowdesk.com` resolves publicly (A+AAAA).
+  *(at that time)* no `neolife` project/network/container/volume existed; `neolife.ooflowdesk.com` resolved publicly (A+AAAA).
 - Conventions: `<project>-web`, `<project>-postgres`, `<project>-tunnel` (cloudflared), per-project dir, dedicated bridge network.
 
 ## 1. Release artifact / image strategy

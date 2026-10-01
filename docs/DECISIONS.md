@@ -8,6 +8,7 @@ Owner-approved decisions and their rationale. Every future implementation task m
 
 - **Decision:** Owner accepted the Master Project Plan and MVP-first strategy, with targeted clarifications, and authorized **PHASE 1 — Traffic MVP** to begin. **PHASE 0 IS COMPLETE.**
 - **Consequences:** Implementation proceeds local-first only; no production deployment; no paid advertising until §11.4 completion criteria and the §11.6 launch gate are satisfied; deferred features remain out of scope.
+- **Clarification (2026-10-01) — partially superseded, original text retained above:** The local-first *sequence* was followed, but the "no production deployment" clause is no longer in force. Production **is live** at `https://neolife.ooflowdesk.com` (see D-014 clarification and `docs/DEPLOYMENT.md` §0). The **paid-advertising** restriction in this decision **remains fully in force** and is still gated behind the §11.6 launch gate. This note does not replace D-001; it records how the decision aged.
 
 ### D-002 — Approved technology stack (2026-09-08)
 
@@ -64,6 +65,7 @@ Owner-approved decisions and their rationale. Every future implementation task m
 ### D-014 — Domain/hosting: `neolife.ooflowdesk.com` via Owner infrastructure + Cloudflare Tunnel (2026-09-08)
 
 - **Decision:** Deploy to `neolife.ooflowdesk.com` on the Owner's existing infrastructure via Cloudflare Tunnel. NEOLIFE must remain isolated from ZongFitness. **No production deployment yet.**
+- **Clarification (2026-10-01) — the trailing "no production deployment yet" is superseded; original text retained above:** The hosting/tunneling architecture decided here was implemented as specified, and the deployment **has since been executed**. Production **is live** at `https://neolife.ooflowdesk.com`, running as an isolated Compose project (`neolife`) on its own bridge network with its own PostgreSQL volume and a dedicated Cloudflare Tunnel, on the Owner's existing server. The isolation requirement continues to hold. Current production record: `docs/DEPLOYMENT.md` §0. Deployment records: `docs/CHANGELOG.md`.
 
 ### D-015 — Legal copy: Kilo drafts; Owner marks MVP baseline COMPLETE (2026-09-08)
 
