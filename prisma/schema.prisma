@@ -68,7 +68,11 @@ model Lead {
   landingPage      String?
    firstTouchSource String?
 
-   assignedUserId String? @db.Uuid
+   // References User.id, which is TEXT: Better Auth generates opaque
+  // alphanumeric IDs, not UUIDs. @db.Uuid here would be incorrect — a real
+  // Better Auth ID is rejected by PostgreSQL as invalid uuid syntax. Keep in
+  // step with Meeting.userId and FollowUp.userId.
+  assignedUserId String?
 
    createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
@@ -94,7 +98,8 @@ model LeadEvent {
   leadId   String? @db.Uuid
   type     String
   metadata Json?
-  userId   String? @db.Uuid
+  // References User.id (TEXT — Better Auth generates opaque IDs, not UUIDs).
+  userId   String?
   user     User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
   lead     Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
 
