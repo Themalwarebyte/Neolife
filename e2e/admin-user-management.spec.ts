@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { E2E_OWNER_EMAIL } from "./seed-e2e-users";
 
 /**
  * Phase P-2 — Admin user management E2E tests.
@@ -60,9 +61,13 @@ test("Phase P-2 — Complete admin user management workflow", async ({
 
   await test.step("Admin accounts are not deactivatable", async () => {
     await ownerPage.goto("/admin/users");
+    // Identify the Owner row by its exact email, not by the "Owner" role label.
+    // The platform legitimately supports multiple admin accounts, so every
+    // admin row renders that label and a text-based role lookup is ambiguous.
     const adminRow = ownerPage.locator("tr", {
-      has: ownerPage.locator("text=Owner"),
+      has: ownerPage.getByText(E2E_OWNER_EMAIL, { exact: true }),
     });
+    await expect(adminRow).toHaveCount(1);
     await expect(adminRow.locator("button")).toBeDisabled();
   });
 
