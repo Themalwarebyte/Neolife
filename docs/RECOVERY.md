@@ -163,25 +163,29 @@ so it picks up the new client.
 
 ### 5. Tests failing
 
-The suite contains **222 tests**: **167** run with no database, plus **55** DB-enabled
+The suite contains **247 tests**: **179** run with no database, plus **68** DB-enabled
 tests that are gated on `const DB_AVAILABLE = Boolean(process.env.DATABASE_URL)`. A run
 without `DATABASE_URL` legitimately reports fewer tests — that is expected, not a failure.
 
-DB-enabled test files: `assignment-integration`, `assignment-reassignment`, `auth`,
-`funnel-events`, `lead-persistence`, `meeting-persistence`, `qualification`,
+DB-enabled test files: `admin-actions`, `assignment-integration`, `assignment-reassignment`,
+`auth`, `funnel-events`, `lead-persistence`, `meeting-persistence`, `qualification`,
 `registration-persistence`, `staff-status-authorization`, `user-management-db`.
 
 ```bash
 docker compose up -d          # start local PostgreSQL
-pnpm test                     # expect 222 tests
+pnpm test                     # expect 247 tests
 pnpm exec vitest run tests/assignment-authorization.test.ts   # single file
 ```
 
 `.env` is loaded by Next.js automatically but **not** by `vitest`/`tsx`. To run the
-DB-enabled tests from a bare shell, export the variable explicitly:
+DB-enabled tests from a bare shell, export **both** variables explicitly —
+`BETTER_AUTH_SECRET` is required by the qualification-token tests, so `DATABASE_URL`
+alone yields 6 failures in `tests/qualification.test.ts`:
 
 ```bash
-DATABASE_URL="postgresql://<user>:<password>@localhost:5433/neolife?schema=public" pnpm test
+DATABASE_URL="postgresql://<user>:<password>@localhost:5433/neolife?schema=public" \
+BETTER_AUTH_SECRET="<local-only value, 16+ characters>" \
+  pnpm test
 ```
 
 For end-to-end DB validation when Windows Node cannot reach the database directly:
@@ -197,22 +201,38 @@ the qualification workflow.
 ### 6. E2E tests failing
 
 E2E runs against **system Chrome** (`channel: "chrome"` in `playwright.config.ts`) — no
-browser download is required.
+browser download is required. The suite starts and manages its own local server.
 
 ```bash
-pnpm dev                     # terminal 1 — server must be running
-pnpm exec playwright test    # terminal 2
+pnpm build                    # required first
+pnpm exec playwright test     # 11 tests
 ```
 
-`e2e/global-setup.ts` runs first and creates shared Owner and Staff session files in
-`test-results/`. Requirements:
+The `webServer` command runs `node e2e/prepare-standalone.mjs` before starting
+`node .next/standalone/server.js`.
 
-- local PostgreSQL running, migrations applied
-- seeded Owner and Staff accounts (see scenarios 1 and 2)
-- `TEST_EMAIL` / seeded accounts must not be locked out by `isActive = false`
+- **Standalone output is incomplete by default.** `next build` does not copy
+  `.next/static/` or `public/` into `.next/standalone/`, so the server returns HTML with
+  no client JavaScript or CSS and every browser-driven spec fails. The prepare script
+  performs the same copy the `Dockerfile` does; it is idempotent and only touches the
+  local build directory.
+- **`reuseExistingServer: false`.** If anything already holds port 3000 — commonly an
+  `ssh -L 3000:...` tunnel to a remote host — the run fails loudly rather than adopting
+  that service as its test target. Free the port; do not disable the guard.
+- `e2e/global-setup.ts` resets the two fixture accounts through
+  `e2e/seed-e2e-users.ts` before signing in, so their passwords are deterministic and
+  stale accounts cannot block the run. The seeder manages only
+  `office@test.local` (Owner) and `colleague1@neolife.local` (Staff), and refuses to act
+  unless `E2E_SEED_USERS=1`, `NODE_ENV` is not `production`, and `DATABASE_URL` points at
+  a loopback host. Seeding is **never** run against production.
+- `global-setup.ts` then writes shared Owner and Staff session files into
+  `test-results/`. That directory is gitignored; if the files are missing, delete it and
+  re-run so they are regenerated.
+- `e2e/.kilo/**` is excluded from spec discovery — those are untracked nested worktree
+  copies whose stale specs fail on unresolvable imports.
 
-`test-results/` is gitignored; if session files are missing, delete the directory and
-re-run so `global-setup.ts` regenerates them.
+Requirements: local PostgreSQL running with migrations applied, and
+`DATABASE_URL` + `BETTER_AUTH_SECRET` exported.
 
 ### 7. Authorization broken (Staff sees too much, or can assign)
 
@@ -271,7 +291,7 @@ Run after any recovery operation:
 3. `pnpm exec prisma migrate status` — no pending migrations
 4. `pnpm lint` — 0 errors, 0 warnings
 5. `pnpm typecheck` — 0 errors
-6. `pnpm test` — 222/222 pass (167 non-DB + 55 DB-enabled, with PostgreSQL running)
+6. `pnpm test` — 247/247 pass (179 non-DB + 68 DB-enabled, with PostgreSQL running)
 7. `pnpm build` — builds successfully, all routes render
 8. `pnpm exec node scripts/test-db-integration.js` — 30/30 DB tests pass
 9. `pnpm exec playwright test` — E2E suite (see `docs/STATUS.md` for current state)

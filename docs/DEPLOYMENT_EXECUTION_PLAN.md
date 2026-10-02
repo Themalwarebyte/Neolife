@@ -18,7 +18,7 @@
 > shared tunnel — NOT approved; Option D — alternative gateway — requires further review).
 
 ## 0. Verified baseline
-- Approved app commit at time of deployment: `3994e9d`. (Test counts in this section are historical — the current suite total is **222**; see `docs/PROJECT_PLAN.md`.)
+- Approved app commit at time of deployment: `3994e9d`. (Test counts in this section are historical — the current suite total is **247**; see `docs/PROJECT_PLAN.md`.)
 - Server (read-only pre-flight, pre-deployment): Docker 29.8.0; `ooadmin` has Docker access (no sudo for docker);
   `/opt/ooflowdesk/` owned by `ooadmin`; secrets under root-owned `/opt/ooflowdesk/secrets/`;
   *(at that time)* no `neolife` project/network/container/volume existed; `neolife.ooflowdesk.com` resolved publicly (A+AAAA).

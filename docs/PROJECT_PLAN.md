@@ -5,9 +5,9 @@
 > Every future implementation task MUST begin by reading this document and identifying the current phase, task, dependencies, required decisions, and completion criteria.
 
 **Current Phase:** PHASE 1 — TRAFFIC MVP
-**Status:** 🟩 PHASE 1 COMPLETE — Phase 0 🟩 COMPLETE. All Phase 1 tasks 1.1–1.11 🟩 DONE. **222/222 tests PASS** (167 without `DATABASE_URL` + 55 DB-enabled) · E2E 11 tests via system Chrome. P-1 (Registration/business-interest flow) 🟩 DONE. P-2 (Admin user management) 🟩 implemented locally, 🟨 E2E validation in progress. **Production deployment 🟩 LIVE** at `https://neolife.ooflowdesk.com`. See `docs/STATUS.md`.
+**Status:** 🟩 PHASE 1 COMPLETE — Phase 0 🟩 COMPLETE. All Phase 1 tasks 1.1–1.11 🟩 DONE. **247/247 tests PASS** (179 without `DATABASE_URL` + 68 DB-enabled) · E2E **11/11 PASS** via system Chrome. P-1 (Registration/business-interest flow) 🟩 DONE. P-2 (Admin user management) 🟩 **DONE**. **Production deployment 🟩 LIVE** at `https://neolife.ooflowdesk.com`. See `docs/STATUS.md`.
 
-> **Test-count convention (official):** the suite contains **222 tests** in total — **167** run without `DATABASE_URL` set, plus **55** additional DB-enabled tests that require a local PostgreSQL instance. Any documentation quoting a different total (e.g. `2026/206`, `43/43`, `29/29`, `36/36`) refers to a superseded, historical baseline and must not be used as the current figure.
+> **Test-count convention (official):** the suite contains **247 tests** in total — **179** run without `DATABASE_URL` set, plus **68** additional DB-enabled tests that require a local PostgreSQL instance. Any documentation quoting a different total (e.g. `222`, `2026/206`, `43/43`, `29/29`, `36/36`) refers to a superseded, historical baseline and must not be used as the current figure.
 
 ---
 
@@ -626,12 +626,12 @@ When a phase meets its completion criteria, explicitly report: **"PHASE X IS COM
 | Phase 0 completion | 🟩 DONE |
 | Phase 1 (Traffic MVP) | 🟩 COMPLETE — all tasks 1.1–1.11 done; deployed to production |
 | P-1 Registration / business-interest flow | 🟩 DONE (2026-09-18, D-026 + D-032) |
-| P-2 Admin user management | 🟩 Implemented locally · 🟨 E2E validation in progress |
+| P-2 Admin user management | 🟩 **DONE** — Better Auth user-ID defect fixed (`73d73e0`), E2E environment made deterministic (`7c31712`), schema alignment (`f709b64`); Admin E2E PASS and full Playwright 11/11 PASS |
 | Application implementation | Tasks 1.1 🟩 · 1.2 🟩 · 1.3 🟩 · 1.4 🟩 · 1.5 🟩 · 1.6 🟩 · 1.7 🟩 · 1.8 🟩 · 1.9 🟩 · 1.10 🟩 · 1.11 🟩 — see `docs/STATUS.md` |
-| Production deployment | 🟩 LIVE — `https://neolife.ooflowdesk.com` |
-| Test suite | 🟩 222/222 PASS (167 non-DB + 55 DB-enabled) · E2E 11 tests |
+| Production deployment | 🟩 LIVE — `https://neolife.ooflowdesk.com`, but still on image `neolife-web:b371fcf`, which **predates** `73d73e0`, `7c31712`, and `f709b64`. The P-2 fixes are therefore **not yet in production** |
+| Test suite | 🟩 247/247 PASS (179 non-DB + 68 DB-enabled) · E2E **11/11 PASS** |
 
-**Next action:** Complete P-2 admin user management E2E validation (the `admin-user-management` spec currently fails at the deactivation step). Paid advertising remains NOT AUTHORIZED and stays gated behind the §11.6 launch gate. See `docs/STATUS.md`.
+**Next action:** Build and deploy a new production image carrying `73d73e0`, `7c31712`, and `f709b64`, then verify in production — until that happens, lead assignment and Staff activation/deactivation remain affected for real users. Paid advertising remains NOT AUTHORIZED and stays gated behind the §11.6 launch gate. See `docs/STATUS.md`.
 
 ---
 

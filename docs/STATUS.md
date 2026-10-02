@@ -17,10 +17,10 @@ Phase/step-by-step implementation status. Authoritative scope lives in `PROJECT_
 |---|---|
 | **Current phase** | PHASE 1 — Traffic MVP · 🟩 COMPLETE (deployed) |
 | **Production** | 🟩 **LIVE** at `https://neolife.ooflowdesk.com` |
-| **Production image** | `neolife-web:b371fcf` |
+| **Production image** | `neolife-web:b371fcf` — ⚠️ **predates the P-2 fixes; deployment pending** |
 | **Branch** | `master` |
-| **Official test count** | **222 total** = 167 (no `DATABASE_URL`) + 55 (DB-enabled) |
-| **E2E** | 11 tests across 5 specs · 10 passing · 1 failing (see below) |
+| **Official test count** | **247 total** = 179 (no `DATABASE_URL`) + 68 (DB-enabled) |
+| **E2E** | 🟩 **11/11 PASS** — 5 specs, 0 failed, 0 skipped, 0 flaky |
 | **Database** | 10 Prisma migrations, all reconciled and applied |
 
 ### 🟩 Completed
@@ -35,20 +35,63 @@ Phase/step-by-step implementation status. Authoritative scope lives in `PROJECT_
 - **Funnel tracking** — first-party `FunnelEvent` capture (D-029), no-PII device
   identity (D-031), full funnel flow `visitor_landing` → `lead_created` →
   `lead_qualified` → `registration_start` → `registration_complete`
+- **P-2 — Admin user management 🟩 DONE.** Owner-only `/admin/users`; Staff account
+  creation; temporary-password and forced password-change flow; Staff
+  activation/deactivation; inactive Staff locked out of the CRM; Owner/admin protected
+  from deactivation; Better Auth opaque user IDs supported; lead assignment working with
+  real Better Auth Staff IDs. Covered by real Server Action regression tests
+  (`tests/admin-actions.test.ts`, 23 tests) and verified end-to-end: Admin User
+  Management E2E passes and the full Playwright suite is 11/11.
+- **Deterministic local E2E environment** — standalone asset preparation, fail-loud
+  server binding, guarded local-only fixture seeding (`7c31712`)
+- **Prisma user-relation schema alignment** (`f709b64`) — see the entry below
 - **Deployed functionality** — two production releases recorded in `docs/CHANGELOG.md`
   (`neolife-web:11e64fa`, `neolife-web:b371fcf`), including the D-020 official
   product/category image rebuild. Production currently serves `b371fcf`.
 
-### 🟨 In progress
+### P-2 defect history (how it was found)
 
-- **P-2 — Admin user management**: implementation 🟩 complete (schema, migration,
-  Better Auth fields, `createCrmUser`, `toggleUserActive`, `changePasswordAction`,
-  `/admin/users`, `/admin/change-password`, `requireCrmUser` guards). **E2E
-  validation is not complete** — `e2e/admin-user-management.spec.ts` fails at the
-  "Owner deactivates the Staff user" step: the `Deactivate` Server Action runs and
-  `revalidatePath` fires, but the row does not update to "Deactivated" in time for
-  the assertion. Unit and DB-layer coverage for this feature passes.
-- **Documentation reconciliation** — completed 2026-10-01 (see `docs/CHANGELOG.md`).
+Worth recording, because the symptom was misleading. Both `toggleUserActive` and
+`assignLead` validated user IDs with a UUID regex, but Better Auth generates opaque
+~32-character alphanumeric IDs — so every real user ID was rejected before reaching the
+database. `toggleUserActive` silently no-opped and `assignLead` returned
+"Invalid assignee." for every real Staff user. Fixed in `73d73e0`. The E2E suite could
+not have surfaced it while the environment was unreliable, which is why the environment
+work in `7c31712` preceded the green run.
+
+### Prisma schema reconciliation (`f709b64`)
+
+`Lead.assignedUserId` and `LeadEvent.userId` were declared `@db.Uuid` while the
+migrations and the live database both use `TEXT`. Verified with
+`prisma migrate diff --from-migrations` that generating a migration from the schema as it
+stood proposed `DROP COLUMN "assignedUserId", ADD COLUMN "assignedUserId" UUID` — which
+would have destroyed every lead-ownership assignment and every audit-event actor, and
+could never have stored a Better Auth ID again.
+
+The annotations were removed. **No migration was required and no database change was
+made** — the migrations and database were already correct. This brings the schema in
+line with `User.id`, and with `Meeting.userId` / `FollowUp.userId`, which were already
+declared without the annotation.
+
+**Residual Prisma drift remains OPEN** and is *not* resolved by that commit:
+
+1. `FunnelEvent.leadId` foreign key omits the `ON UPDATE CASCADE` the schema declares
+2. `QualificationToken.leadId` foreign key omits the `ON UPDATE CASCADE` the schema declares
+3. `FunnelEvent.createdAt` is `TIMESTAMP` where the schema wants `TIMESTAMP(3)`
+4. `QualificationToken` `expiresAt` / `consumedAt` / `createdAt` lack `(3)` precision
+
+These are non-destructive but mean a future `prisma migrate dev` **will** generate a
+migration. It requires separate investigation before that is run.
+
+### ⚠️ Production release gap
+
+Production is live on `neolife-web:b371fcf`, an image that **predates** `73d73e0`,
+`7c31712`, and `f709b64`. The P-2 fixes exist in GitHub `master` only.
+
+Until a new image is built and deployed, **lead assignment and Staff
+activation/deactivation remain affected for real production users** — the same
+UUID-validation defect is still in the deployed build. Do not treat P-2 as
+production-complete.
 
 ### ⚪ Not started / not authorized
 
@@ -57,6 +100,22 @@ Phase/step-by-step implementation status. Authoritative scope lives in `PROJECT_
 - **Phase 2 — Conversion & CRM Deepening**, and Phases 3–8.
 - **D-021 email provider** — still provider-agnostic, NOT YET SELECTED
   (`src/lib/email.ts`, default `none`/`dummy`).
+
+### Open technical issues
+
+1. **Production deployment of `73d73e0` / `7c31712` / `f709b64`** — not yet deployed.
+2. **Residual Prisma drift** — the four items listed above.
+3. **`admin-actions` DB-test flakiness** — roughly 1 in 6 full-suite runs fails under
+   parallel execution, because several suites write to the same database concurrently.
+4. **Accumulated local `e2e-staff-*` fixture users** — the P-2 spec creates one per
+   attempt, amplified by `retries: 2`.
+5. **Untracked `.kilo` worktree artifacts** — nested full copies of this repository on
+   disk. They cause `pnpm exec eslint .` to exit 1 on this machine and are excluded from
+   Playwright discovery via `testIgnore`. Not a repository defect: tracked source lints
+   clean and a fresh clone is unaffected.
+6. **Misleading test comment** — `tests/assignment-reassignment.test.ts:16` claims those
+   DB tests verify the actual `assignLead` action; they verify the pure helper. Real
+   Server Action coverage lives in `tests/admin-actions.test.ts`.
 
 ### Superseded historical claims
 
@@ -68,8 +127,10 @@ These were true when written and are retained below as history. Do not re-use th
   intentionally NOT in the application schema" — superseded; 10 migrations applied.
 - "Playwright browser download is blocked in this environment" — superseded; E2E runs
   on system Chrome.
-- Test counts such as `43/43`, `29/29`, `36/36`, `167 pass` — historical baselines.
-  The official total is **222**.
+- "P-2 E2E validation is not complete" / "fails at the deactivation step" — superseded;
+  P-2 is complete and the suite is 11/11. See the defect history above.
+- Test counts such as `43/43`, `29/29`, `36/36`, `167 pass`, `222 total` — historical
+  baselines. The official total is **247**.
 
 ---
 

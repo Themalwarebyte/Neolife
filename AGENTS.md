@@ -27,14 +27,33 @@ This project uses **pnpm** (see `pnpm-lock.yaml` / `pnpm-workspace.yaml`). Do no
 
 ## Testing conventions
 
-- **Official total: 222 tests** — **167** run without `DATABASE_URL`, plus **55**
+- **Official total: 247 tests** — **179** run without `DATABASE_URL`, plus **68**
   DB-enabled tests that require a local PostgreSQL instance.
 - DB-dependent suites gate on `const DB_AVAILABLE = Boolean(process.env.DATABASE_URL)`.
   A run without that variable legitimately reports fewer tests; that is not a failure.
 - `vitest` and `tsx` do **not** auto-load `.env`. Next.js does. To run DB-enabled
-  tests from a bare shell, export `DATABASE_URL` explicitly.
+  tests from a bare shell, export `DATABASE_URL` **and** `BETTER_AUTH_SECRET`.
+  `BETTER_AUTH_SECRET` is required by the qualification-token tests, so setting
+  `DATABASE_URL` alone produces 6 failures in `tests/qualification.test.ts`.
 - E2E runs against **system Chrome** (`channel: "chrome"`); no browser download needed.
-  `e2e/global-setup.ts` creates shared Owner/Staff sessions in `test-results/`.
+
+### E2E environment
+
+- `pnpm build` first, then `pnpm playwright test` (11 tests). The Playwright
+  `webServer` command runs `node e2e/prepare-standalone.mjs` before starting the
+  standalone server, because `next build` does not copy `.next/static/` or `public/`
+  into `.next/standalone/`. Without that step the server returns HTML with no client
+  JavaScript or CSS.
+- `reuseExistingServer: false`. If anything already holds port 3000 — for example an
+  `ssh -L 3000:...` tunnel to a remote host — the run fails loudly instead of adopting
+  that service as its test target.
+- `e2e/seed-e2e-users.ts` resets two local fixture accounts before each run
+  (`office@test.local`, `colleague1@neolife.local`) so their passwords are
+  deterministic. It refuses to run unless `E2E_SEED_USERS=1`, `NODE_ENV` is not
+  `production`, and `DATABASE_URL` points at a loopback host. Never seed production.
+- `e2e/global-setup.ts` writes shared Owner/Staff session files into `test-results/`.
+- `e2e/.kilo/**` is excluded from spec discovery; those are untracked nested worktree
+  copies whose stale specs fail on unresolvable imports.
 
 ## Architecture notes
 
@@ -44,6 +63,13 @@ This project uses **pnpm** (see `pnpm-lock.yaml` / `pnpm-workspace.yaml`). Do no
 - **Aliases:** `@/` maps to `src/` (configured in both `tsconfig.json` and `vitest.config.ts`).
 - **Database:** PostgreSQL 16 via Prisma. Local dev uses `docker compose up -d`.
   Schema changes require a new migration; never edit an applied migration.
+- **User IDs:** `User.id` is a TEXT column holding an opaque ~32-char Better Auth
+  identifier, **not** a UUID. Every user-reference column (`Lead.assignedUserId`,
+  `LeadEvent.userId`, `Meeting.userId`, `FollowUp.userId`) must therefore stay
+  TEXT-compatible. Entity IDs such as `Lead.id` and `Meeting.id` remain UUID
+  (`gen_random_uuid()`). Do not add `@db.Uuid` to a user-reference field: PostgreSQL
+  rejects Better Auth IDs as uuid syntax, and a migration generated from such an
+  annotation would issue a destructive `DROP COLUMN` + `ADD COLUMN UUID`.
 - **Auth:** Better Auth 1.7.2 with `@/lib/auth.ts`. Server-side session checks via
   `src/server/auth/requireCrmUser.ts` (`getCrmUser`, `requireCrmUser`, `requireAdmin`).
 - **Server Actions:** marked `"use server"`. Guard with `await requireAdmin()` or
@@ -70,6 +96,6 @@ This project uses **pnpm** (see `pnpm-lock.yaml` / `pnpm-workspace.yaml`). Do no
 
 1. `pnpm typecheck` — must pass
 2. `pnpm exec eslint . --max-warnings 0` — must pass
-3. `pnpm test` — all non-DB tests must pass (167); DB tests skip without `DATABASE_URL`
-   (55) and must pass when PostgreSQL is available (222 total)
+3. `pnpm test` — all non-DB tests must pass (179); DB tests skip without `DATABASE_URL`
+   (68) and must pass when PostgreSQL is available (247 total)
 4. Confirm no secrets, credentials, or production configuration are staged

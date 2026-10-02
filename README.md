@@ -90,27 +90,34 @@ is at `/admin/login`.
 
 ## Testing
 
-The suite contains **222 tests**:
+The suite contains **247 tests**:
 
-- **167** unit / pure-logic tests that run with no database.
-- **55** additional DB-enabled tests that require a local PostgreSQL instance.
+- **179** unit / pure-logic tests that run with no database.
+- **68** additional DB-enabled tests that require a local PostgreSQL instance.
 
 DB-dependent suites gate on the presence of `DATABASE_URL`, so a run without it reports
-167 tests and is not a failure. Note that `vitest` does not load `.env` automatically
-(Next.js does) — export `DATABASE_URL` explicitly to include the DB-enabled tests.
+179 tests and is not a failure. Note that `vitest` does not load `.env` automatically
+(Next.js does) — export `DATABASE_URL` **and** `BETTER_AUTH_SECRET` explicitly to include
+the DB-enabled tests.
 
 ```bash
 docker compose up -d
-DATABASE_URL="postgresql://<user>:<password>@localhost:5433/neolife?schema=public" pnpm test
+DATABASE_URL="postgresql://<user>:<password>@localhost:5433/neolife?schema=public" \
+BETTER_AUTH_SECRET="<a local-only value of 16+ characters>" pnpm test
 ```
 
-End-to-end tests use Playwright against **system Chrome** (no browser download needed)
-and expect the dev server and database to be running:
+End-to-end tests use Playwright against **system Chrome** (no browser download needed).
+Build first, then run:
 
 ```bash
-pnpm dev
+pnpm build
 pnpm exec playwright test
 ```
+
+The test harness prepares its own runtime and fixtures: it copies the static assets the
+standalone build omits, starts a local server that refuses to reuse an already-running
+service on port 3000, and resets two local test accounts before the run. Seeding is
+restricted to a loopback database and never runs against production.
 
 ---
 

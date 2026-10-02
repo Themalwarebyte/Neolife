@@ -2,9 +2,13 @@
 
 ## Unreleased
 
-### Admin user management (🟩 local)
+### 🟩 Admin user management (P-2) — COMPLETE
 
-Implemented Owner-approved admin user management for Phase P-2 preparation: Staff user creation with forced password change on first login, activation/deactivation toggle, and password-change flow.
+Phase P-2 is technically complete and verified end-to-end. The items below are
+preserved from the original implementation entry.
+
+Implemented Owner-approved admin user management: Staff user creation with forced
+password change on first login, activation/deactivation toggle, and password-change flow.
 
 **Schema:**
 - `prisma/schema.prisma` — added `mustChangePassword Boolean @default(false)` and `isActive Boolean @default(true)` to the `User` model.
@@ -13,7 +17,7 @@ Implemented Owner-approved admin user management for Phase P-2 preparation: Staf
 
 **Server actions (`src/app/admin/(protected)/actions.ts`):**
 - `createCrmUser` — Owner-only; creates a Staff user via Better Auth `signUpEmail`, then sets `role: "staff"` and `mustChangePassword: true` via Prisma. Rejects duplicate emails.
-- `toggleUserActive` — Owner-only; toggles `isActive` on a user. Owner accounts cannot be deactivated.
+- `toggleUserActive` — Owner-only; toggles `isActive` on a user. Owner accounts cannot be deactivated, and the caller cannot deactivate themselves.
 - `changePasswordAction` — any authenticated user with `mustChangePassword`; calls Better Auth `changePassword`, then clears `mustChangePassword`.
 
 **Pages:**
@@ -27,13 +31,67 @@ Implemented Owner-approved admin user management for Phase P-2 preparation: Staf
 - `src/app/admin/(protected)/layout.tsx` — redirects users with `mustChangePassword: true` to `/admin/change-password`; added "Users" nav link for Owner accounts.
 
 **Tests:**
-- `tests/user-management.test.ts` — 13 pure schema validation tests.
-- `tests/user-management-db.test.ts` — 4 DB integration tests (skipped without local PostgreSQL).
+- `tests/user-management.test.ts` — schema validation tests for the user-ID pattern.
+- `tests/user-management-db.test.ts` — DB integration tests (skipped without local PostgreSQL).
+- `tests/admin-actions.test.ts` — 23 regression tests driving the **real** Server Actions (`toggleUserActive`, `assignLead`) against a real database, mocking only the Next.js request-scoped seams (`requireCrmUser`, `revalidatePath`). Covers Better Auth IDs, authorization guards, admin/self-deactivation protection, audit events, reassignment, unassignment, and malformed input.
 
-**Verification:**
-- Lint: PASS (0 errors, 0 warnings)
-- Typecheck: PASS (`tsc --noEmit`)
-- Tests: 167 passed, 55 skipped (DB-only) — **222 total** · E2E 11 tests (the P-2 `admin-user-management` spec is 🟨 failing at the deactivation step; see `docs/STATUS.md`)
+### fix: support Better Auth user IDs in admin actions (`73d73e0`)
+
+`toggleUserActive` and `assignLead` validated user IDs with a UUID check, but Better Auth
+generates opaque ~32-character alphanumeric identifiers. Every real user ID was rejected
+before reaching the database: `toggleUserActive` silently no-opped and `assignLead`
+returned "Invalid assignee." for every real Staff user.
+
+- `src/lib/user-management.ts` — shared `BETTER_AUTH_USER_ID_PATTERN`
+  (`^[A-Za-z0-9_-]{16,64}$`) plus `isValidBetterAuthUserId`; `toggleUserSchema` now
+  uses it. Accepts real Better Auth IDs and UUIDs; still rejects empty, oversized, and
+  unsafe input.
+- `src/app/admin/(protected)/actions.ts` — `assignLead` validates `targetUserId` with the
+  shared validator; the UUID check is retained for genuinely UUID-based Lead and Meeting
+  IDs.
+- Authorization logic unchanged: same `requireAdmin()` guards, same role boundaries, same
+  admin-target and self-deactivation protection.
+
+### test: make local E2E environment deterministic (`7c31712`)
+
+The Playwright suite could not run reliably locally. Four independent causes fixed; no
+application code changed.
+
+- `e2e/prepare-standalone.mjs` — copies `.next/static/` and `public/` into
+  `.next/standalone/`, mirroring the `Dockerfile`. Without it the standalone server
+  returned HTML with no client JavaScript or CSS.
+- `playwright.config.ts` — `reuseExistingServer: false`. A local `ssh -L 3000:...` tunnel
+  had been found holding port 3000 and pointing at a remote container, so the suite could
+  have silently executed against a remote environment. A busy port now fails loudly.
+- `e2e/seed-e2e-users.ts` — resets two fixture accounts (`office@test.local`,
+  `colleague1@neolife.local`) so their passwords are deterministic; the existing
+  `scripts/seed-*.ts` are idempotent on `role` only and never reset a credential. Refuses
+  to act unless `E2E_SEED_USERS=1`, `NODE_ENV` is not `production`, `BETTER_AUTH_URL` is
+  absent or local, and `DATABASE_URL` is loopback-local.
+- `e2e/admin-user-management.spec.ts` — the Owner row was located with
+  `tr:has-text("Owner")`, but every admin row renders that role label, so the locator
+  matched two admins once the fixture seeder created a second. Now addressed by exact
+  fixture email with a uniqueness guard; the Owner-protection assertion is unchanged.
+- `playwright.config.ts` — `testIgnore: "**/.kilo/**"` so stale specs in the untracked
+  nested worktree are not discovered.
+
+### fix: align user relation IDs with Better Auth text IDs (`f709b64`)
+
+`Lead.assignedUserId` and `LeadEvent.userId` were declared `@db.Uuid` while the
+migrations and the live database both use `TEXT`, because `User.id` is a TEXT column
+holding an opaque Better Auth identifier.
+
+Verified with `prisma migrate diff --from-migrations` against a throwaway shadow
+database: generating a migration from the schema as it stood proposed
+`DROP COLUMN "assignedUserId", ADD COLUMN "assignedUserId" UUID` — destructive, and it
+could never have stored a Better Auth ID again. Removing the annotations eliminates those
+statements entirely.
+
+**No migration was required and no database change was made.** The remaining 22 `@db.Uuid`
+annotations (entity IDs) are correct and untouched. Residual drift remains open:
+`FunnelEvent.leadId` and `QualificationToken.leadId` foreign keys omit the declared
+`ON UPDATE CASCADE`, and `FunnelEvent.createdAt` plus the `QualificationToken` timestamps
+lack `TIMESTAMP(3)` precision.
 
 ### Phase P-1 — Registration / business-interest flow (🟩 local)
 

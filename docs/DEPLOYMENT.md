@@ -25,6 +25,27 @@
 | Compose project / network | `neolife` — dedicated, isolated |
 | Origin public | Internet → Cloudflare → Tunnel → `neolife-web:3000` |
 
+> ### ⚠️ Deployed build is behind `master`
+>
+> Production still runs `neolife-web:b371fcf`. GitHub `master` has since advanced past
+> three commits that are **not** deployed:
+>
+> | Commit | Effect |
+> |---|---|
+> | `73d73e0` | fix: support Better Auth user IDs in admin actions |
+> | `7c31712` | test: make local E2E environment deterministic |
+> | `f709b64` | fix: align user relation IDs with Better Auth text IDs |
+>
+> The most significant is `73d73e0`. Before it, `toggleUserActive` and `assignLead`
+> validated user IDs as UUIDs, which rejects every real Better Auth ID — so in the
+> currently deployed image **lead assignment and Staff activation/deactivation are
+> affected for real users**. Treat those two features as broken in production until a
+> new image is built and deployed. See `docs/STATUS.md`.
+>
+> `f709b64` is a schema-alignment change only and generated no migration, so no
+> `migrate deploy` step is required for it — but the rebuilt application still requires
+> `pnpm prisma generate` against the corrected schema (see §6 step 3).
+
 Evidence of deployment is recorded in `docs/CHANGELOG.md` (entries marked 🟩
 deployed, including the `neolife-web:11e64fa` and `neolife-web:b371fcf`
 releases) and in the committed `compose.production.yaml` / `deploy/compose.yaml`
