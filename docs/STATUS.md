@@ -17,11 +17,12 @@ Phase/step-by-step implementation status. Authoritative scope lives in `PROJECT_
 |---|---|
 | **Current phase** | PHASE 1 — Traffic MVP · 🟩 COMPLETE (deployed) |
 | **Production** | 🟩 **LIVE** at `https://neolife.ooflowdesk.com` |
-| **Production image** | `neolife-web:b371fcf` — ⚠️ **predates the P-2 fixes; deployment pending** |
+| **Production image** | **`neolife-web:92ee361`** · deployed 2026-10-02 · 🟩 verified |
+| **Deployed SHA** | `92ee3610fbd4b704886a40f726af6ef52de6f14a` |
 | **Branch** | `master` |
 | **Official test count** | **247 total** = 179 (no `DATABASE_URL`) + 68 (DB-enabled) |
 | **E2E** | 🟩 **11/11 PASS** — 5 specs, 0 failed, 0 skipped, 0 flaky |
-| **Database** | 10 Prisma migrations, all reconciled and applied |
+| **Database** | 10 Prisma migrations — 🟩 **10/10 applied in production** |
 
 ### 🟩 Completed
 
@@ -45,9 +46,12 @@ Phase/step-by-step implementation status. Authoritative scope lives in `PROJECT_
 - **Deterministic local E2E environment** — standalone asset preparation, fail-loud
   server binding, guarded local-only fixture seeding (`7c31712`)
 - **Prisma user-relation schema alignment** (`f709b64`) — see the entry below
-- **Deployed functionality** — two production releases recorded in `docs/CHANGELOG.md`
-  (`neolife-web:11e64fa`, `neolife-web:b371fcf`), including the D-020 official
-  product/category image rebuild. Production currently serves `b371fcf`.
+- **Deployed functionality** — three production releases recorded in `docs/CHANGELOG.md`
+  (`neolife-web:11e64fa`, `neolife-web:b371fcf`, `neolife-web:92ee361`). The D-020
+  official product/category image rebuild shipped in `b371fcf`; production now serves
+  `92ee361`.
+- **Production release `92ee361` 🟩 DEPLOYED AND VERIFIED (2026-10-02)** — see the
+  production verification table below.
 
 ### P-2 defect history (how it was found)
 
@@ -83,15 +87,43 @@ declared without the annotation.
 These are non-destructive but mean a future `prisma migrate dev` **will** generate a
 migration. It requires separate investigation before that is run.
 
-### ⚠️ Production release gap
+### 🟩 Production deployment `92ee361` — deployed and verified (2026-10-02)
 
-Production is live on `neolife-web:b371fcf`, an image that **predates** `73d73e0`,
-`7c31712`, and `f709b64`. The P-2 fixes exist in GitHub `master` only.
+Production runs image **`neolife-web:92ee361`** at commit
+`92ee3610fbd4b704886a40f726af6ef52de6f14a`, recorded on the server at
+`/opt/ooflowdesk/neolife/.deployed-sha`. **10/10** Prisma migrations are applied.
 
-Until a new image is built and deployed, **lead assignment and Staff
-activation/deactivation remain affected for real production users** — the same
-UUID-validation defect is still in the deployed build. Do not treat P-2 as
-production-complete.
+| Verification area | Result |
+|---|---|
+| Owner authentication + CRM access | 🟩 PASS |
+| Staff activation / deactivation | 🟩 PASS |
+| Inactive Staff CRM restriction | 🟩 PASS |
+| Staff reactivation | 🟩 PASS |
+| Lead assignment (real Better Auth Staff ID) | 🟩 PASS |
+| `LeadEvent` actor audit tracking | 🟩 PASS |
+| Public routes + `/health` | 🟩 PASS |
+| Container / database / tunnel health | 🟩 PASS |
+| Better Auth opaque ID support (deployed validator vs a real 32-char `User.id`) | 🟩 PASS |
+
+Better Auth ID support was confirmed directly: the deployed image's own
+`isValidBetterAuthUserId` and `toggleUserSchema` accept a genuine 32-character
+alphanumeric production `User.id`, while still accepting UUIDs and still rejecting
+malformed input.
+
+**Migration gap resolved.** The pre-deployment audit found production **six migrations
+behind**, predating lead ownership, funnel tracking, and the P-2 user fields — so those
+features had never existed in production rather than existing and being broken. A
+verified `pg_dump -Fc` backup was taken, then exactly four additive migrations were
+applied with `prisma migrate deploy` (`add_lead_ownership`, `add_leadevent_actor`,
+`add_funnel_events`, `add_user_management_fields`). Post-migration checks confirmed
+`Lead.assignedUserId` and `LeadEvent.userId` as TEXT with foreign keys and indexes, both
+new tables present, both new `User` columns present with migration defaults, and **all
+existing rows preserved** (1 user, 2 leads, 0 lead events). The database was behind, not
+damaged; nothing was corrupted or lost. The previously running `b371fcf` image stayed
+healthy throughout, confirming the additive schema was backward-compatible.
+
+Rollback remains available: image `neolife-web:b371fcf`, the pre-migration dump, and
+the pre-change compose file are all retained on the server.
 
 ### ⚪ Not started / not authorized
 
@@ -103,19 +135,26 @@ production-complete.
 
 ### Open technical issues
 
-1. **Production deployment of `73d73e0` / `7c31712` / `f709b64`** — not yet deployed.
-2. **Residual Prisma drift** — the four items listed above.
-3. **`admin-actions` DB-test flakiness** — roughly 1 in 6 full-suite runs fails under
+1. **Residual Prisma drift** — the four items listed above. A future `prisma migrate dev`
+   will generate a migration for them; it is non-destructive but needs review first.
+2. **`admin-actions` DB-test flakiness** — roughly 1 in 6 full-suite runs fails under
    parallel execution, because several suites write to the same database concurrently.
-4. **Accumulated local `e2e-staff-*` fixture users** — the P-2 spec creates one per
+3. **Accumulated local `e2e-staff-*` fixture users** — the P-2 spec creates one per
    attempt, amplified by `retries: 2`.
-5. **Untracked `.kilo` worktree artifacts** — nested full copies of this repository on
+4. **Untracked `.kilo` worktree artifacts** — nested full copies of this repository on
    disk. They cause `pnpm exec eslint .` to exit 1 on this machine and are excluded from
    Playwright discovery via `testIgnore`. Not a repository defect: tracked source lints
    clean and a fresh clone is unaffected.
-6. **Misleading test comment** — `tests/assignment-reassignment.test.ts:16` claims those
+5. **Misleading test comment** — `tests/assignment-reassignment.test.ts:16` claims those
    DB tests verify the actual `assignLead` action; they verify the pure helper. Real
    Server Action coverage lives in `tests/admin-actions.test.ts`.
+6. **Future enhancement (not a defect)** — an inactive account still receives a session
+   cookie from Better Auth's sign-in endpoint, because `isActive` is an
+   `additionalFields` value enforced by the application's `getCrmUser()` guard rather
+   than by the auth layer itself. The user-visible effect is correct: every protected
+   route redirects a deactivated user to `/admin/login` (verified in production). If
+   hard rejection at the auth layer is ever desired, that requires a Better Auth hook
+   and is deliberately out of scope for P-2.
 
 ### Superseded historical claims
 
@@ -129,6 +168,10 @@ These were true when written and are retained below as history. Do not re-use th
   on system Chrome.
 - "P-2 E2E validation is not complete" / "fails at the deactivation step" — superseded;
   P-2 is complete and the suite is 11/11. See the defect history above.
+- "Production is 4–6 migrations behind", "production runs `neolife-web:b371fcf`", and
+  "lead assignment / Staff activation are affected for real users" — superseded
+  2026-10-02; production now runs `92ee361` with 10/10 migrations applied and all P-2
+  flows verified. Retained as history in the production deployment section above.
 - Test counts such as `43/43`, `29/29`, `36/36`, `167 pass`, `222 total` — historical
   baselines. The official total is **247**.
 

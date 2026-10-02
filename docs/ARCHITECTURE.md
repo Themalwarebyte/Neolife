@@ -56,11 +56,13 @@ application serves two audiences:
 - **Pure helpers** in `src/lib/assignment.ts` (`canAssignLeads`, `isAssignableRole`, `canViewLead`, `leadVisibilityWhere`) encapsulate the authorization policy for testability.
 - **Pure helpers** in `src/lib/user-management.ts` encapsulate the user-management input policy (name, email, temporary-password strength) for testability.
 
-### Admin user management (P-2) — 🟩 DONE
+### Admin user management (P-2) — 🟩 DONE · production verified
 
 Owner-only account lifecycle: create Staff users, force a password change on first
-login, and activate/deactivate accounts. Verified end-to-end: Admin User Management E2E
-passes and the full Playwright suite is 11/11.
+login, and activate/deactivate accounts. Verified end-to-end locally (Admin User
+Management E2E passes, full Playwright 11/11) **and in production** on image
+`neolife-web:92ee361`, including deactivation, the inactive-Staff CRM restriction,
+reactivation, and lead assignment with a real Better Auth Staff ID.
 
 **Routes**
 
@@ -91,6 +93,13 @@ passes and the full Playwright suite is 11/11.
 - **Inactive accounts are fully locked out.** `getCrmUser()` returns `null` when
   `isActive` is false, so `requireCrmUser()` treats them as unauthenticated and
   redirects to `/admin/login`. Every protected route is affected, not just CRM reads.
+  Note the boundary of this control: Better Auth's own sign-in endpoint still issues a
+  session cookie for an inactive account, because `isActive` is an `additionalFields`
+  value rather than an auth-layer gate. The restriction is therefore enforced at the
+  application layer, which is the current design — verified in production, where a
+  deactivated Staff account receives a token but is redirected away from every
+  protected route. Adding auth-layer rejection would require a Better Auth hook and is
+  a possible future enhancement, not a defect.
 - **Owner accounts cannot be deactivated**, and the Owner cannot deactivate their own
   account — both enforced in `toggleUserActive` after `requireAdmin()`.
 - **Forced password change cannot be bypassed.** The `(protected)` layout redirects
@@ -312,13 +321,18 @@ Any user with mustChangePassword = true
 ## Deployment architecture
 
 - **Local dev:** Docker Compose (`docker-compose.yml`) — PostgreSQL 16 on port 5433.
-- **Production:** 🟩 **LIVE** at `https://neolife.ooflowdesk.com`. Docker standalone +
-  Compose (`compose.production.yaml`, mirrored to the server as `deploy/compose.yaml`) —
-  isolated `neolife` project, dedicated bridge network, dedicated PostgreSQL volume,
-  Cloudflare Tunnel. Services are `neolife-web`, `neolife-postgres`, `neolife-tunnel`,
-  and a profiled one-shot `neolife-seed`. There is **no gateway/proxy service** in the
-  current topology: TLS termination and origin routing are handled by Cloudflare
-  directly in front of `neolife-web`.
+- **Production:** 🟩 **LIVE** at `https://neolife.ooflowdesk.com`, running image
+  `neolife-web:92ee361` at commit `92ee361` (deployed and verified 2026-10-02, 10/10
+  migrations applied). Docker standalone + Compose (`compose.production.yaml`, mirrored
+  to the server as `/opt/ooflowdesk/neolife/compose.yaml`) — isolated `neolife` project,
+  dedicated bridge network, dedicated PostgreSQL volume, Cloudflare Tunnel. Services
+  are `neolife-web`, `neolife-postgres`, `neolife-tunnel`, and a profiled one-shot
+  `neolife-seed`. There is **no gateway/proxy service** in the current topology: TLS
+  termination and origin routing are handled by Cloudflare directly in front of
+  `neolife-web`.
+- **Deployment access:** the secret store is root-owned, so the documented
+  `sudo docker compose --env-file …` workflow requires sudo on the server. See
+  `docs/DEPLOYMENT.md` §6.0.
 - **Migration strategy:** `prisma migrate deploy` against the production `DATABASE_URL`
   (never `migrate dev`); migrations are forward-only, so rollback is app-only.
 - **Secrets:** Root-owned env file injected as container environment variables at run

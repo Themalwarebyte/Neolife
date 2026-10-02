@@ -2,6 +2,54 @@
 
 ## Unreleased
 
+### 🟩 Deployed: `92ee361` to production (2026-10-02)
+
+Image `neolife-web:92ee361` deployed to `https://neolife.ooflowdesk.com`; SHA recorded
+on the server at `/opt/ooflowdesk/neolife/.deployed-sha`. **10/10** Prisma migrations
+applied. Post-deployment verification all PASS: Owner authentication and CRM access,
+Staff activation/deactivation, inactive-Staff CRM restriction, Staff reactivation, lead
+assignment with a real Better Auth Staff ID, `LeadEvent` actor audit tracking, public
+routes, `/health`, and container/database/tunnel health.
+
+**Migration gap closed.** The pre-deployment audit found production six migrations
+behind, predating lead ownership, funnel tracking, and the P-2 user fields — so those
+features had never existed in production rather than existing and being broken. A
+verified `pg_dump -Fc` backup was taken first, then exactly four additive migrations
+were applied via `prisma migrate deploy`:
+
+- `20260917000000_add_lead_ownership` — adds `Lead.assignedUserId` TEXT + FK + indexes
+- `20260917120000_add_leadevent_actor` — adds `LeadEvent.userId` TEXT + FK + index
+- `20260918000000_add_funnel_events` — creates `FunnelEvent` + `QualificationToken`
+- `20260919000000_add_user_management_fields` — adds `User.mustChangePassword`, `User.isActive`
+
+Post-migration verification confirmed both user-reference columns as TEXT with foreign
+keys and indexes, both new tables present, both new `User` columns present with
+migration defaults, and **all existing rows preserved**. The previously running
+`b371fcf` image stayed healthy throughout, confirming backward compatibility. The
+database was behind, not damaged — nothing was corrupted or lost.
+
+**Better Auth ID support confirmed in production.** The deployed image's own
+`isValidBetterAuthUserId` and `toggleUserSchema` were run against a genuine
+32-character alphanumeric production `User.id` and both accepted it, while still
+accepting UUIDs and still rejecting malformed input.
+
+Deployment notes:
+
+- The `seed` service image reference was updated alongside `web` so the two cannot
+  drift. The seed service was **not executed**.
+- The secret store is root-owned, so the documented
+  `sudo docker compose --env-file …` workflow requires sudo on this server. Recorded in
+  `docs/DEPLOYMENT.md` §6.0.
+- Rollback artifacts retained: image `neolife-web:b371fcf`, the pre-migration dump, and
+  the pre-change compose file.
+
+One observation recorded for the future, not a defect: an inactive account still
+receives a session cookie from Better Auth's sign-in endpoint, because `isActive` is an
+`additionalFields` value enforced by the application's `getCrmUser()` guard rather than
+by the auth layer. The user-visible effect is correct — a deactivated Staff account is
+redirected away from every protected route, verified in production. Auth-layer
+rejection would require a Better Auth hook.
+
 ### 🟩 Admin user management (P-2) — COMPLETE
 
 Phase P-2 is technically complete and verified end-to-end. The items below are

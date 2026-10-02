@@ -1,12 +1,14 @@
 # NEOLIFE — §11.7 Deployment Execution Plan
 
-> **STATUS: EXECUTED — production is LIVE** at `https://neolife.ooflowdesk.com`.
+> **CURRENT RELEASE (2026-10-02): image `neolife-web:92ee361`, commit `92ee361`,
+> deployed and verified.** 10/10 Prisma migrations applied. See `docs/DEPLOYMENT.md` §0
+> and `docs/STATUS.md`.
 >
-> This plan was written and executed on **2026-09-08** to stand up the initial
-> NEOLIFE production deployment. It is retained as the authoritative historical
-> record of how that deployment was performed, and as the reference for future
-> releases. The live arrangement and the current redeploy procedure are in
-> `docs/DEPLOYMENT.md` (§0 and §6).
+> **STATUS OF THIS DOCUMENT:** the plan below was written and executed on **2026-09-08**
+> to stand up the *initial* production deployment. It is retained as the authoritative
+> historical record of how that first deployment was performed. It does **not** describe
+> subsequent releases; for the current production arrangement and the redeploy procedure
+> see `docs/DEPLOYMENT.md` (§0 and §6).
 >
 > Paid advertising remains **NOT AUTHORIZED** and gated behind the §11.6 launch gate.
 >

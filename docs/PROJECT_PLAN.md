@@ -628,10 +628,14 @@ When a phase meets its completion criteria, explicitly report: **"PHASE X IS COM
 | P-1 Registration / business-interest flow | 🟩 DONE (2026-09-18, D-026 + D-032) |
 | P-2 Admin user management | 🟩 **DONE** — Better Auth user-ID defect fixed (`73d73e0`), E2E environment made deterministic (`7c31712`), schema alignment (`f709b64`); Admin E2E PASS and full Playwright 11/11 PASS |
 | Application implementation | Tasks 1.1 🟩 · 1.2 🟩 · 1.3 🟩 · 1.4 🟩 · 1.5 🟩 · 1.6 🟩 · 1.7 🟩 · 1.8 🟩 · 1.9 🟩 · 1.10 🟩 · 1.11 🟩 — see `docs/STATUS.md` |
-| Production deployment | 🟩 LIVE — `https://neolife.ooflowdesk.com`, but still on image `neolife-web:b371fcf`, which **predates** `73d73e0`, `7c31712`, and `f709b64`. The P-2 fixes are therefore **not yet in production** |
+| Production deployment | 🟩 LIVE — `https://neolife.ooflowdesk.com`, image **`neolife-web:92ee361`** at commit `92ee361`, deployed and verified 2026-10-02 · 10/10 migrations applied |
 | Test suite | 🟩 247/247 PASS (179 non-DB + 68 DB-enabled) · E2E **11/11 PASS** |
 
-**Next action:** Build and deploy a new production image carrying `73d73e0`, `7c31712`, and `f709b64`, then verify in production — until that happens, lead assignment and Staff activation/deactivation remain affected for real users. Paid advertising remains NOT AUTHORIZED and stays gated behind the §11.6 launch gate. See `docs/STATUS.md`.
+**Next action:** Resolve the residual Prisma drift as a dedicated investigation *before*
+running any future `prisma migrate dev`, then reconcile the local test-hygiene items
+(`admin-actions` parallel flakiness, `.kilo` artifact cleanup). Phase 2 remains not
+started, and paid advertising remains NOT AUTHORIZED, gated behind the §11.6 launch
+gate. See `docs/STATUS.md`.
 
 ---
 
