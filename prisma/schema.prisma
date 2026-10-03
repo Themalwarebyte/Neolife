@@ -307,6 +307,11 @@ model ProductInterest {
     @@index([createdAt])
 }
 
+// Referential actions and timestamp precision here follow the normal Prisma
+// conventions (ON UPDATE CASCADE, TIMESTAMP(3)), matching every
+// Prisma-generated table in this schema. The hand-written
+// 20260918000000_add_funnel_events migration omitted both; they were restored
+// by 20261003000000_align_funnel_event_conventions.
 model FunnelEvent {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   type      String
@@ -325,6 +330,8 @@ model FunnelEvent {
   @@index([deviceId, createdAt])
 }
 
+// Referential actions and timestamp precision here follow the normal Prisma
+// conventions (ON UPDATE CASCADE, TIMESTAMP(3)). See the note on FunnelEvent.
 model QualificationToken {
   id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   leadId     String    @db.Uuid
