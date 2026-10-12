@@ -219,6 +219,17 @@ The following decisions were identified during the NeoLife Product Catalogue pla
 
 All of D-019 through D-026 were **pending** during planning and are now **APPROVED** as of 2026-09-13. The decisions listed above reflect the Owner's explicit approval.
 
+### D-034 — Staff referral links with system initial assignment (APPROVED — 2026-10-10)
+
+- **Decision:** Owner approved staff referral links plus automatic **initial** lead assignment on capture.
+  - Every eligible (active, `role = "staff"`) Staff account gets one revocable, cryptographically random, opaque referral code; the public link format is `https://neolife.ooflowdesk.com/business?ref=<code>`. Internal Better Auth user IDs are never exposed in URLs.
+  - On lead capture with a valid, active Staff referral link, the **system** performs the initial assignment: `Lead.assignedUserId` is set to that Staff user's id inside the same transaction that persists the lead, the immutable original referrer (`referredByUserId` + code + method + timestamp snapshot on `Lead`), and audit events.
+  - This is a narrowly scoped exception to D-027 (Owner-only assignment): only the SYSTEM, only on lead creation, only when a valid active Staff referral is present. D-027 otherwise remains fully in force: Staff still cannot assign, reassign, or unassign leads; reassignment changes current ownership only and never mutates the original referral attribution; unassigned/invalid referrals fail safely into the Owner's pool.
+  - Referral attribution is immutable after creation — no Server Action may modify `referredByUserId`, `referralCode`, `referralMethod`, or `referralCapturedAt` after the lead exists.
+  - Manual "Who referred you?" fallback validated against approved public-facing Staff display names; a valid referral link overrides conflicting manual input.
+- **Implementation:** `prisma/schema.prisma` (`ReferralCode` model, referral fields on `Lead`, `Notification` model), migration `20261010000000_add_referrals_notifications`, `src/lib/referrals.ts`, `src/app/business/page.tsx`, `src/lib/leads.ts`, notifications (`src/lib/notifications.ts`, `/admin/notifications`), email composer + WhatsApp/click-to-call in the lead detail view (`src/app/admin/(protected)/actions.ts`, `src/lib/communications.ts`).
+- **Email scope:** outbound client email uses the existing provider-agnostic `src/lib/email.ts` (D-021 keeps the provider unset); sending stays disabled until `EMAIL_PROVIDER`/credentials are configured — the CRM composer reports provider status and records audit events either way. WhatsApp and click-to-call are link openers only; a successful link open is never recorded as a sent message.
+
 ### D-033 — Admin user management for Phase P-2 (APPROVED — 2026-09-19)
 
 - **Decision:** Add `mustChangePassword` and `isActive` boolean fields to the `User` model. Owner (admin) can create Staff users with a temporary password that is enforced to change on first login. Owner can deactivate/reactivate Staff users. Inactive users cannot authenticate or access CRM routes.

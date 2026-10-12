@@ -66,13 +66,24 @@ model Lead {
   utmContent       String?
   utmTerm          String?
   landingPage      String?
-   firstTouchSource String?
+  firstTouchSource String?
 
    // References User.id, which is TEXT: Better Auth generates opaque
   // alphanumeric IDs, not UUIDs. @db.Uuid here would be incorrect — a real
   // Better Auth ID is rejected by PostgreSQL as invalid uuid syntax. Keep in
   // step with Meeting.userId and FollowUp.userId.
   assignedUserId String?
+
+  // Referral attribution (D-034) — captured ONCE at lead creation and treated
+  // as immutable afterwards. referredByUserId is a snapshot of the original
+  // referrer: reassignment moves Lead.assignedUserId only and MUST never touch
+  // these fields. ON DELETE SET NULL keeps attribution auditably intact even
+  // if the referring Staff account is later deleted.
+  referredByUserId   String?
+  referralCode       String?
+  referralMethod     String? // "link" | "manual_name"
+  referredByName     String? // manual-fallback display name, as typed by the visitor
+  referralCapturedAt DateTime?
 
    createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
@@ -82,14 +93,23 @@ model Lead {
   followUps FollowUp[]
   productInterests ProductInterest[]
   assignedUser User? @relation("user_assigned_leads", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  referredBy   User? @relation("user_referred_leads", fields: [referredByUserId], references: [id], onDelete: SetNull)
+
+  // referralCode is deliberately stored as a plain TEXT value with NO foreign
+  // key: revoking or deleting a ReferralCode row must never rewrite historical
+  // attribution. Resolution goes through src/lib/referrals.ts lookups instead.
+
   funnelEvents FunnelEvent[]
   qualificationTokens QualificationToken[]
+  notifications Notification[]
 
   @@index([status])
   @@index([createdAt])
   @@index([utmCampaign])
   @@index([assignedUserId])
   @@index([assignedUserId, status])
+  @@index([referredByUserId])
+  @@index([referralCode])
 }
 
 // First-party funnel events (D-005) — NOT a custom analytics platform.
@@ -161,7 +181,51 @@ model User {
   sessions Session[]
   accounts Account[]
   assignedLeads Lead[] @relation("user_assigned_leads")
+  referredLeads Lead[] @relation("user_referred_leads")
+  referralCode  ReferralCode?
+  notifications Notification[]
   events LeadEvent[]
+}
+
+// Staff referral links (D-034). One code per Staff user; Owner-managed.
+// Codes are 128-bit random, URL-safe and opaque — they never embed or leak
+// Better Auth user IDs. `publicName` is the approved public-facing display
+// name used by the manual "Who referred you?" fallback.
+model ReferralCode {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String    @unique
+  code       String    @unique
+  isActive   Boolean   @default(true)
+  publicName String
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  user          User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+
+// In-app notifications (D-034, Phase 3). Per-recipient, deduplicated by
+// dedupKey so delivery retries never create duplicates.
+model Notification {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String
+  leadId    String?   @db.Uuid
+  type      String
+  title     String
+  body      String?
+  dedupKey  String    @unique
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lead Lead? @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
+  @@index([leadId])
 }
 
 model Session {

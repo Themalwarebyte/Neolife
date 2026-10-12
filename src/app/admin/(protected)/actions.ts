@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers as nextHeaders } from "next/headers";
 import { requireAdmin, requireCrmUser } from "@/server/auth/requireCrmUser";
 import { prisma } from "@/server/db/prisma";
 import {
@@ -18,7 +19,119 @@ import {
   changePasswordSchema,
   isValidBetterAuthUserId,
 } from "@/lib/user-management";
+import { randomBytes } from "node:crypto";
 import { LeadStatus, MeetingStatus } from "@/generated/prisma/client";
+import {
+  isClientEmailSendingEnabled,
+  isValidRecipientEmail,
+  recordCommunicationEvent,
+  validateComposerInput,
+} from "@/lib/communications";
+import { sendMail } from "@/lib/email";
+
+// ─── Referral link management (D-034) ────────────────────────────────────
+
+const REFERRAL_CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+
+function newReferralCode(): string {
+  const bytes = randomBytes(22);
+  let code = "";
+  for (const byte of bytes) {
+    code += REFERRAL_CODE_ALPHABET[byte % REFERRAL_CODE_ALPHABET.length];
+  }
+  return code;
+}
+
+/**
+ * Owner-only: (re)generate the referral link for a Staff user.
+ * Regenerating replaces the old code — a previously shared link stops
+ * resolving, which is an intentional, Owner-controlled rotation.
+ */
+export async function generateStaffReferralLink(formData: FormData): Promise<CrmActionResult> {
+  await requireAdmin();
+  const staffUserId = String(formData.get("staffUserId") ?? "").trim();
+  const publicName = String(formData.get("publicName") ?? "").trim();
+
+  if (!isValidBetterAuthUserId(staffUserId)) {
+    return { status: "error", message: "Invalid staff user." };
+  }
+  if (publicName.length < 2 || publicName.length > 60) {
+    return {
+      status: "error",
+      message: "Public name must be 2–60 characters.",
+    };
+  }
+
+  try {
+    const target = await prisma.user.findUnique({
+      where: { id: staffUserId },
+      select: { id: true, role: true, isActive: true, name: true },
+    });
+    if (!target || target.role !== "staff" || !target.isActive) {
+      return { status: "error", message: "Active staff user not found." };
+    }
+
+    const code = newReferralCode();
+    await prisma.referralCode.upsert({
+      where: { userId: staffUserId },
+      update: { code, publicName, isActive: true, revokedAt: null },
+      create: { userId: staffUserId, code, publicName },
+    });
+
+    revalidatePath("/admin/referrals");
+    return {
+      status: "success",
+      message: `Referral link updated for ${target.name}.`,
+    };
+  } catch {
+    return { status: "error", message: "Could not update the referral link." };
+  }
+}
+
+/** Owner-only: revoke a Staff referral link (existing links fail safely). */
+export async function revokeStaffReferralLink(formData: FormData): Promise<CrmActionResult> {
+  await requireAdmin();
+  const staffUserId = String(formData.get("staffUserId") ?? "").trim();
+  if (!isValidBetterAuthUserId(staffUserId)) {
+    return { status: "error", message: "Invalid staff user." };
+  }
+  try {
+    const updated = await prisma.referralCode.updateMany({
+      where: { userId: staffUserId, revokedAt: null },
+      data: { isActive: false, revokedAt: new Date() },
+    });
+    revalidatePath("/admin/referrals");
+    return updated.count > 0
+      ? { status: "success", message: "Referral link revoked." }
+      : { status: "error", message: "No active referral link found." };
+  } catch {
+    return { status: "error", message: "Could not revoke the referral link." };
+  }
+}
+
+/**
+ * Staff-safe: return the CURRENT USER's own referral link data (or null).
+ * Staff can see and copy their own link only; the Owner sees all via the
+ * /admin/referrals page.
+ */
+export async function getMyReferralLink() {
+  const user = await requireCrmUser();
+  const record = await prisma.referralCode.findUnique({
+    where: { userId: user.id },
+    select: { code: true, isActive: true, revokedAt: true, publicName: true },
+  });
+  if (!record || !record.isActive || record.revokedAt) return null;
+  const headerList = await nextHeaders();
+  const origin =
+    process.env.NEXT_PUBLIC_SITE_URL ??
+    headerList.get("origin") ??
+    "https://neolife.ooflowdesk.com";
+  return {
+    code: record.code,
+    publicName: record.publicName,
+    link: `${origin.replace(/\/+$/, "")}/business?ref=${encodeURIComponent(record.code)}`,
+  };
+}
 
 export type CrmActionResult = { status: "success" | "error"; message: string };
 
@@ -405,6 +518,101 @@ export async function toggleUserActive(userId: string): Promise<void> {
     revalidatePath("/admin/users");
   } catch {
     return;
+  }
+}
+
+// ─── Client communications (D-034, Phase 4) ───────────────────────────────
+
+const COMMUNICATION_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Sends an email to the AUTHORIZED lead's own address — never to an address
+ * chosen in the form. Staff may email only leads currently assigned to
+ * them; the Owner may email any lead. The recipient is resolved server-side
+ * from the Lead record, so arbitrary recipient substitution is impossible.
+ * External sending stays disabled until a provider is configured (D-021);
+ * the action then records an audit event with the provider status either way.
+ */
+export async function sendClientEmail(
+  _previous: CrmActionResult | null,
+  formData: FormData,
+): Promise<CrmActionResult> {
+  const user = await requireCrmUser();
+
+  const leadId = String(formData.get("leadId") ?? "");
+  if (!COMMUNICATION_UUID.test(leadId)) {
+    return { status: "error", message: "Invalid lead." };
+  }
+
+  const parsed = validateComposerInput(formData.get("subject"), formData.get("body"));
+  if (!parsed) {
+    return {
+      status: "error",
+      message: "Please provide a subject and a message (body up to 10,000 characters).",
+    };
+  }
+
+  try {
+    // Ownership-scoped lookup: Staff only reach their OWN assigned leads.
+    const lead = await prisma.lead.findUnique({
+      where:
+        user.role === "admin"
+          ? { id: leadId }
+          : { id: leadId, assignedUserId: user.id },
+      select: { id: true, email: true, firstName: true },
+    });
+    if (!lead) return { status: "error", message: "Lead not found." };
+
+    if (!lead.email || !isValidRecipientEmail(lead.email)) {
+      return {
+        status: "error",
+        message: "This contact has no usable email address on record.",
+      };
+    }
+
+    if (!isClientEmailSendingEnabled()) {
+      return {
+        status: "error",
+        message:
+          "Email sending is not enabled yet: configure the delivery provider first. Nothing was sent.",
+      };
+    }
+
+    const { subject, body } = parsed;
+    const escaped = body
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/\n/g, "<br>");
+    const result = await sendMail({
+      to: lead.email,
+      subject,
+      text: body,
+      html: `<p style="font-family:system-ui,sans-serif;font-size:14px;line-height:1.6;color:#1f2937;">${escaped}</p><p style="font-family:system-ui,sans-serif;font-size:12px;color:#6b7280;">NEOLIFE Office Team</p>`,
+    });
+
+    await recordCommunicationEvent({
+      leadId: lead.id,
+      userId: user.id,
+      channel: "email",
+      subject,
+      providerStatus: result.ok ? "accepted" : (result.error ?? "failed"),
+    });
+
+    revalidatePath(`/admin/leads/${lead.id}`);
+
+    if (result.ok) {
+      return {
+        status: "success",
+        message: `Email to ${lead.email} accepted by the delivery provider.`,
+      };
+    }
+    return {
+      status: "error",
+      message: "The delivery provider rejected the message. Nothing was sent.",
+    };
+  } catch {
+    return { status: "error", message: "Could not send the email." };
   }
 }
 

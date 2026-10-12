@@ -8,6 +8,13 @@ import { LeadStatusForm } from "@/components/admin/LeadStatusForm";
 import { FollowUpForm } from "@/components/admin/FollowUpForm";
 import { MeetingForm } from "@/components/admin/MeetingForm";
 import { MeetingUpdateForm } from "@/components/admin/MeetingUpdateForm";
+import { CommunicationPanel } from "@/components/admin/CommunicationPanel";
+import {
+  buildTelLink,
+  buildWhatsAppLink,
+  isClientEmailSendingEnabled,
+  normalizeToE164,
+} from "@/lib/communications";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +57,18 @@ export default async function LeadDetailPage({
   if (!lead) notFound();
 
   const isOwner = user.role === "admin";
+
+  // D-034 Phase 4 — communications (Owner + current assignee only, which the
+  // ownership-scoped `where` above already guarantees).
+  const e164 = normalizeToE164(lead.phone);
+  const whatsappHref = e164
+    ? buildWhatsAppLink(
+        e164,
+        `Hello ${lead.firstName}, this is the NEOLIFE office team. We received your interest and would love to answer your questions.`,
+      )
+    : null;
+  const telHref = e164 ? buildTelLink(e164) : null;
+  const emailSendingEnabled = isClientEmailSendingEnabled();
 
   // Phase B: Owner-only data for the assignment UI.
   const staffUsers = isOwner ? (await getCrmUsers()) as StaffUser[] : [];
@@ -114,6 +133,16 @@ export default async function LeadDetailPage({
                   }
                 />
               ) : null}
+              {/* D-034: original referrer is visibly distinct from the current
+                  assignee — reassignment never rewrites it. */}
+              <Field
+                label="Referred by (original)"
+                value={
+                  lead.referredByName
+                    ? `${lead.referredByName}${lead.referralMethod ? ` · via ${lead.referralMethod === "link" ? "referral link" : "manual entry"}` : ""}`
+                    : null
+                }
+              />
             </dl>
           </section>
 
@@ -166,6 +195,17 @@ export default async function LeadDetailPage({
               <MeetingForm leadId={lead.id} />
             </div>
           </section>
+
+          <CommunicationPanel
+            leadId={lead.id}
+            leadName={lead.firstName}
+            phoneRaw={lead.phone}
+            emailOnRecord={lead.email}
+            whatasppEnabled={Boolean(whatsappHref)}
+            emailEnabled={emailSendingEnabled}
+            whatsappHref={whatsappHref}
+            telHref={telHref}
+          />
 
           <section className="rounded-2xl border border-neutral-200 bg-white p-6">
             <h2 className="text-sm font-bold uppercase tracking-wide text-neutral-500">

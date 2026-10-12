@@ -13,10 +13,67 @@ import {
 import { generateQualificationToken } from "@/lib/qualification";
 import { recordFunnelEvent } from "@/lib/funnel";
 import { clientKeyFromHeaders, isRateLimited } from "@/lib/rateLimit";
+import {
+  MAX_PUBLIC_NAME_LENGTH,
+  resolveReferralByName,
+  resolveReferralCode,
+} from "@/lib/referrals";
+import { type ReferralAttribution } from "@/lib/leads";
 
 export type SubmitLeadResult =
   | { status: "success"; message: string; qualificationToken?: string }
   | { status: "error"; message: string; fieldErrors?: Record<string, string> };
+
+const SAFE_CODE = /^[A-Za-z0-9_-]{8,64}$/;
+
+/**
+ * D-034 referral resolution — server-side only.
+ *
+ * Precedence: a valid, active referral link code ALWAYS wins over any
+ * conflicting manual "Who referred you?" input. Invalid, revoked, missing
+ * or inactive referrals fail safely to null → lead stays unassigned in the
+ * Owner's pool. Nothing here can throw: capture must never be broken by a
+ * bad referral input.
+ */
+async function resolveReferralAttribution(
+  formData: FormData,
+): Promise<ReferralAttribution | null> {
+  const rawCode = formData.get("referralCode");
+  if (typeof rawCode === "string" && rawCode.length > 0) {
+    // Strict charset before any DB lookup: URL junk is dropped, never parsed.
+    const code = rawCode.trim();
+    if (SAFE_CODE.test(code) && code.length <= 64) {
+      const resolved = await resolveReferralCode(code);
+      if (resolved) {
+        return {
+          userId: resolved.userId,
+          code: resolved.code,
+          method: "link",
+        };
+      }
+    }
+    // An unusable link code means NO referral — a manual name is not
+    // promoted to compensate (fail-safe, no attribution guessing).
+    return null;
+  }
+
+  const rawName = formData.get("referredByName");
+  if (typeof rawName === "string" && rawName.trim().length > 0) {
+    const typed = rawName.trim().slice(0, MAX_PUBLIC_NAME_LENGTH);
+    const resolved = await resolveReferralByName(typed);
+    if (resolved) {
+      return {
+        userId: resolved.userId,
+        code: resolved.code,
+        method: "manual_name",
+        typedName: typed,
+      };
+    }
+    return null;
+  }
+
+  return null;
+}
 
 /**
  * Server Action handling public lead submissions.
@@ -79,7 +136,8 @@ export async function submitLeadAction(
     }
 
     const attribution = parseAttributionPayload(input);
-    const persisted = await persistLead(parsed.data, attribution);
+    const referral = await resolveReferralAttribution(formData);
+    const persisted = await persistLead(parsed.data, attribution, referral);
 
     // Phase D: record the authoritative lead_created FunnelEvent (server-side only).
     await recordFunnelEvent({
