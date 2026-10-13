@@ -18,6 +18,54 @@
   --color-cream-100: #f5efe2;
   --color-leaf-500: #65a30d;
   --color-ink: #0f172a;
+
+  /* Mulberry admin console (Phase 5, D-034 task) — protected /admin only.
+     The public marketing brand (brand/forest/cream) is untouched. */
+  --color-mulberry-50: #fbf3f8;
+  --color-mulberry-100: #f6edf4;
+  --color-mulberry-200: #ecd2e2;
+  --color-mulberry-300: #dfb3cd;
+  --color-mulberry-400: #c988ac;
+  --color-mulberry-500: #b8759a;
+  --color-mulberry-600: #8e4173;
+  --color-mulberry-700: #70234d;
+  --color-mulberry-800: #421631;
+  --color-mulberry-900: #2b0f20;
+}
+
+/* Subtle animated gradient sweep for the mulberry admin shell.
+   Very low contrast so text contrast is unaffected; disabled entirely for
+   prefers-reduced-motion users. */
+@keyframes mulberry-drift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.mulberry-shell {
+  background:
+    linear-gradient(
+      120deg,
+      #f6edf4 0%,
+      #fbf3f8 25%,
+      #f6edf4 50%,
+      #f3e6f0 75%,
+      #f6edf4 100%
+    );
+  background-size: 200% 200%;
+  animation: mulberry-drift 40s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mulberry-shell {
+    animation: none;
+  }
 }
 
 html {
@@ -81,5 +129,10 @@ html {
 :focus-visible {
   outline: 2px solid var(--color-brand-600);
   outline-offset: 2px;
+}
+
+/* Mulberry admin focus ring (used inside the protected shell) */
+.mulberry-shell :focus-visible {
+  outline-color: var(--color-mulberry-600);
 }
 

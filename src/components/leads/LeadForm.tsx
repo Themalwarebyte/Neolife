@@ -20,8 +20,11 @@ const errorClass = "mt-1.5 text-sm font-medium text-red-600";
  * Public lead-capture form (Task 1.5).
  * Client-side validation is UX only — all validation is enforced server-side
  * by `submitLeadAction`. Attribution is intentionally out of scope (Task 1.4).
+ * Referral (D-034): `referralCode` comes from the /business?ref= link and is
+ * a read-only hidden field when present; otherwise the manual "Who referred
+ * you?" fallback is offered.
  */
-export function LeadForm() {
+export function LeadForm({ referralCode }: { referralCode?: string }) {
   const [state, formAction, pending] = useActionState<
     SubmitLeadResult | null,
     FormData
@@ -159,6 +162,11 @@ export function LeadForm() {
       ) : null}
       {/* Phase D — non-PII device correlation for funnel events */}
       <input type="hidden" name="deviceId" value={deviceId} />
+      {/* D-034 — opaque referral code from the shareable /business?ref= link.
+          Read-only: the server re-resolves it; this field never carries a user id. */}
+      {referralCode ? (
+        <input type="hidden" name="referralCode" value={referralCode} />
+      ) : null}
       <div className="grid gap-5 sm:grid-cols-2">
         <div>
           <label htmlFor="firstName" className={labelClass}>
@@ -281,6 +289,27 @@ export function LeadForm() {
           ) : null}
         </div>
       </div>
+      {/* D-034 — optional manual fallback, only when there is NO link code.
+          A conflicting manual name is never honored over a valid link: the
+          server drops it entirely when a code is present. */}
+      {!referralCode ? (
+        <div>
+          <label htmlFor="referredByName" className={labelClass}>
+            Who referred you? (optional)
+          </label>
+          <input
+            id="referredByName"
+            name="referredByName"
+            maxLength={60}
+            placeholder="The team member who shared this with you"
+            className={`mt-1.5 ${fieldClass}`}
+            autoComplete="off"
+          />
+          <p className="mt-1 text-xs text-neutral-400">
+            Enter the name of the NEOLIFE team member who shared this with you.
+          </p>
+        </div>
+      ) : null}
       <div>
         <div className="flex items-start gap-3 rounded-xl bg-neutral-50 p-4">
           <input

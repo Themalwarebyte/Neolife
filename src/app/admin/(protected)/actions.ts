@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers as nextHeaders } from "next/headers";
 import { requireAdmin, requireCrmUser } from "@/server/auth/requireCrmUser";
 import { prisma } from "@/server/db/prisma";
 import {
@@ -18,7 +19,190 @@ import {
   changePasswordSchema,
   isValidBetterAuthUserId,
 } from "@/lib/user-management";
+import { randomBytes } from "node:crypto";
 import { LeadStatus, MeetingStatus } from "@/generated/prisma/client";
+import {
+  classifySendOutcome,
+  currentEmailProvider,
+  finalizeClientEmailReservation,
+  isClientEmailSendingEnabled,
+  isValidRecipientEmail,
+  recordCommunicationEvent,
+  reserveClientEmailSend,
+  validateComposerInput,
+} from "@/lib/communications";
+import {
+  findActivePublicNameConflict,
+  normalizePublicName,
+  publicNameKey,
+} from "@/lib/referrals";
+import { sendMail } from "@/lib/email";
+import { Prisma } from "@/generated/prisma/client";
+
+// ─── Referral link management (D-034) ────────────────────────────────────
+
+const REFERRAL_CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+
+function newReferralCode(): string {
+  const bytes = randomBytes(22);
+  let code = "";
+  for (const byte of bytes) {
+    code += REFERRAL_CODE_ALPHABET[byte % REFERRAL_CODE_ALPHABET.length];
+  }
+  return code;
+}
+
+/**
+ * Owner-only: (re)generate the referral link for a Staff user.
+ * Regenerating replaces the old code — a previously shared link stops
+ * resolving, which is an intentional, Owner-controlled rotation.
+ */
+export async function generateStaffReferralLink(formData: FormData): Promise<CrmActionResult> {
+  await requireAdmin();
+  const staffUserId = String(formData.get("staffUserId") ?? "").trim();
+  const publicName = String(formData.get("publicName") ?? "").trim();
+
+  if (!isValidBetterAuthUserId(staffUserId)) {
+    return { status: "error", message: "Invalid staff user." };
+  }
+  const normalizedPublicName = normalizePublicName(publicName);
+  if (
+    !normalizedPublicName ||
+    normalizedPublicName.length < 2 ||
+    normalizedPublicName.length > 60
+  ) {
+    return {
+      status: "error",
+      message: "Public name must be 2–60 characters.",
+    };
+  }
+
+  try {
+    const target = await prisma.user.findUnique({
+      where: { id: staffUserId },
+      select: { id: true, role: true, isActive: true, name: true },
+    });
+    if (!target || target.role !== "staff" || !target.isActive) {
+      return { status: "error", message: "Active staff user not found." };
+    }
+
+    // Task #027 — prevent duplicate ACTIVE public referral names: an
+    // ambiguous name must never exist among active staff, because the manual
+    // fallback refuses to guess between two matching members.
+    const clash = await findActivePublicNameConflict(
+      normalizedPublicName,
+      staffUserId,
+    );
+    if (clash) {
+      return {
+        status: "error",
+        message:
+          "That public name is already used by another active staff member. Pick a different one.",
+      };
+    }
+
+    const code = newReferralCode();
+    // Task #029 (Fix 2): storage, lookup and display all use the NORMALIZED
+    // name. publicName keeps normalized form with its original casing for
+    // display; publicNameNormal is the lower-cased equality key protected by
+    // a unique constraint, which enforces the duplicate-name rule RACE-SAFE.
+    const storedPublicName = normalizedPublicName;
+    const nameKey = publicNameKey(normalizedPublicName);
+    try {
+      await prisma.referralCode.upsert({
+        where: { userId: staffUserId },
+        update: {
+          code,
+          publicName: storedPublicName,
+          publicNameNormal: nameKey,
+          isActive: true,
+          revokedAt: null,
+        },
+        create: {
+          userId: staffUserId,
+          code,
+          publicName: storedPublicName,
+          publicNameNormal: nameKey,
+        },
+      });
+    } catch (error) {
+      // Race-safe duplicate enforcement (Task #029): losing the concurrent
+      // registration to the unique constraint is a normal, handled outcome —
+      // never an unexplained failure.
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        return {
+          status: "error",
+          message:
+            "That public name is already used by another active staff member. Pick a different one.",
+        };
+      }
+      throw error;
+    }
+
+    revalidatePath("/admin/referrals");
+    return {
+      status: "success",
+      message: `Referral link updated for ${target.name}.`,
+    };
+  } catch {
+    return { status: "error", message: "Could not update the referral link." };
+  }
+}
+
+/** Owner-only: revoke a Staff referral link (existing links fail safely). */
+export async function revokeStaffReferralLink(formData: FormData): Promise<CrmActionResult> {
+  await requireAdmin();
+  const staffUserId = String(formData.get("staffUserId") ?? "").trim();
+  if (!isValidBetterAuthUserId(staffUserId)) {
+    return { status: "error", message: "Invalid staff user." };
+  }
+  try {
+    const updated = await prisma.referralCode.updateMany({
+      where: { userId: staffUserId, revokedAt: null },
+      // Task #029 (Fix 2): clearing the normalized key frees the name for
+      // reuse — NULLs are exempt from the unique constraint, so the name can
+      // be re-registered later without stale-key collisions.
+      data: {
+        isActive: false,
+        revokedAt: new Date(),
+        publicNameNormal: null,
+      },
+    });
+    revalidatePath("/admin/referrals");
+    return updated.count > 0
+      ? { status: "success", message: "Referral link revoked." }
+      : { status: "error", message: "No active referral link found." };
+  } catch {
+    return { status: "error", message: "Could not revoke the referral link." };
+  }
+}
+
+/**
+ * Staff-safe: return the CURRENT USER's own referral link data (or null).
+ * Staff can see and copy their own link only; the Owner sees all via the
+ * /admin/referrals page.
+ */
+export async function getMyReferralLink() {
+  const user = await requireCrmUser();
+  const record = await prisma.referralCode.findUnique({
+    where: { userId: user.id },
+    select: { code: true, isActive: true, revokedAt: true, publicName: true },
+  });
+  if (!record || !record.isActive || record.revokedAt) return null;
+  const headerList = await nextHeaders();
+  const origin =
+    process.env.NEXT_PUBLIC_SITE_URL ??
+    headerList.get("origin") ??
+    "https://neolife.ooflowdesk.com";
+  return {
+    code: record.code,
+    publicName: record.publicName,
+    link: `${origin.replace(/\/+$/, "")}/business?ref=${encodeURIComponent(record.code)}`,
+  };
+}
 
 export type CrmActionResult = { status: "success" | "error"; message: string };
 
@@ -405,6 +589,147 @@ export async function toggleUserActive(userId: string): Promise<void> {
     revalidatePath("/admin/users");
   } catch {
     return;
+  }
+}
+
+// ─── Client communications (D-034, Phase 4) ───────────────────────────────
+
+const COMMUNICATION_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Sends an email to the AUTHORIZED lead's own address — never to an address
+ * chosen in the form. Staff may email only leads currently assigned to
+ * them; the Owner may email any lead. The recipient is resolved server-side
+ * from the Lead record, so arbitrary recipient substitution is impossible.
+ * External sending stays disabled until a provider is configured (D-021);
+ * the action then records an audit event with the provider status either way.
+ */
+export async function sendClientEmail(
+  _previous: CrmActionResult | null,
+  formData: FormData,
+): Promise<CrmActionResult> {
+  const user = await requireCrmUser();
+
+  const leadId = String(formData.get("leadId") ?? "");
+  if (!COMMUNICATION_UUID.test(leadId)) {
+    return { status: "error", message: "Invalid lead." };
+  }
+
+  const parsed = validateComposerInput(formData.get("subject"), formData.get("body"));
+  if (!parsed) {
+    return {
+      status: "error",
+      message: "Please provide a subject and a message (body up to 10,000 characters).",
+    };
+  }
+
+  try {
+    // Ownership-scoped lookup: Staff only reach their OWN assigned leads.
+    const lead = await prisma.lead.findUnique({
+      where:
+        user.role === "admin"
+          ? { id: leadId }
+          : { id: leadId, assignedUserId: user.id },
+      select: { id: true, email: true, firstName: true, consent: true },
+    });
+    if (!lead) return { status: "error", message: "Lead not found." };
+
+    if (!lead.consent) {
+      return {
+        status: "error",
+        message:
+          "This contact has not consented to being contacted. Nothing was sent.",
+      };
+    }
+
+    if (!lead.email || !isValidRecipientEmail(lead.email)) {
+      return {
+        status: "error",
+        message: "This contact has no usable email address on record.",
+      };
+    }
+
+    if (!isClientEmailSendingEnabled()) {
+      return {
+        status: "error",
+        message:
+          "Email sending is not enabled yet: configure the delivery provider first. Nothing was sent.",
+      };
+    }
+
+    // Task #029 (Fix 4) — race-safe outbound throttle: a durable reservation
+    // row is inserted ATOMICALLY (advisory-lock-serialized short transaction)
+    // BEFORE any provider call, so simultaneous requests can never bypass the
+    // per-lead interval or the per-sender hourly cap. The reservation is also
+    // the persisted attempt identity for the audit trail. The lock releases
+    // at COMMIT — no long transaction is held open during the provider call.
+    const reservation = await reserveClientEmailSend(lead.id, user.id);
+    if (!reservation.allowed) {
+      return { status: "error", message: reservation.reason };
+    }
+
+    const { subject, body } = parsed;
+    const escaped = body
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/\n/g, "<br>");
+    const provider = currentEmailProvider();
+    const result = await sendMail({
+      to: lead.email,
+      subject,
+      text: body,
+      html: `<p style="font-family:system-ui,sans-serif;font-size:14px;line-height:1.6;color:#1f2937;">${escaped}</p><p style="font-family:system-ui,sans-serif;font-size:12px;color:#6b7280;">NEOLIFE Office Team</p>`,
+    });
+
+    // Status reporting must be accurate (Task #027/#029): "accepted" only
+    // means a REAL provider accepted the request — never that it was
+    // delivered; timeouts/5xx/network errors map to "unknown" (the message
+    // may have gone out, so no blind resend is offered); 4xx map to
+    // "failed"; local simulation is labeled as simulation.
+    const sendStatus = classifySendOutcome(provider, result);
+    const providerStatus = `${provider}:${sendStatus}${
+      result.ok ? "" : `:${result.error ?? "unknown"}`
+    }`;
+
+    await recordCommunicationEvent({
+      leadId: lead.id,
+      userId: user.id,
+      channel: "email",
+      subject,
+      providerStatus,
+    });
+
+    // Latch the reservation status independently of the CRM audit trail: if
+    // the audit event above failed, the reservation still records the
+    // attempt; if THIS update fails, the row stays "reserved" — conservative
+    // against the limits either way.
+    await finalizeClientEmailReservation(reservation.reservationId, sendStatus);
+
+    revalidatePath(`/admin/leads/${lead.id}`);
+
+    if (result.ok) {
+      return {
+        status: "success",
+        message:
+          provider === "resend"
+            ? `Email to ${lead.email} accepted by the delivery provider.`
+            : `Email prepared locally (simulation) — no external email was sent to ${lead.email}.`,
+      };
+    }
+    if (sendStatus === "unknown") {
+      return {
+        status: "error",
+        message:
+          "The send attempt could not be confirmed — the message may have been sent. Wait before attempting again; contact the recipient to verify. Do not resend immediately.",
+      };
+    }
+    return {
+      status: "error",
+      message: "The delivery provider rejected the message. Nothing was sent.",
+    };
+  } catch {
+    return { status: "error", message: "Could not send the email." };
   }
 }
 

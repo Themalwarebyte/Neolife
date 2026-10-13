@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/server/db/prisma";
 import { requireCrmUser } from "@/server/auth/requireCrmUser";
+import { NotificationBell } from "@/components/admin/NotificationBell";
 
 export const dynamic = "force-dynamic";
 
@@ -12,8 +13,15 @@ const INTEREST_LABELS: Record<string, string> = {
 };
 
 function StatusPill({ status }: { status: string }) {
+  const DONE = new Set(["CONVERTED"]);
+  const CLOSED = new Set(["NOT_INTERESTED", "DISQUALIFIED"]);
+  const cls = DONE.has(status)
+    ? "bg-emerald-100 text-emerald-800"
+    : CLOSED.has(status)
+      ? "bg-neutral-200 text-neutral-600"
+      : "bg-mulberry-100 text-mulberry-800";
   return (
-    <span className="inline-flex items-center rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs font-semibold text-neutral-700">
+    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${cls}`}>
       {status.replaceAll("_", " ")}
     </span>
   );
@@ -41,6 +49,9 @@ export default async function LeadsPage() {
       interestType: true,
       status: true,
       assignedUserId: true,
+      referredByName: true,
+      referredBySnapshot: true,
+      referralMethod: true,
       createdAt: true,
       utmSource: true,
       utmCampaign: true,
@@ -53,7 +64,7 @@ export default async function LeadsPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-neutral-900">
             {isOwner ? "All Contacts" : "My Contacts"}
@@ -61,6 +72,15 @@ export default async function LeadsPage() {
           <p className="text-sm text-neutral-500">
             {leads.length} contact{leads.length === 1 ? "" : "s"}
           </p>
+        </div>
+        <div className="flex gap-3">
+          <Link
+            href="/admin/referrals"
+            className="hidden items-center rounded-full border border-mulberry-200 bg-white px-4 py-2 text-sm font-semibold text-mulberry-700 transition-colors hover:bg-mulberry-50 sm:inline-flex"
+          >
+            Referral links
+          </Link>
+          <NotificationBell />
         </div>
       </div>
 
@@ -87,6 +107,7 @@ export default async function LeadsPage() {
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Assigned</th>
                   <th className="px-4 py-3">Source</th>
+                  {isOwner ? <th className="px-4 py-3">Referred by</th> : null}
                   <th className="px-4 py-3">Created</th>
                   <th className="px-4 py-3">Activity</th>
                 </tr>
@@ -136,6 +157,15 @@ export default async function LeadsPage() {
                           {lead.utmCampaign}
                         </div>
                       ) : null}
+                    </td>
+                    <td className="px-4 py-3 text-neutral-600">
+                      {lead.referredByName || lead.referredBySnapshot ? (
+                        <span title="Original referrer (immutable attribution)">
+                          {lead.referredByName ?? lead.referredBySnapshot}
+                        </span>
+                      ) : (
+                        <span className="text-neutral-400">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-neutral-600">
                       {lead.createdAt.toLocaleDateString()}

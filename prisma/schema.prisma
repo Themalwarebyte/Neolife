@@ -66,13 +66,25 @@ model Lead {
   utmContent       String?
   utmTerm          String?
   landingPage      String?
-   firstTouchSource String?
+  firstTouchSource String?
 
    // References User.id, which is TEXT: Better Auth generates opaque
   // alphanumeric IDs, not UUIDs. @db.Uuid here would be incorrect — a real
   // Better Auth ID is rejected by PostgreSQL as invalid uuid syntax. Keep in
   // step with Meeting.userId and FollowUp.userId.
   assignedUserId String?
+
+  // Referral attribution (D-034) — captured ONCE at lead creation and treated
+  // as immutable afterwards. referredByUserId is a snapshot of the original
+  // referrer: reassignment moves Lead.assignedUserId only and MUST never touch
+  // these fields. ON DELETE SET NULL keeps attribution auditably intact even
+  // if the referring Staff account is later deleted.
+  referredByUserId   String?
+  referralCode       String?
+  referralMethod     String? // "link" | "manual_name"
+  referredByName     String? // manual-fallback display name, as typed by the visitor
+  referralCapturedAt DateTime?
+  referredBySnapshot String? // creation-time snapshot of the APPROVED public referrer name (Task #027)
 
    createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
@@ -82,14 +94,23 @@ model Lead {
   followUps FollowUp[]
   productInterests ProductInterest[]
   assignedUser User? @relation("user_assigned_leads", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  referredBy   User? @relation("user_referred_leads", fields: [referredByUserId], references: [id], onDelete: SetNull)
+
+  // referralCode is deliberately stored as a plain TEXT value with NO foreign
+  // key: revoking or deleting a ReferralCode row must never rewrite historical
+  // attribution. Resolution goes through src/lib/referrals.ts lookups instead.
+
   funnelEvents FunnelEvent[]
   qualificationTokens QualificationToken[]
+  notifications Notification[]
 
   @@index([status])
   @@index([createdAt])
   @@index([utmCampaign])
   @@index([assignedUserId])
   @@index([assignedUserId, status])
+  @@index([referredByUserId])
+  @@index([referralCode])
 }
 
 // First-party funnel events (D-005) — NOT a custom analytics platform.
@@ -161,7 +182,88 @@ model User {
   sessions Session[]
   accounts Account[]
   assignedLeads Lead[] @relation("user_assigned_leads")
+  referredLeads Lead[] @relation("user_referred_leads")
+  referralCode  ReferralCode?
+  notifications Notification[]
   events LeadEvent[]
+}
+
+// Staff referral links (D-034). One code per Staff user; Owner-managed.
+// Codes are 128-bit random, URL-safe and opaque — they never embed or leak
+// Better Auth user IDs. `publicName` is the approved public-facing display
+// name used by the manual "Who referred you?" fallback.
+model ReferralCode {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String    @unique
+  code       String    @unique
+  isActive   Boolean   @default(true)
+  publicName String
+  /** Task #029 (D-034): normalized lookup key for the public referral name
+   *  (trimmed, internal whitespace collapsed, lower-cased) so storage and
+   *  lookup always agree. NULL once revoked — freeing the name for reuse —
+   *  and NULL for legacy rows whose normalized name collided with another
+   *  ACTIVE row at migration time (preserved, reported; never resolvable
+   *  until the Owner re-registers the name). Unique across ALL rows: two
+   *  NULLs are allowed by PostgreSQL (NULLs are distinct), so revoked and
+   *  collision-quarantined rows can coexist while at most ONE active row per
+   *  normalized name exists — the ambiguity guard becomes race-safe via this
+   *  atomic constraint. */
+  publicNameNormal String? @unique
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  user          User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/**
+ * Task #029, Fix 4 — durable outbound-email send reservation (rate limiting).
+ *
+ * Rows are inserted ATOMICALLY inside a short claim transaction (serialized
+ * by a PostgreSQL advisory lock) BEFORE any provider call, making the
+ * per-lead 90s interval and the 20-per-sender-hour cap race-safe. The row
+ * also persists an auditable attempt identity before external sending.
+ *
+ * status lifecycle: reserved → accepted | failed | unknown | simulated.
+ * Every status counts conservatively against both limits, so failures
+ * (including provider timeouts recorded as "unknown" and finalization
+ * failures, which leave the row "reserved") can never reopen the limit.
+ * leadId is a plain string with no FK: the attempt audit trail must survive
+ * lead deletion and rows naturally expire out of the rate windows.
+ */
+model EmailSendReservation {
+  id         String   @id @default(uuid())
+  leadId     String
+  userId     String
+  reservedAt DateTime @default(now())
+  status     String   @default("reserved")
+
+  @@index([leadId, reservedAt])
+  @@index([userId, reservedAt])
+}
+
+
+// In-app notifications (D-034, Phase 3). Per-recipient, deduplicated by
+// dedupKey so delivery retries never create duplicates.
+model Notification {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String
+  leadId    String?   @db.Uuid
+  type      String
+  title     String
+  body      String?
+  dedupKey  String    @unique
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lead Lead? @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
+  @@index([leadId])
 }
 
 model Session {

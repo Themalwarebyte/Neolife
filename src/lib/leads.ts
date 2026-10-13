@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { prisma } from "@/server/db/prisma";
 import { parseAttribution, type Attribution } from "@/lib/attribution";
+import {
+  NOTIFICATION_TYPES,
+  tryNewNotification,
+} from "@/lib/notifications";
 
 /**
  * Task 1.5 — lead-capture validation & persistence (public, untrusted input).
@@ -168,31 +172,141 @@ export async function findActiveLeadByPhone(normalizedPhone: string) {
 export const GENERIC_ERROR_MESSAGE =
   "Sorry, something went wrong on our side. Please try again in a moment.";
 
-/** Persist a validated lead (attribution pre-validated via parseAttributionPayload). */
+/**
+ * Referral payload resolved server-side by src/lib/referrals.ts (D-034).
+ * The public form may only carry a code / display name — the referrer user
+ * id itself is NEVER accepted from the client directly.
+ */
+export type ReferralAttribution = {
+  userId: string;
+  code: string;
+  method: "link" | "manual_name";
+  typedName?: string;
+  /** Creation-time snapshot of the APPROVED public referral name (both
+   * methods), so attribution stays meaningful after code rotation, revocation,
+   * or referrer-account deletion. Distinct from typedName, which is the
+   * visitor's self-reported spelling for manual_name attribution only. */
+  publicReferrerName?: string;
+};
+
+/**
+ * Persist a validated lead together with its resolved referral (D-034).
+ *
+ * Atomic scope (Task #027): the lead row, the immutable referral attribution
+ * (incl. the creation-time public referrer snapshot), the system initial
+ * assignment (the narrow D-034 exception to D-027) and the CRITICAL audit
+ * events run as ONE Prisma interactive transaction — either all are written
+ * or none of them are.
+ *
+ * The assignee NOTIFICATION is deliberately OUTSIDE the transaction: it is
+ * optional, non-critical state, and an in-transaction insert (even with a
+ * swallowed .catch) does not reliably isolate its failure from the interactive
+ * transaction. A notification failure therefore cannot roll back a valid
+ * lead. Deduplication is preserved by the unique dedupKey. Delivery
+ * SEMANTICS (Task #029 correction): notification creation is BEST-EFFORT —
+ * there is NO durable retry or outbox, so a failed notification is dropped
+ * (never claimed as "at-least-once"); staff always discover assigned leads
+ * via their Contacts view. Durable retry/outbox is a possible future
+ * enhancement.
+ */
 export async function persistLead(
   data: z.output<typeof leadSchema>,
   attribution: Attribution = {},
+  referral: ReferralAttribution | null = null,
 ) {
-  return prisma.lead.create({
-    data: {
-      firstName: data.firstName,
-      lastName: data.lastName,
-      phone: data.phone,
-      email: data.email,
-      city: data.city,
-      interestType: data.interestType,
-      consent: true,
-      consentAt: new Date(),
-      // Task 1.4 — first-party attribution, only when validly provided:
-      utmSource: attribution.source,
-      utmMedium: attribution.medium,
-      utmCampaign: attribution.campaign,
-      utmContent: attribution.content,
-      utmTerm: attribution.term,
-      landingPage: attribution.landingPage,
-      firstTouchSource: attribution.firstTouchSource,
-      // status intentionally not set here (defaults to NEW_LEAD)
-    },
-    select: { id: true },
+  const lead = await prisma.$transaction(async (tx) => {
+    const lead = await tx.lead.create({
+      data: {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phone: data.phone,
+        email: data.email,
+        city: data.city,
+        interestType: data.interestType,
+        consent: true,
+        consentAt: new Date(),
+        // Task 1.4 — first-party attribution, only when validly provided:
+        utmSource: attribution.source,
+        utmMedium: attribution.medium,
+        utmCampaign: attribution.campaign,
+        utmContent: attribution.content,
+        utmTerm: attribution.term,
+        landingPage: attribution.landingPage,
+        firstTouchSource: attribution.firstTouchSource,
+        // D-034 — immutable referral attribution (system-set only; never
+        // part of any CRM-facing update path):
+        referredByUserId: referral?.userId,
+        referralCode: referral?.code,
+        referralMethod: referral?.method,
+        referredByName: referral?.typedName,
+        referredBySnapshot: referral?.publicReferrerName,
+        referralCapturedAt: referral ? new Date() : null,
+        // D-034 system initial assignment — active Staff referrer becomes
+        // the first assignee. deactivated-by-reassignment rules (D-027)
+        // continue to apply to every later assignment change.
+        assignedUserId: referral?.userId,
+        // status intentionally not set here (defaults to NEW_LEAD)
+      },
+      select: { id: true },
+    });
+
+    // Audit trail: capture (system actor) + system assignment event — both
+    // CRITICAL for attribution history, so they stay inside the transaction.
+    await tx.leadEvent.create({
+      data: {
+        leadId: lead.id,
+        type: "lead_captured",
+        metadata: referral ? { referralCode: referral.code, method: referral.method, referredBySnapshot: referral.publicReferrerName } : undefined,
+      },
+    });
+    if (referral) {
+      await tx.leadEvent.create({
+        data: {
+          leadId: lead.id,
+          type: "lead_assigned",
+          metadata: {
+            // D-028: `LeadEvent.userId` is the canonical ACTOR field and must
+            // come from the authenticated CRM user. A system assignment has
+            // no authenticated actor ⇒ userId stays null; the assignee lives
+            // in `metadata.to`. Conceptual separation preserved (D-034):
+            //   actor = system | assignee = referring staff member | original
+            //   referrer = referring staff member.
+            by: "system",
+            systemReason: "referral",
+            from: null,
+            to: referral.userId,
+            referralCode: referral.code,
+          },
+          userId: null,
+        },
+      });
+    }
+
+    return lead;
   });
+
+  // Post-transaction, genuinely isolated notification write (Task #027/#029).
+  // Deliberately GENERIC: the body carries NO client personal information,
+  // so a later reassignment can never leak lead details to the former
+  // assignee's historical notifications. Lead details stay behind the
+  // ownership authorization guard at /admin/leads/<id>.
+  // tryNewNotification is BEST-EFFORT (Task #029 correction): it swallows
+  // its own errors (unique dedupKey violations and transient failures) and
+  // can never affect the committed lead. There is NO durable retry or outbox
+  // mechanism — a failed notification is currently dropped, and dedupKey
+  // only prevents duplicate rows, not loss. Staff always discover assigned
+  // leads through their Contacts view; durable retry is a future
+  // enhancement, and delivery is never claimed as guaranteed.
+  if (referral) {
+    await tryNewNotification({
+      userId: referral.userId,
+      leadId: lead.id,
+      type: "lead_assigned" satisfies (typeof NOTIFICATION_TYPES)[number],
+      title: "New referral contact",
+      body: "A contact arrived via your referral link and has been added to your Contacts.",
+      dedupKey: `lead_assigned:${lead.id}`,
+    });
+  }
+
+  return lead;
 }

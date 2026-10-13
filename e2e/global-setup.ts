@@ -39,6 +39,16 @@ export default async function globalSetup(config: FullConfig) {
   await page.waitForURL(/\/admin\/leads$/, { timeout: 15000 });
   await context.storageState({ path: `${resultsDir}/staff1-session.json` });
 
+  // Create Staff B session (additional fixture for the referral workflow spec).
+  const staff2Email = "colleague2@neolife.local";
+  const staff2Password = process.env.STAFF2_PASSWORD ?? "dev-staff2-password-12345";
+  await page.goto(`${baseURL}/admin/login`);
+  await page.getByLabel("Email").fill(staff2Email);
+  await page.getByLabel("Password").fill(staff2Password);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.waitForURL(/\/admin\/leads$/, { timeout: 15000 });
+  await context.storageState({ path: `${resultsDir}/staff2-session.json` });
+
   // Create Owner session
   const ownerEmail = "office@test.local";
   const ownerPassword = process.env.ADMIN_PASSWORD ?? "owner-password-12345";

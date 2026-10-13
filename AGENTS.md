@@ -27,8 +27,13 @@ This project uses **pnpm** (see `pnpm-lock.yaml` / `pnpm-workspace.yaml`). Do no
 
 ## Testing conventions
 
-- **Official total: 247 tests** — **179** run without `DATABASE_URL`, plus **68**
-  DB-enabled tests that require a local PostgreSQL instance.
+- **Official total: 295 tests** — **201** run without `DATABASE_URL`, plus **94**
+  DB-enabled tests that require a local PostgreSQL instance. (Task #025 added the
+  referral suite; Task #029's audit-actor, normalization, and email-reservation
+  suites superseded the Task #027 figures of 284 = 201 + 83. Excludes E2E:
+  **23 Playwright tests** — 11 pre-existing specs plus 12 referral-workflow
+  tests (13 lettered scenarios, B+C combined); no other current-state E2E
+  totals are authoritative.)
 - DB-dependent suites gate on `const DB_AVAILABLE = Boolean(process.env.DATABASE_URL)`.
   A run without that variable legitimately reports fewer tests; that is not a failure.
 - `vitest` and `tsx` do **not** auto-load `.env`. Next.js does. To run DB-enabled
@@ -39,7 +44,7 @@ This project uses **pnpm** (see `pnpm-lock.yaml` / `pnpm-workspace.yaml`). Do no
 
 ### E2E environment
 
-- `pnpm build` first, then `pnpm playwright test` (11 tests). The Playwright
+- `pnpm build` first, then `pnpm playwright test` **(23 tests)**. The Playwright
   `webServer` command runs `node e2e/prepare-standalone.mjs` before starting the
   standalone server, because `next build` does not copy `.next/static/` or `public/`
   into `.next/standalone/`. Without that step the server returns HTML with no client
@@ -96,6 +101,6 @@ This project uses **pnpm** (see `pnpm-lock.yaml` / `pnpm-workspace.yaml`). Do no
 
 1. `pnpm typecheck` — must pass
 2. `pnpm exec eslint . --max-warnings 0` — must pass
-3. `pnpm test` — all non-DB tests must pass (179); DB tests skip without `DATABASE_URL`
-   (68) and must pass when PostgreSQL is available (247 total)
+3. `pnpm test` — all non-DB tests must pass (201); DB tests skip without `DATABASE_URL`
+   (94) and must pass when PostgreSQL is available (295 total)
 4. Confirm no secrets, credentials, or production configuration are staged

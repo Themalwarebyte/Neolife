@@ -1,12 +1,18 @@
 import { requireCrmUser } from "@/server/auth/requireCrmUser";
 import { SignOutButton } from "@/components/admin/SignOutButton";
 import { redirect } from "next/navigation";
+import { NotificationBell } from "@/components/admin/NotificationBell";
+import { AdminNav } from "@/components/admin/AdminNav";
 
 /**
  * Phase A — protected CRM route group (two-user support).
  * Server-side guard: unauthenticated users are redirected to /admin/login.
  * Any authenticated CRM user (admin or staff) can access the route group.
  * Ownership scoping happens at the data layer (per-page query filters).
+ *
+ * Phase 5 — Mulberry admin shell: deep-plum top bar, mulberry sidebar
+ * navigation with notification bell, animated shell background (static for
+ * reduced-motion users), white content surfaces.
  */
 export default async function ProtectedAdminLayout({
   children,
@@ -20,46 +26,46 @@ export default async function ProtectedAdminLayout({
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50">
-      <header className="border-b border-neutral-200 bg-white">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-8">
-          <div className="flex items-center gap-5">
+    <div className="mulberry-shell min-h-screen">
+      <header className="bg-mulberry-800 text-white">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 sm:px-8">
+          <div className="flex items-center gap-4">
             <a
               href="/admin/leads"
-              className="text-lg font-extrabold tracking-tight text-neutral-900"
+              className="text-lg font-extrabold tracking-tight"
             >
-              NEOLIFE <span className="text-brand-600">CRM</span>
+              NEOLIFE <span className="text-mulberry-300">CRM</span>
             </a>
-            <span className="hidden text-xs uppercase tracking-widest text-neutral-400 sm:inline">
+            <span className="hidden text-xs uppercase tracking-widest text-mulberry-300/80 sm:inline">
               Office
             </span>
             {user.role === "admin" ? (
-              <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">
+              <span className="rounded-full bg-mulberry-600 px-2.5 py-0.5 text-xs font-semibold text-white">
                 Owner
               </span>
             ) : (
-              <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800">
+              <span className="rounded-full bg-mulberry-500/40 px-2.5 py-0.5 text-xs font-semibold text-white">
                 Colleague
               </span>
             )}
-            {user.role === "admin" ? (
-              <a
-                href="/admin/users"
-                className="text-sm font-medium text-neutral-600 hover:text-neutral-900"
-              >
-                Users
-              </a>
-            ) : null}
           </div>
           <div className="flex items-center gap-3">
-            <span className="hidden text-sm text-neutral-500 sm:inline">
+            <NotificationBell />
+            <span className="hidden text-sm text-mulberry-100/80 sm:inline">
               {user.email}
             </span>
             <SignOutButton />
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-5 py-8 sm:px-8">{children}</main>
+
+      <div className="mx-auto flex max-w-7xl flex-col gap-0 px-0 sm:flex-row sm:px-8">
+        <AdminNav role={user.role} />
+
+        <main className="min-w-0 flex-1 px-5 py-8 sm:px-6 lg:px-8">
+          {children}
+        </main>
+      </div>
     </div>
   );
 }
