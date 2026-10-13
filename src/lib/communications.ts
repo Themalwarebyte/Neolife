@@ -97,7 +97,7 @@ export function isClientEmailSendingEnabled(): boolean {
 const MAX_SUBJECT_LENGTH = 200;
 const MAX_BODY_LENGTH = 10000;
 
-// ─── Outbound send safeguards (Task #027, Fix 4) ───────────────────────────
+// ─── Outbound send safeguards (Task #029, Fix 4) ───────────────────────────
 
 /** Minimum interval between two outbound emails to the SAME contact. */
 export const EMAIL_MIN_INTERVAL_PER_LEAD_SECONDS = 90;
@@ -105,66 +105,138 @@ export const EMAIL_MIN_INTERVAL_PER_LEAD_SECONDS = 90;
 /** Rolling hourly cap of outbound emails per sending user. */
 export const EMAIL_MAX_PER_SENDER_PER_HOUR = 20;
 
-export type SendPermission =
-  | { allowed: true }
+/** Reservation row is created BEFORE the provider call — never after. */
+export type EmailSendReservationResult =
+  | { allowed: true; reservationId: string }
   | { allowed: false; reason: string };
 
+/** Terminal/latching statuses for a reservation row. */
+export type EmailSendStatus =
+  | "reserved"
+  | "accepted"
+  | "failed"
+  | "unknown"
+  | "simulated";
+
 /**
- * Server-side outbound email throttle, based on the audit "communication"
- * LeadEvents already recorded per attempt (so it survives restarts and
- * covers all senders of the same lead).
- * - Per-lead interval: prevents repeated sends to the same contact within an
- *   abusive interval, regardless of which staff member sends.
- * - Per-sender hourly cap: prevents mass blasting across many leads.
- * Throws on a transient DB failure? No — fails CLOSED (not allowed) so a
- * monitoring outage can never open a spam window.
+ * Map a provider result to the reservation status.
+ * "accepted" means ONLY that a real provider accepted the message — never
+ * that it was delivered. Network failures, 5xx responses and any non-HTTP
+ * error are "unknown": the message may have gone out, so the caller must NOT
+ * blindly resend and the audit trail records the uncertainty. 4xx responses
+ * are definitive provider rejections ("failed").
  */
-export async function checkClientEmailPermission(
+export function classifySendOutcome(
+  provider: string,
+  result: { ok: boolean; error?: string },
+): Exclude<EmailSendStatus, "reserved"> {
+  if (!result.ok) {
+    if (provider === "local") return "failed";
+    if (
+      provider === "resend" &&
+      /resend_http_4\d\d/.test(result.error ?? "")
+    ) {
+      // Definitive provider rejection — the message was NOT accepted.
+      return "failed";
+    }
+    // resend 5xx / network failure / timeout / other provider: the message
+    // MAY have been accepted — never claim failure or success blindly.
+    return "unknown";
+  }
+  if (provider === "resend") return "accepted";
+  if (provider === "local") return "simulated";
+  return "unknown";
+}
+
+/**
+ * Reserve the right to send one outbound email (Task #029, Fix 4).
+ *
+ * Race-safe by construction: the reserved send slots are counted and the
+ * reservation row inserted inside ONE short transaction (identity: leadId +
+ * sending user) serialized by a two-key PostgreSQL advisory transaction lock
+ * (deterministic ordered pair ⇒ no deadlock across concurrent claims). The
+ * lock is released when the transaction COMMITS, so no long transaction is
+ * ever held open during a provider call.
+ *
+ * Conservative counting: EVERY reservation row counts against both limits,
+ * regardless of its status — including "failed", "unknown" and rows left in
+ * "reserved" when the provider call crashed — so failures can never reopen
+ * the limit and duplicate client/browser retries are refused inside the
+ * per-lead interval.
+ */
+export async function reserveClientEmailSend(
   leadId: string,
   userId: string,
-): Promise<SendPermission> {
+): Promise<EmailSendReservationResult> {
   try {
-    const perLeadSince = new Date(
-      Date.now() - EMAIL_MIN_INTERVAL_PER_LEAD_SECONDS * 1000,
-    );
-    const recentForLead = await prisma.leadEvent.count({
-      where: {
-        leadId,
-        type: "communication",
-        createdAt: { gte: perLeadSince },
-        metadata: { path: ["channel"], equals: "email" },
-      },
-    });
-    if (recentForLead > 0) {
-      return {
-        allowed: false,
-        reason: `An email to this contact was attempted recently. Please wait ${EMAIL_MIN_INTERVAL_PER_LEAD_SECONDS} seconds before sending another one.`,
-      };
-    }
+    return await prisma.$transaction(async (tx) => {
+      // Deterministic-name advisory keys: encode two bounded ints (Prisma
+      // supports the two-KEY two-argument form: pg_advisory_xact_lock(bigint,
+      // bigint)). We use fixed keys for CLIENT_EMAIL_USER(1)/CLIENT_EMAIL_LEAD(1).
+      // Ordering: the user-scope lock first, then the lead-scope lock, in the
+      // same order in every claim ⇒ no lock-order deadlock.
+      await tx.$executeRawUnsafe(
+        `SELECT pg_advisory_xact_lock(1, 1), pg_advisory_xact_lock(2, 1)`,
+      );
 
-    const hourAgo = new Date(Date.now() - 3_600_000);
-    const sentLastHour = await prisma.leadEvent.count({
-      where: {
-        type: "communication",
-        userId,
-        createdAt: { gte: hourAgo },
-        metadata: { path: ["channel"], equals: "email" },
-      },
-    });
-    if (sentLastHour >= EMAIL_MAX_PER_SENDER_PER_HOUR) {
-      return {
-        allowed: false,
-        reason: `Hourly sending limit of ${EMAIL_MAX_PER_SENDER_PER_HOUR} emails reached. Please try again later.`,
-      };
-    }
+      const perLeadSince = new Date(
+        Date.now() - EMAIL_MIN_INTERVAL_PER_LEAD_SECONDS * 1000,
+      );
+      const recentForLead = await tx.emailSendReservation.count({
+        where: { leadId, reservedAt: { gte: perLeadSince } },
+      });
+      if (recentForLead > 0) {
+        return {
+          allowed: false,
+          reason: `An email to this contact was attempted recently. Please wait ${EMAIL_MIN_INTERVAL_PER_LEAD_SECONDS} seconds before sending another one.` as const satisfies string,
+        };
+      }
 
-    return { allowed: true };
+      const hourAgo = new Date(Date.now() - 3_600_000);
+      const sentLastHour = await tx.emailSendReservation.count({
+        where: { userId, reservedAt: { gte: hourAgo } },
+      });
+      if (sentLastHour >= EMAIL_MAX_PER_SENDER_PER_HOUR) {
+        return {
+          allowed: false,
+          reason: `Hourly sending limit of ${EMAIL_MAX_PER_SENDER_PER_HOUR} emails reached. Please try again later.` as const satisfies string,
+        };
+      }
+
+      const created = await tx.emailSendReservation.create({
+        data: { leadId, userId, status: "reserved" },
+        select: { id: true },
+      });
+      return { allowed: true, reservationId: created.id } as const;
+    });
   } catch {
-    // Fail closed: don't send while we cannot verify the limits.
+    // Fail closed: don't send while the reservation cannot be verified.
     return {
       allowed: false,
       reason: "Sending is temporarily unavailable. Please try again shortly. Nothing was sent.",
     };
+  }
+}
+
+/**
+ * Latch the final status of a reservation AFTER the provider interaction.
+ * Called independently of the CRM audit trail: if the leadEvent audit write
+ * fails, the reservation state still records what happened to the attempt;
+ * if THIS update fails, the row remains "reserved" — conservative, because
+ * it keeps counting against the limits.
+ */
+export async function finalizeClientEmailReservation(
+  reservationId: string,
+  status: Exclude<EmailSendStatus, "reserved">,
+): Promise<number> {
+  try {
+    const updated = await prisma.emailSendReservation.updateMany({
+      where: { id: reservationId },
+      data: { status },
+    });
+    return updated.count;
+  } catch {
+    return 0; // row (if any) stays "reserved" — conservative
   }
 }
 

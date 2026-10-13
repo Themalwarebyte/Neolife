@@ -202,8 +202,12 @@ export type ReferralAttribution = {
  * optional, non-critical state, and an in-transaction insert (even with a
  * swallowed .catch) does not reliably isolate its failure from the interactive
  * transaction. A notification failure therefore cannot roll back a valid
- * lead. Deduplication is preserved by the unique dedupKey; delivery is
- * at-least-once on retry, not exactly-once.
+ * lead. Deduplication is preserved by the unique dedupKey. Delivery
+ * SEMANTICS (Task #029 correction): notification creation is BEST-EFFORT —
+ * there is NO durable retry or outbox, so a failed notification is dropped
+ * (never claimed as "at-least-once"); staff always discover assigned leads
+ * via their Contacts view. Durable retry/outbox is a possible future
+ * enhancement.
  */
 export async function persistLead(
   data: z.output<typeof leadSchema>,
@@ -261,13 +265,19 @@ export async function persistLead(
           leadId: lead.id,
           type: "lead_assigned",
           metadata: {
+            // D-028: `LeadEvent.userId` is the canonical ACTOR field and must
+            // come from the authenticated CRM user. A system assignment has
+            // no authenticated actor ⇒ userId stays null; the assignee lives
+            // in `metadata.to`. Conceptual separation preserved (D-034):
+            //   actor = system | assignee = referring staff member | original
+            //   referrer = referring staff member.
             by: "system",
             systemReason: "referral",
             from: null,
             to: referral.userId,
             referralCode: referral.code,
           },
-          userId: referral.userId,
+          userId: null,
         },
       });
     }
@@ -275,13 +285,18 @@ export async function persistLead(
     return lead;
   });
 
-  // Post-transaction, genuinely isolated notification write (Task #027).
+  // Post-transaction, genuinely isolated notification write (Task #027/#029).
   // Deliberately GENERIC: the body carries NO client personal information,
   // so a later reassignment can never leak lead details to the former
   // assignee's historical notifications. Lead details stay behind the
   // ownership authorization guard at /admin/leads/<id>.
-  // tryNewNotification swallows its own errors (unique dedupKey violations and
-  // transient failures) and can never affect the committed lead.
+  // tryNewNotification is BEST-EFFORT (Task #029 correction): it swallows
+  // its own errors (unique dedupKey violations and transient failures) and
+  // can never affect the committed lead. There is NO durable retry or outbox
+  // mechanism — a failed notification is currently dropped, and dedupKey
+  // only prevents duplicate rows, not loss. Staff always discover assigned
+  // leads through their Contacts view; durable retry is a future
+  // enhancement, and delivery is never claimed as guaranteed.
   if (referral) {
     await tryNewNotification({
       userId: referral.userId,

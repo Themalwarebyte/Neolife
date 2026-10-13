@@ -8,7 +8,11 @@ import {
   resolveReferralCode,
 } from "../src/lib/referrals";
 import { tryNewNotification } from "../src/lib/notifications";
-import { checkClientEmailPermission } from "../src/lib/communications";
+import {
+  reserveClientEmailSend,
+  finalizeClientEmailReservation,
+  classifySendOutcome,
+} from "../src/lib/communications";
 
 /**
  * D-034 — DB-backed referral, auto-assignment and notification tests.
@@ -91,10 +95,22 @@ runIfDb("D-034 — referral resolution + auto assignment (DB)", () => {
     const code1 = generateReferralCode();
     const code2 = generateReferralCode();
     await prisma.referralCode.create({
-      data: { userId: staffId1, code: code1, publicName: "Alice A" },
+      // Storage stores the NORMALIZED equality key alongside the display
+      // name (Task #029, Fix 2) — as the Owner action path does.
+      data: {
+        userId: staffId1,
+        code: code1,
+        publicName: "Alice A",
+        publicNameNormal: "alice a",
+      },
     });
     await prisma.referralCode.create({
-      data: { userId: staffId2, code: code2, publicName: "Betty B" },
+      data: {
+        userId: staffId2,
+        code: code2,
+        publicName: "Betty B",
+        publicNameNormal: "betty b",
+      },
     });
 
     const r1 = await resolveReferralCode(code1);
@@ -380,26 +396,60 @@ runIfDb("D-034 — referral resolution + auto assignment (DB)", () => {
     expect(stored?.referralMethod).toBeNull();
   });
 
-  it("ambiguous public names are REJECTED, never silently matched (Task #027)", async () => {
+  it("equivalent names are structurally impossible among active staff; ambiguous states are inert (Task #029 Fix 2)", async () => {
     const { persistLead } = await import("../src/lib/leads");
     await cleanupLead(testPhoneE);
 
-    // Both staff members expose the SAME approved public name.
+    // Register the name normally for Staff 1 (same path the Owner action
+    // takes: normalized display value + lower-cased equality key).
     await prisma.referralCode.update({
       where: { userId: staffId1 },
-      data: { publicName: "Shared Alias", isActive: true, revokedAt: null },
-    });
-    await prisma.referralCode.update({
-      where: { userId: staffId2 },
-      data: { publicName: "shared alias", isActive: true, revokedAt: null },
+      data: {
+        publicName: "Shared Alias",
+        publicNameNormal: "shared alias",
+        isActive: true,
+        revokedAt: null,
+      },
     });
 
-    // Ambiguous resolution returns null under both exact and case-insensitive
-    // spellings — never first-match.
-    expect(await resolveReferralByName("Shared Alias")).toBeNull();
-    expect(await resolveReferralByName("shared alias")).toBeNull();
+    // A second Staff member CANNOT register an equivalent active name — not
+    // even through direct writes: the unique constraint on publicNameNormal
+    // enforces the duplicate-name rule race-safe at the database level (this
+    // is exactly the "simultaneous conflicting registrations" scenario).
+    await expect(
+      prisma.referralCode.update({
+        where: { userId: staffId2 },
+        data: {
+          publicName: "shared alias",
+          publicNameNormal: "shared alias",
+          isActive: true,
+          revokedAt: null,
+        },
+      }),
+    ).rejects.toMatchObject({ code: "P2002" });
 
-    // A lead captured with the ambiguous name therefore stays unassigned.
+    // Resolution of the name therefore matches EXACTLY the one registered
+    // staff member — case- and whitespace-independently.
+    const exact = await resolveReferralByName("Shared Alias");
+    expect(exact?.userId).toBe(staffId1);
+    expect((await resolveReferralByName("shared  ALIAS"))?.userId).toBe(staffId1);
+
+    // The Owner duplicate-name guard agrees: a genuinely registered name
+    // conflicts against OTHER staff (never self), while the name registered
+    // only for Staff 1 does not conflict for Staff 2 (their registration was
+    // rejected, so no equivalent active name exists for them).
+    const conflictForStaff1 = await findActivePublicNameConflict(
+      "shared alias",
+      staffId1,
+    );
+    expect(conflictForStaff1).toBeNull();
+    const conflictForStaff1OnBetty = await findActivePublicNameConflict(
+      "Betty B",
+      staffId1,
+    );
+    expect(conflictForStaff1OnBetty?.userId).toBe(staffId2);
+
+    // A lead typed before any registration stays unassigned (fail-safe pool).
     const lead = await persistLead(
       {
         firstName: "Ambiguous",
@@ -411,7 +461,7 @@ runIfDb("D-034 — referral resolution + auto assignment (DB)", () => {
         consent: true,
       },
       {},
-      null,
+      null, // "Nobody Realname" fails resolution — fail-safe to the Owner pool.
     );
     const stored = await prisma.lead.findUnique({
       where: { id: lead.id },
@@ -419,31 +469,28 @@ runIfDb("D-034 — referral resolution + auto assignment (DB)", () => {
     });
     expect(stored?.assignedUserId).toBeNull();
 
-    // Owner duplicate-name guard agrees: a conflict is flagged against BOTH
-    // staff users, and each user's own name is not a self-conflict.
-    const conflictForStaff1 = await findActivePublicNameConflict(
-      "Shared Alias",
-      staffId1,
-    );
-    expect(conflictForStaff1).not.toBeNull();
-    expect(conflictForStaff1?.userId).toBe(staffId2);
-
-    // Restore the distinct approved names.
+    // Restore the distinct approved names (key + display together).
     await prisma.referralCode.update({
       where: { userId: staffId1 },
-      data: { publicName: "Alice A" },
+      data: { publicName: "Alice A", publicNameNormal: "alice a" },
     });
     await prisma.referralCode.update({
       where: { userId: staffId2 },
-      data: { publicName: "Betty B" },
+      data: { publicName: "Betty B", publicNameNormal: "betty b" },
     });
   });
 
   it("Owner duplicate-name guard treats captured candidate conflicts case-insensitively and ignores revoked names", async () => {
-    // Revoked duplicate does NOT block reuse (it cannot cause ambiguity).
+    // Revoked duplicate does NOT block reuse (it cannot cause ambiguity) —
+    // the revoke path clears the normalized key, mirroring the Owner action.
     await prisma.referralCode.update({
       where: { userId: staffId2 },
-      data: { publicName: "Revoked Alias", revokedAt: new Date(), isActive: false },
+      data: {
+        publicName: "Revoked Alias",
+        publicNameNormal: null,
+        revokedAt: new Date(),
+        isActive: false,
+      },
     });
     const afterRevoke = await findActivePublicNameConflict("Revoked Alias", staffId1);
     expect(afterRevoke).toBeNull();
@@ -451,7 +498,12 @@ runIfDb("D-034 — referral resolution + auto assignment (DB)", () => {
     // Restore.
     await prisma.referralCode.update({
       where: { userId: staffId2 },
-      data: { publicName: "Betty B", revokedAt: null, isActive: true },
+      data: {
+        publicName: "Betty B",
+        publicNameNormal: "betty b",
+        revokedAt: null,
+        isActive: true,
+      },
     });
     const active = await findActivePublicNameConflict("betty b", staffId1);
     expect(active?.userId).toBe(staffId2);
@@ -468,41 +520,106 @@ runIfDb("D-034 — referral resolution + auto assignment (DB)", () => {
     expect(normalizePublicName("   ")).toBeNull();
   });
 
-  it("outbound email throttle blocks repeated sends and hourly blasts (Task #027)", async () => {
+  it("audit actor integrity: system assignment event has NULL actor, correct target and attribution (Task #029 Fix 1, D-028/D-034)", async () => {
+    const { persistLead } = await import("../src/lib/leads");
+    const codeRow = await prisma.referralCode.findUnique({ where: { userId: staffId1 } });
+
+    const lead = await persistLead(
+      {
+        firstName: "Actor",
+        lastName: undefined,
+        phone: testPhoneD,
+        email: undefined,
+        city: undefined,
+        interestType: "BUSINESS",
+        consent: true,
+      },
+      {},
+      codeRow
+        ? {
+            userId: staffId1,
+            code: codeRow.code,
+            method: "link" as const,
+            publicReferrerName: codeRow.publicName,
+          }          : null,
+    );
+
+    const events = await prisma.leadEvent.findMany({
+      where: { leadId: lead.id, type: "lead_assigned" },
+      select: { userId: true, metadata: true },
+    });
+    expect(events).toHaveLength(1);
+    const systemEvent = events[0]!;
+    // D-028: canonical actor is NULL — no authenticated CRM user performed a
+    // system referral assignment. The assignee lives ONLY in metadata.to.
+    expect(systemEvent.userId).toBeNull();
+    expect(systemEvent.metadata).toMatchObject({
+      by: "system",
+      systemReason: "referral",
+      to: staffId1,
+      referralCode: codeRow?.code,
+    });
+
+    // D-034: assignee + original attribution both remain the referring staff.
+    const stored = await prisma.lead.findUnique({
+      where: { id: lead.id },
+      select: { assignedUserId: true, referredByUserId: true },
+    });
+    expect(stored?.assignedUserId).toBe(staffId1);
+    expect(stored?.referredByUserId).toBe(staffId1);
+  });
+
+  it("outbound email throttle: reservation blocks repeated sends and hourly blasts (Task #029 Fix 4)", async () => {
     const lead = await prisma.lead.findFirst({
       where: { phone: testPhoneA },
       select: { id: true },
     });
     expect(lead).not.toBeNull();
 
-    // First send is allowed: no recent email attempt for this lead.
-    expect(await checkClientEmailPermission(lead!.id, staffId1)).toEqual({ allowed: true });
+    // First send is allowed: no recent reservation for this lead.
+    const first = await reserveClientEmailSend(lead!.id, staffId1);
+    expect(first.allowed).toBe(true);
 
-    // Record an email attempt NOW → per-lead interval blocks a second send,
-    // regardless of which user sends.
-    await prisma.leadEvent.create({
-      data: {
-        leadId: lead!.id,
-        type: "communication",
-        metadata: { channel: "email", providerStatus: "resend:accepted" },
-        userId: staffId1,
-      },
-    });
-    const blocked = await checkClientEmailPermission(lead!.id, staffId2);
-    expect(blocked.allowed).toBe(false);
+    // A reservation inserted BEFORE the provider call blocks a second claim —
+    // regardless of which sender uses the lead or which status latches later.
+    const second = await reserveClientEmailSend(lead!.id, staffId2);
+    expect(second.allowed).toBe(false);
 
     // Per-sender hourly cap (20) blocks even leads with no recent attempt.
-    await prisma.leadEvent.createMany({
+    // staffId2 already used 0 slots this hour in this test run.
+    const filler = await prisma.emailSendReservation.createMany({
       data: Array.from({ length: 20 }, () => ({
         leadId: lead!.id,
-        type: "communication" as const,
-        metadata: { channel: "email", providerStatus: "resend:accepted" },
         userId: staffId2,
-        createdAt: new Date(),
+        status: "accepted" as const,
       })),
     });
-    const capped = await checkClientEmailPermission(lead!.id, staffId2);
+    expect(filler.count).toBe(20);
+    const capped = await reserveClientEmailSend(lead!.id, staffId2);
     expect(capped.allowed).toBe(false);
+
+    // Conservative counting: "unknown" and "failed" reservations keep
+    // counting. Pending "reserved" rows likewise never reopen the limit.
+    expect(classifySendOutcome("resend", { ok: false, error: "resend_http_500:oops" })).toBe("unknown");
+    expect(classifySendOutcome("resend", { ok: false, error: "resend_http_422:bad" })).toBe("failed");
+    expect(classifySendOutcome("resend", { ok: true })).toBe("accepted");
+    expect(classifySendOutcome("local", { ok: true })).toBe("simulated");
+    expect(classifySendOutcome("local", { ok: false })).toBe("failed");
+
+    // Finalization latches the status independently of the CRM audit trail.
+    const latched = await finalizeClientEmailReservation(
+      (first as { reservationId: string }).reservationId,
+      "accepted",
+    );
+    expect(latched).toBe(1);
+    const row = await prisma.emailSendReservation.findUnique({
+      where: { id: (first as { reservationId: string }).reservationId },
+      select: { status: true },
+    });
+    expect(row?.status).toBe("accepted");
+
+    // Cleanup: remove this test's reservations.
+    await prisma.emailSendReservation.deleteMany({ where: { leadId: lead!.id } });
 
     await prisma.leadEvent.deleteMany({
       where: { leadId: lead!.id, type: "communication" },

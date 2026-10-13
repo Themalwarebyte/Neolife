@@ -92,15 +92,29 @@ export function normalizePublicName(raw: string): string | null {
 }
 
 /**
+ * Equality key for approved public referral names (Task #029, Fix 2).
+ * Storage and lookup MUST both go through this function so that "Jane  Doe",
+ * " jane doe " and "JANE DOE" are treated as the same registered name.
+ * The key is persisted in ReferralCode.publicNameNormal, which is UNIQUE —
+ * the duplicate-name guard is therefore an atomic, race-safe constraint.
+ */
+export function publicNameKey(normalized: string): string {
+  return normalized.toLowerCase();
+}
+
+/**
  * Manual fallback: resolve an approved publicName typed by the visitor
  * ("Who referred you?") to the single active Staff member with that
  * public name.
  *
- * AMBIGUITY RULE (Task #027): the name must resolve to EXACTLY ONE eligible
- * Staff member. Zero matches fails safely to null (no such referrer); more
- * than one match is REJECTED as ambiguous — the lead is never assigned to
- * one of several matching Staff members on the basis of database ordering.
- * Match is case-insensitive after normalization.
+ * AMBIGUITY RULE (Task #027/#029): the name must resolve to EXACTLY ONE
+ * eligible Staff member. Zero matches fails safely to null (no such
+ * referrer, including legacy rows quarantined as NULL keys by the backfill
+ * migration); more than one match is REJECTED as ambiguous — a lead is never
+ * assigned to one of several matching Staff members on the basis of database
+ * ordering. Equivalence is enforced by publicNameKey; the race-safe unique
+ * constraint guarantees at most one ACTIVE row can carry a given key, so
+ * ambiguity cannot arise from equivalent registrations.
  */
 export async function resolveReferralByName(
   publicName: string,
@@ -112,7 +126,7 @@ export async function resolveReferralByName(
       where: {
         isActive: true,
         revokedAt: null,
-        publicName: { equals: normalized, mode: "insensitive" },
+        publicNameNormal: publicNameKey(normalized),
         user: { isActive: true, role: "staff" },
       },
       select: {
@@ -136,11 +150,14 @@ export async function resolveReferralByName(
 }
 
 /**
- * Duplicate-public-name guard for Owner management (Task #027): an ACTIVE,
- * non-revoked referral code may not reuse another Staff member's active
- * public referral name (case-insensitive). Revoked/inactive names do not
- * block reuse — they cannot contribute to manual-resolution ambiguity.
- * Returns the clashing record, or null when the name is free.
+ * Duplicate-public-name guard for Owner management (Task #027/#029): an
+ * ACTIVE, non-revoked referral code may not reuse another Staff member's
+ * active public referral name. Revoked names do not block reuse (their
+ * normalized key is NULL); quarantined legacy collisions are also inert.
+ * This is primarily a friendly pre-check: the unique constraint on
+ * ReferralCode.publicNameNormal enforces the rule race-safe under concurrent
+ * Owner operations. Returns the clashing record, or null when the name is
+ * free.
  */
 export async function findActivePublicNameConflict(
   publicName: string,
@@ -153,7 +170,7 @@ export async function findActivePublicNameConflict(
       where: {
         isActive: true,
         revokedAt: null,
-        publicName: { equals: normalized, mode: "insensitive" },
+        publicNameNormal: publicNameKey(normalized),
         userId: { not: excludeUserId },
       },
       select: { userId: true },

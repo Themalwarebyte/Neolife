@@ -22,15 +22,22 @@ import {
 import { randomBytes } from "node:crypto";
 import { LeadStatus, MeetingStatus } from "@/generated/prisma/client";
 import {
-  checkClientEmailPermission,
+  classifySendOutcome,
   currentEmailProvider,
+  finalizeClientEmailReservation,
   isClientEmailSendingEnabled,
   isValidRecipientEmail,
   recordCommunicationEvent,
+  reserveClientEmailSend,
   validateComposerInput,
 } from "@/lib/communications";
-import { findActivePublicNameConflict, normalizePublicName } from "@/lib/referrals";
+import {
+  findActivePublicNameConflict,
+  normalizePublicName,
+  publicNameKey,
+} from "@/lib/referrals";
 import { sendMail } from "@/lib/email";
+import { Prisma } from "@/generated/prisma/client";
 
 // ─── Referral link management (D-034) ────────────────────────────────────
 
@@ -95,11 +102,45 @@ export async function generateStaffReferralLink(formData: FormData): Promise<Crm
     }
 
     const code = newReferralCode();
-    await prisma.referralCode.upsert({
-      where: { userId: staffUserId },
-      update: { code, publicName, isActive: true, revokedAt: null },
-      create: { userId: staffUserId, code, publicName },
-    });
+    // Task #029 (Fix 2): storage, lookup and display all use the NORMALIZED
+    // name. publicName keeps normalized form with its original casing for
+    // display; publicNameNormal is the lower-cased equality key protected by
+    // a unique constraint, which enforces the duplicate-name rule RACE-SAFE.
+    const storedPublicName = normalizedPublicName;
+    const nameKey = publicNameKey(normalizedPublicName);
+    try {
+      await prisma.referralCode.upsert({
+        where: { userId: staffUserId },
+        update: {
+          code,
+          publicName: storedPublicName,
+          publicNameNormal: nameKey,
+          isActive: true,
+          revokedAt: null,
+        },
+        create: {
+          userId: staffUserId,
+          code,
+          publicName: storedPublicName,
+          publicNameNormal: nameKey,
+        },
+      });
+    } catch (error) {
+      // Race-safe duplicate enforcement (Task #029): losing the concurrent
+      // registration to the unique constraint is a normal, handled outcome —
+      // never an unexplained failure.
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        return {
+          status: "error",
+          message:
+            "That public name is already used by another active staff member. Pick a different one.",
+        };
+      }
+      throw error;
+    }
 
     revalidatePath("/admin/referrals");
     return {
@@ -121,7 +162,14 @@ export async function revokeStaffReferralLink(formData: FormData): Promise<CrmAc
   try {
     const updated = await prisma.referralCode.updateMany({
       where: { userId: staffUserId, revokedAt: null },
-      data: { isActive: false, revokedAt: new Date() },
+      // Task #029 (Fix 2): clearing the normalized key frees the name for
+      // reuse — NULLs are exempt from the unique constraint, so the name can
+      // be re-registered later without stale-key collisions.
+      data: {
+        isActive: false,
+        revokedAt: new Date(),
+        publicNameNormal: null,
+      },
     });
     revalidatePath("/admin/referrals");
     return updated.count > 0
@@ -609,11 +657,15 @@ export async function sendClientEmail(
       };
     }
 
-    // Task #027 — server-side outbound throttle (per-lead interval and
-    // per-sender hourly cap), enforced before any provider call.
-    const permission = await checkClientEmailPermission(lead.id, user.id);
-    if (!permission.allowed) {
-      return { status: "error", message: permission.reason };
+    // Task #029 (Fix 4) — race-safe outbound throttle: a durable reservation
+    // row is inserted ATOMICALLY (advisory-lock-serialized short transaction)
+    // BEFORE any provider call, so simultaneous requests can never bypass the
+    // per-lead interval or the per-sender hourly cap. The reservation is also
+    // the persisted attempt identity for the audit trail. The lock releases
+    // at COMMIT — no long transaction is held open during the provider call.
+    const reservation = await reserveClientEmailSend(lead.id, user.id);
+    if (!reservation.allowed) {
+      return { status: "error", message: reservation.reason };
     }
 
     const { subject, body } = parsed;
@@ -630,14 +682,15 @@ export async function sendClientEmail(
       html: `<p style="font-family:system-ui,sans-serif;font-size:14px;line-height:1.6;color:#1f2937;">${escaped}</p><p style="font-family:system-ui,sans-serif;font-size:12px;color:#6b7280;">NEOLIFE Office Team</p>`,
     });
 
-    // Status reporting must be accurate (Task #027): "accepted" only means a
-    // REAL provider accepted the message. Local simulation (provider "none"
-    // with NEOLIFE_ALLOW_LOCAL_EMAIL=1) is never reported as external send.
-    const providerStatus = result.ok
-      ? provider === "resend"
-        ? "resend:accepted"
-        : "local:simulated"
-      : `${provider}:failed:${result.error ?? "unknown"}`;
+    // Status reporting must be accurate (Task #027/#029): "accepted" only
+    // means a REAL provider accepted the request — never that it was
+    // delivered; timeouts/5xx/network errors map to "unknown" (the message
+    // may have gone out, so no blind resend is offered); 4xx map to
+    // "failed"; local simulation is labeled as simulation.
+    const sendStatus = classifySendOutcome(provider, result);
+    const providerStatus = `${provider}:${sendStatus}${
+      result.ok ? "" : `:${result.error ?? "unknown"}`
+    }`;
 
     await recordCommunicationEvent({
       leadId: lead.id,
@@ -646,6 +699,12 @@ export async function sendClientEmail(
       subject,
       providerStatus,
     });
+
+    // Latch the reservation status independently of the CRM audit trail: if
+    // the audit event above failed, the reservation still records the
+    // attempt; if THIS update fails, the row stays "reserved" — conservative
+    // against the limits either way.
+    await finalizeClientEmailReservation(reservation.reservationId, sendStatus);
 
     revalidatePath(`/admin/leads/${lead.id}`);
 
@@ -656,6 +715,13 @@ export async function sendClientEmail(
           provider === "resend"
             ? `Email to ${lead.email} accepted by the delivery provider.`
             : `Email prepared locally (simulation) — no external email was sent to ${lead.email}.`,
+      };
+    }
+    if (sendStatus === "unknown") {
+      return {
+        status: "error",
+        message:
+          "The send attempt could not be confirmed — the message may have been sent. Wait before attempting again; contact the recipient to verify. Do not resend immediately.",
       };
     }
     return {

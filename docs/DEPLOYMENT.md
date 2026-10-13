@@ -4,8 +4,16 @@
 > NEOLIFE is deployed and managed through the Owner's existing infrastructure
 > (Docker Compose + Cloudflare Tunnel), isolated from all other services.
 >
-> **Current release: image `neolife-web:92ee361`, commit `92ee361`, deployed and
-> verified 2026-10-02.** All 10 Prisma migrations are applied.
+> **Current release: image `neolife-web:32b6c27`, commit
+> `32b6c272e63236c18d51d3ed5e867dece0e56c4f`, verified 2026-10-13** (Task #029
+> record correction: the previously listed `92ee361` / 10-migration state was
+> superseded per the independently verified production record). Production
+> has **11 migrations applied**. The referral/notification feature branch's
+> migrations — `20261010000000_add_referrals_notifications` and everything
+> built on it (referral links, notifications, communications) — are **NOT
+> DEPLOYED**: they remain feature-branch work awaiting review, and none of
+> those features are live in production. Local development has more
+> migrations applied than production; never confuse the two states.
 >
 > This document contains **no production secrets**. Production values must never
 > be committed to Git, documentation, `.env.example`, test fixtures, or logs.
@@ -20,10 +28,10 @@
 | Item | Value |
 |---|---|
 | Live origin | `https://neolife.ooflowdesk.com` |
-| Current production image | **`neolife-web:92ee361`** |
-| Deployed commit | **`92ee3610fbd4b704886a40f726af6ef52de6f14a`** |
+| Current production image | **`neolife-web:32b6c27`** |
+| Deployed commit | **`32b6c272e63236c18d51d3ed5e867dece0e56c4f`** |
 | Deployed-SHA marker | `/opt/ooflowdesk/neolife/.deployed-sha` |
-| Database migrations | **10 / 10 applied** |
+| Database migrations | **11 applied** (13 exist locally; 15 after the Task #029 correction migrations, all **NOT DEPLOYED**) |
 | Application container | `neolife-web` (Next.js standalone, internal port 3000) |
 | Database container | `neolife-postgres` (postgres:16-alpine, dedicated named volume) |
 | Tunnel container | `neolife-tunnel` (`cloudflare/cloudflared`, remotely-managed) |

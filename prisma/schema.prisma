@@ -198,6 +198,17 @@ model ReferralCode {
   code       String    @unique
   isActive   Boolean   @default(true)
   publicName String
+  /** Task #029 (D-034): normalized lookup key for the public referral name
+   *  (trimmed, internal whitespace collapsed, lower-cased) so storage and
+   *  lookup always agree. NULL once revoked — freeing the name for reuse —
+   *  and NULL for legacy rows whose normalized name collided with another
+   *  ACTIVE row at migration time (preserved, reported; never resolvable
+   *  until the Owner re-registers the name). Unique across ALL rows: two
+   *  NULLs are allowed by PostgreSQL (NULLs are distinct), so revoked and
+   *  collision-quarantined rows can coexist while at most ONE active row per
+   *  normalized name exists — the ambiguity guard becomes race-safe via this
+   *  atomic constraint. */
+  publicNameNormal String? @unique
   revokedAt  DateTime?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
@@ -205,6 +216,32 @@ model ReferralCode {
   user          User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+/**
+ * Task #029, Fix 4 — durable outbound-email send reservation (rate limiting).
+ *
+ * Rows are inserted ATOMICALLY inside a short claim transaction (serialized
+ * by a PostgreSQL advisory lock) BEFORE any provider call, making the
+ * per-lead 90s interval and the 20-per-sender-hour cap race-safe. The row
+ * also persists an auditable attempt identity before external sending.
+ *
+ * status lifecycle: reserved → accepted | failed | unknown | simulated.
+ * Every status counts conservatively against both limits, so failures
+ * (including provider timeouts recorded as "unknown" and finalization
+ * failures, which leave the row "reserved") can never reopen the limit.
+ * leadId is a plain string with no FK: the attempt audit trail must survive
+ * lead deletion and rows naturally expire out of the rate windows.
+ */
+model EmailSendReservation {
+  id         String   @id @default(uuid())
+  leadId     String
+  userId     String
+  reservedAt DateTime @default(now())
+  status     String   @default("reserved")
+
+  @@index([leadId, reservedAt])
+  @@index([userId, reservedAt])
 }
 
 
