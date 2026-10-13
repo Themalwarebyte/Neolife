@@ -22,11 +22,14 @@ import {
 import { randomBytes } from "node:crypto";
 import { LeadStatus, MeetingStatus } from "@/generated/prisma/client";
 import {
+  checkClientEmailPermission,
+  currentEmailProvider,
   isClientEmailSendingEnabled,
   isValidRecipientEmail,
   recordCommunicationEvent,
   validateComposerInput,
 } from "@/lib/communications";
+import { findActivePublicNameConflict, normalizePublicName } from "@/lib/referrals";
 import { sendMail } from "@/lib/email";
 
 // ─── Referral link management (D-034) ────────────────────────────────────
@@ -55,7 +58,12 @@ export async function generateStaffReferralLink(formData: FormData): Promise<Crm
   if (!isValidBetterAuthUserId(staffUserId)) {
     return { status: "error", message: "Invalid staff user." };
   }
-  if (publicName.length < 2 || publicName.length > 60) {
+  const normalizedPublicName = normalizePublicName(publicName);
+  if (
+    !normalizedPublicName ||
+    normalizedPublicName.length < 2 ||
+    normalizedPublicName.length > 60
+  ) {
     return {
       status: "error",
       message: "Public name must be 2–60 characters.",
@@ -69,6 +77,21 @@ export async function generateStaffReferralLink(formData: FormData): Promise<Crm
     });
     if (!target || target.role !== "staff" || !target.isActive) {
       return { status: "error", message: "Active staff user not found." };
+    }
+
+    // Task #027 — prevent duplicate ACTIVE public referral names: an
+    // ambiguous name must never exist among active staff, because the manual
+    // fallback refuses to guess between two matching members.
+    const clash = await findActivePublicNameConflict(
+      normalizedPublicName,
+      staffUserId,
+    );
+    if (clash) {
+      return {
+        status: "error",
+        message:
+          "That public name is already used by another active staff member. Pick a different one.",
+      };
     }
 
     const code = newReferralCode();
@@ -559,9 +582,17 @@ export async function sendClientEmail(
         user.role === "admin"
           ? { id: leadId }
           : { id: leadId, assignedUserId: user.id },
-      select: { id: true, email: true, firstName: true },
+      select: { id: true, email: true, firstName: true, consent: true },
     });
     if (!lead) return { status: "error", message: "Lead not found." };
+
+    if (!lead.consent) {
+      return {
+        status: "error",
+        message:
+          "This contact has not consented to being contacted. Nothing was sent.",
+      };
+    }
 
     if (!lead.email || !isValidRecipientEmail(lead.email)) {
       return {
@@ -578,12 +609,20 @@ export async function sendClientEmail(
       };
     }
 
+    // Task #027 — server-side outbound throttle (per-lead interval and
+    // per-sender hourly cap), enforced before any provider call.
+    const permission = await checkClientEmailPermission(lead.id, user.id);
+    if (!permission.allowed) {
+      return { status: "error", message: permission.reason };
+    }
+
     const { subject, body } = parsed;
     const escaped = body
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
       .replace(/\n/g, "<br>");
+    const provider = currentEmailProvider();
     const result = await sendMail({
       to: lead.email,
       subject,
@@ -591,12 +630,21 @@ export async function sendClientEmail(
       html: `<p style="font-family:system-ui,sans-serif;font-size:14px;line-height:1.6;color:#1f2937;">${escaped}</p><p style="font-family:system-ui,sans-serif;font-size:12px;color:#6b7280;">NEOLIFE Office Team</p>`,
     });
 
+    // Status reporting must be accurate (Task #027): "accepted" only means a
+    // REAL provider accepted the message. Local simulation (provider "none"
+    // with NEOLIFE_ALLOW_LOCAL_EMAIL=1) is never reported as external send.
+    const providerStatus = result.ok
+      ? provider === "resend"
+        ? "resend:accepted"
+        : "local:simulated"
+      : `${provider}:failed:${result.error ?? "unknown"}`;
+
     await recordCommunicationEvent({
       leadId: lead.id,
       userId: user.id,
       channel: "email",
       subject,
-      providerStatus: result.ok ? "accepted" : (result.error ?? "failed"),
+      providerStatus,
     });
 
     revalidatePath(`/admin/leads/${lead.id}`);
@@ -604,7 +652,10 @@ export async function sendClientEmail(
     if (result.ok) {
       return {
         status: "success",
-        message: `Email to ${lead.email} accepted by the delivery provider.`,
+        message:
+          provider === "resend"
+            ? `Email to ${lead.email} accepted by the delivery provider.`
+            : `Email prepared locally (simulation) — no external email was sent to ${lead.email}.`,
       };
     }
     return {

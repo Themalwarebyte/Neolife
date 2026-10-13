@@ -35,6 +35,7 @@ import { prisma } from "../src/server/db/prisma";
  */
 export const E2E_OWNER_EMAIL = "office@test.local";
 export const E2E_STAFF_EMAIL = "colleague1@neolife.local";
+export const E2E_STAFF2_EMAIL = "colleague2@neolife.local";
 
 /** The ONLY two identities this module is permitted to manage. */
 const FIXTURES = [
@@ -47,10 +48,17 @@ const FIXTURES = [
   },
   {
     email: E2E_STAFF_EMAIL,
-    name: "NEOLIFE Colleague (E2E)",
+    name: "E2E Colleague One",
     role: "staff",
     passwordEnv: "STAFF_PASSWORD",
     defaultPassword: "dev-staff-password-12345",
+  },
+  {
+    email: E2E_STAFF2_EMAIL,
+    name: "E2E Colleague Two",
+    role: "staff",
+    passwordEnv: "STAFF2_PASSWORD",
+    defaultPassword: "dev-staff2-password-12345",
   },
 ] as const;
 

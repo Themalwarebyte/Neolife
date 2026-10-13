@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { prisma } from "@/server/db/prisma";
 import { parseAttribution, type Attribution } from "@/lib/attribution";
+import {
+  NOTIFICATION_TYPES,
+  tryNewNotification,
+} from "@/lib/notifications";
 
 /**
  * Task 1.5 — lead-capture validation & persistence (public, untrusted input).
@@ -178,21 +182,35 @@ export type ReferralAttribution = {
   code: string;
   method: "link" | "manual_name";
   typedName?: string;
+  /** Creation-time snapshot of the APPROVED public referral name (both
+   * methods), so attribution stays meaningful after code rotation, revocation,
+   * or referrer-account deletion. Distinct from typedName, which is the
+   * visitor's self-reported spelling for manual_name attribution only. */
+  publicReferrerName?: string;
 };
 
 /**
  * Persist a validated lead together with its resolved referral (D-034).
- * Runs as ONE Prisma interactive transaction so the immutable referral
- * attribution, the system initial assignment (the narrow D-034 exception to
- * D-027), the audit events and the assignee notification are either all
- * written or none of them are — no partial/racy capture.
+ *
+ * Atomic scope (Task #027): the lead row, the immutable referral attribution
+ * (incl. the creation-time public referrer snapshot), the system initial
+ * assignment (the narrow D-034 exception to D-027) and the CRITICAL audit
+ * events run as ONE Prisma interactive transaction — either all are written
+ * or none of them are.
+ *
+ * The assignee NOTIFICATION is deliberately OUTSIDE the transaction: it is
+ * optional, non-critical state, and an in-transaction insert (even with a
+ * swallowed .catch) does not reliably isolate its failure from the interactive
+ * transaction. A notification failure therefore cannot roll back a valid
+ * lead. Deduplication is preserved by the unique dedupKey; delivery is
+ * at-least-once on retry, not exactly-once.
  */
 export async function persistLead(
   data: z.output<typeof leadSchema>,
   attribution: Attribution = {},
   referral: ReferralAttribution | null = null,
 ) {
-  return prisma.$transaction(async (tx) => {
+  const lead = await prisma.$transaction(async (tx) => {
     const lead = await tx.lead.create({
       data: {
         firstName: data.firstName,
@@ -217,6 +235,7 @@ export async function persistLead(
         referralCode: referral?.code,
         referralMethod: referral?.method,
         referredByName: referral?.typedName,
+        referredBySnapshot: referral?.publicReferrerName,
         referralCapturedAt: referral ? new Date() : null,
         // D-034 system initial assignment — active Staff referrer becomes
         // the first assignee. deactivated-by-reassignment rules (D-027)
@@ -227,12 +246,13 @@ export async function persistLead(
       select: { id: true },
     });
 
-    // Audit trail: capture (system actor) + system assignment event.
+    // Audit trail: capture (system actor) + system assignment event — both
+    // CRITICAL for attribution history, so they stay inside the transaction.
     await tx.leadEvent.create({
       data: {
         leadId: lead.id,
         type: "lead_captured",
-        metadata: referral ? { referralCode: referral.code, method: referral.method } : undefined,
+        metadata: referral ? { referralCode: referral.code, method: referral.method, referredBySnapshot: referral.publicReferrerName } : undefined,
       },
     });
     if (referral) {
@@ -250,25 +270,28 @@ export async function persistLead(
           userId: referral.userId,
         },
       });
-      // In-app notification for the assignee (Phase 3). Deduped by unique
-      // dedupKey; failures below rollback with the transaction, while the
-      // public action never discards a captured lead because of them.
-      const leadName = [data.firstName, data.lastName].filter(Boolean).join(" ");
-      await tx.notification.create({
-        data: {
-          userId: referral.userId,
-          leadId: lead.id,
-          type: "lead_assigned",
-          title: "New referral contact",
-          body: `${leadName} arrived via your referral link.`,
-          dedupKey: `lead_assigned:${lead.id}`,
-        },
-      }).catch(() => {
-        // A duplicate notification insert must not fail capture — the
-        // unique dedupKey guarantees idempotence, so swallowing is safe.
-      });
     }
 
     return lead;
   });
+
+  // Post-transaction, genuinely isolated notification write (Task #027).
+  // Deliberately GENERIC: the body carries NO client personal information,
+  // so a later reassignment can never leak lead details to the former
+  // assignee's historical notifications. Lead details stay behind the
+  // ownership authorization guard at /admin/leads/<id>.
+  // tryNewNotification swallows its own errors (unique dedupKey violations and
+  // transient failures) and can never affect the committed lead.
+  if (referral) {
+    await tryNewNotification({
+      userId: referral.userId,
+      leadId: lead.id,
+      type: "lead_assigned" satisfies (typeof NOTIFICATION_TYPES)[number],
+      title: "New referral contact",
+      body: "A contact arrived via your referral link and has been added to your Contacts.",
+      dedupKey: `lead_assigned:${lead.id}`,
+    });
+  }
+
+  return lead;
 }

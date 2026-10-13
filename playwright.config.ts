@@ -56,6 +56,16 @@ export default defineConfig({
     // E2E runs only: the suite performs five sign-ins from one IP within a
     // few seconds (global setup + P-2 workflow), which the production default
     // throttles with 429s. See src/lib/auth.ts. Production is unaffected.
-    env: { E2E_DISABLE_AUTH_RATE_LIMIT: "1" },
+    //
+    // BETTER_AUTH_URL (Task #027, Fix 7): pins the auth base URL to the local
+    // standalone server so Better Auth's origin validation accepts
+    // http://localhost:3000 deterministically. Without this, the sign-ins in
+    // e2e/global-setup.ts fail with "Invalid origin" unless the operator
+    // remembers to export BETTER_AUTH_URL by hand. This env ONLY reaches the
+    // webServer command below (local E2E), never production auth settings.
+    env: {
+      E2E_DISABLE_AUTH_RATE_LIMIT: "1",
+      BETTER_AUTH_URL: "http://localhost:3000",
+    },
   },
 });

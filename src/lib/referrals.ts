@@ -78,24 +78,41 @@ export async function resolveReferralCode(
 }
 
 /**
+ * Normalize a typed public referral name before any DB comparison.
+ * Trims, collapses internal whitespace and enforces the max length, so input
+ * such as "  Jane   Doe " matches the approved "Jane Doe" deterministically.
+ * Returns null when the input is empty or exceeds the max length.
+ */
+export function normalizePublicName(raw: string): string | null {
+  const normalized = raw.trim().replace(/\s+/g, " ");
+  if (normalized.length === 0 || normalized.length > MAX_PUBLIC_NAME_LENGTH) {
+    return null;
+  }
+  return normalized;
+}
+
+/**
  * Manual fallback: resolve an approved publicName typed by the visitor
  * ("Who referred you?") to the single active Staff member with that
- * public name. Returns null when there is no match — it is NOT an error to
- * type a name that does not exist (fail-safe to Owner pool).
+ * public name.
+ *
+ * AMBIGUITY RULE (Task #027): the name must resolve to EXACTLY ONE eligible
+ * Staff member. Zero matches fails safely to null (no such referrer); more
+ * than one match is REJECTED as ambiguous — the lead is never assigned to
+ * one of several matching Staff members on the basis of database ordering.
+ * Match is case-insensitive after normalization.
  */
 export async function resolveReferralByName(
   publicName: string,
 ): Promise<ResolvedReferral | null> {
-  const trimmed = publicName.trim();
-  if (trimmed.length === 0 || trimmed.length > MAX_PUBLIC_NAME_LENGTH) {
-    return null;
-  }
+  const normalized = normalizePublicName(publicName);
+  if (!normalized) return null;
   try {
-    const record = await prisma.referralCode.findFirst({
+    const records = await prisma.referralCode.findMany({
       where: {
         isActive: true,
         revokedAt: null,
-        publicName: { equals: trimmed },
+        publicName: { equals: normalized, mode: "insensitive" },
         user: { isActive: true, role: "staff" },
       },
       select: {
@@ -105,7 +122,8 @@ export async function resolveReferralByName(
         user: { select: { id: true, name: true } },
       },
     });
-    if (!record) return null;
+    if (records.length !== 1) return null; // 0 = unknown; >1 = ambiguous
+    const record = records[0]!;
     return {
       userId: record.userId,
       code: record.code,
@@ -114,6 +132,35 @@ export async function resolveReferralByName(
     };
   } catch {
     return null;
+  }
+}
+
+/**
+ * Duplicate-public-name guard for Owner management (Task #027): an ACTIVE,
+ * non-revoked referral code may not reuse another Staff member's active
+ * public referral name (case-insensitive). Revoked/inactive names do not
+ * block reuse — they cannot contribute to manual-resolution ambiguity.
+ * Returns the clashing record, or null when the name is free.
+ */
+export async function findActivePublicNameConflict(
+  publicName: string,
+  excludeUserId: string,
+): Promise<{ userId: string } | null> {
+  const normalized = normalizePublicName(publicName);
+  if (!normalized) return null;
+  try {
+    return await prisma.referralCode.findFirst({
+      where: {
+        isActive: true,
+        revokedAt: null,
+        publicName: { equals: normalized, mode: "insensitive" },
+        userId: { not: excludeUserId },
+      },
+      select: { userId: true },
+    });
+  } catch {
+    // Fail CLOSED: a transient DB error must not silently allow a name clash.
+    throw new Error("referral_name_conflict_check_unavailable");
   }
 }
 

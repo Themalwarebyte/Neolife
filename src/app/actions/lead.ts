@@ -15,6 +15,7 @@ import { recordFunnelEvent } from "@/lib/funnel";
 import { clientKeyFromHeaders, isRateLimited } from "@/lib/rateLimit";
 import {
   MAX_PUBLIC_NAME_LENGTH,
+  normalizePublicName,
   resolveReferralByName,
   resolveReferralCode,
 } from "@/lib/referrals";
@@ -49,6 +50,7 @@ async function resolveReferralAttribution(
           userId: resolved.userId,
           code: resolved.code,
           method: "link",
+          publicReferrerName: resolved.publicName,
         };
       }
     }
@@ -59,7 +61,11 @@ async function resolveReferralAttribution(
 
   const rawName = formData.get("referredByName");
   if (typeof rawName === "string" && rawName.trim().length > 0) {
-    const typed = rawName.trim().slice(0, MAX_PUBLIC_NAME_LENGTH);
+    // Consistent normalization/validation (Task #027): trim, collapse
+    // whitespace, bounded length — the exact input normalizePublicName uses
+    // inside resolution, so the stored self-report matches what was matched.
+    const typed = normalizePublicName(rawName) ??
+      rawName.trim().slice(0, MAX_PUBLIC_NAME_LENGTH);
     const resolved = await resolveReferralByName(typed);
     if (resolved) {
       return {
@@ -67,6 +73,7 @@ async function resolveReferralAttribution(
         code: resolved.code,
         method: "manual_name",
         typedName: typed,
+        publicReferrerName: resolved.publicName,
       };
     }
     return null;

@@ -12,6 +12,13 @@ import {
   normalizeToE164,
   validateComposerInput,
 } from "../src/lib/communications";
+import { normalizePublicName } from "../src/lib/referrals";
+import {
+  currentEmailProvider,
+  isClientEmailSendingEnabled,
+  EMAIL_MAX_PER_SENDER_PER_HOUR,
+  EMAIL_MIN_INTERVAL_PER_LEAD_SECONDS,
+} from "../src/lib/communications";
 import { BETTER_AUTH_USER_ID_PATTERN, isValidBetterAuthUserId } from "../src/lib/user-management";
 
 /**
@@ -48,6 +55,13 @@ describe("D-034 — referral codes (pure)", () => {
 
   it("exposes the bounded public-name length used by the manual fallback", () => {
     expect(MAX_PUBLIC_NAME_LENGTH).toBe(60);
+  });
+
+  it("normalizes typed public names consistently before matching (Task #027)", () => {
+    expect(normalizePublicName("  Jane   Doe ")).toBe("Jane Doe");
+    expect(normalizePublicName("John")).toBe("John");
+    expect(normalizePublicName("   ")).toBeNull();
+    expect(normalizePublicName("a".repeat(61))).toBeNull();
   });
 });
 
@@ -127,5 +141,53 @@ describe("Phase 4 — email composer validation (pure)", () => {
     expect(isValidRecipientEmail("client@example.com")).toBe(true);
     expect(isValidRecipientEmail(null)).toBe(false);
     expect(isValidRecipientEmail("not-an-email")).toBe(false);
+  });
+});
+
+describe("Task #027 — outbound email safeguards (pure)", () => {
+  const OLD_ENV = process.env;
+
+  function withEnv(env: Record<string, string>, run: () => void) {
+    process.env = { ...OLD_ENV, ...env };
+    try {
+      run();
+    } finally {
+      process.env = OLD_ENV;
+    }
+  }
+
+  it("stays disabled under partial provider configuration", () => {
+    withEnv({ EMAIL_PROVIDER: "resend", RESEND_API_KEY: "key" }, () => {
+      // Missing EMAIL_FROM — incomplete configuration must NOT enable sending.
+      expect(isClientEmailSendingEnabled()).toBe(false);
+      expect(currentEmailProvider()).toBe("resend");
+    });
+    withEnv({ EMAIL_PROVIDER: "resend" }, () => {
+      expect(isClientEmailSendingEnabled()).toBe(false);
+    });
+  });
+
+  it("enables only with COMPLETE resend configuration", () => {
+    withEnv(
+      { EMAIL_PROVIDER: "resend", RESEND_API_KEY: "key", EMAIL_FROM: "from@example.com" },
+      () => {
+        expect(isClientEmailSendingEnabled()).toBe(true);
+      },
+    );
+  });
+
+  it("keeps the default state disabled and distinguishes local simulation", () => {
+    withEnv({}, () => {
+      expect(isClientEmailSendingEnabled()).toBe(false);
+      expect(currentEmailProvider()).toBe("disabled");
+    });
+    withEnv({ EMAIL_PROVIDER: "none", NEOLIFE_ALLOW_LOCAL_EMAIL: "1" }, () => {
+      expect(currentEmailProvider()).toBe("local");
+    });
+  });
+
+  it("exposes the throttle limits as bounded, testable constants", () => {
+    expect(EMAIL_MIN_INTERVAL_PER_LEAD_SECONDS).toBeGreaterThan(0);
+    expect(EMAIL_MAX_PER_SENDER_PER_HOUR).toBeGreaterThan(0);
   });
 });

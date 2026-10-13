@@ -84,6 +84,7 @@ model Lead {
   referralMethod     String? // "link" | "manual_name"
   referredByName     String? // manual-fallback display name, as typed by the visitor
   referralCapturedAt DateTime?
+  referredBySnapshot String? // creation-time snapshot of the APPROVED public referrer name (Task #027)
 
    createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt

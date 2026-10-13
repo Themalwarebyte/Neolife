@@ -50,6 +50,7 @@ export default async function LeadsPage() {
       status: true,
       assignedUserId: true,
       referredByName: true,
+      referredBySnapshot: true,
       referralMethod: true,
       createdAt: true,
       utmSource: true,
@@ -158,9 +159,9 @@ export default async function LeadsPage() {
                       ) : null}
                     </td>
                     <td className="px-4 py-3 text-neutral-600">
-                      {lead.referredByName ? (
+                      {lead.referredByName || lead.referredBySnapshot ? (
                         <span title="Original referrer (immutable attribution)">
-                          {lead.referredByName}
+                          {lead.referredByName ?? lead.referredBySnapshot}
                         </span>
                       ) : (
                         <span className="text-neutral-400">—</span>

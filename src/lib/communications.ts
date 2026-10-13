@@ -71,20 +71,102 @@ export function isValidRecipientEmail(email: string | null): email is string {
 
 const EMAIL_PROVIDER_ENV = "EMAIL_PROVIDER";
 
+/** The only provider that performs REAL external delivery. */
+export function currentEmailProvider(): "resend" | "local" | "disabled" {
+  const provider = (process.env[EMAIL_PROVIDER_ENV] || "").toLowerCase();
+  if (provider === "resend") return "resend";
+  if (provider === "none" && process.env.NEOLIFE_ALLOW_LOCAL_EMAIL === "1")
+    return "local";
+  return "disabled";
+}
+
 /**
  * External client-email sending must be OFF unless a real provider is both
- * configured and explicitly enabled (Owner approval path).
+ * COMPLETELY configured (API key AND verified sender address) and explicitly
+ * enabled (Owner approval path). Partial configuration stays disabled.
  */
 export function isClientEmailSendingEnabled(): boolean {
-  const provider = (process.env[EMAIL_PROVIDER_ENV] || "").toLowerCase();
   return (
-    (provider === "resend" && Boolean(process.env.RESEND_API_KEY)) ||
-    (provider === "none" && process.env.NEOLIFE_ALLOW_LOCAL_EMAIL === "1")
+    (currentEmailProvider() === "resend" &&
+      Boolean(process.env.RESEND_API_KEY) &&
+      Boolean(process.env.EMAIL_FROM)) ||
+    currentEmailProvider() === "local"
   );
 }
 
 const MAX_SUBJECT_LENGTH = 200;
 const MAX_BODY_LENGTH = 10000;
+
+// ─── Outbound send safeguards (Task #027, Fix 4) ───────────────────────────
+
+/** Minimum interval between two outbound emails to the SAME contact. */
+export const EMAIL_MIN_INTERVAL_PER_LEAD_SECONDS = 90;
+
+/** Rolling hourly cap of outbound emails per sending user. */
+export const EMAIL_MAX_PER_SENDER_PER_HOUR = 20;
+
+export type SendPermission =
+  | { allowed: true }
+  | { allowed: false; reason: string };
+
+/**
+ * Server-side outbound email throttle, based on the audit "communication"
+ * LeadEvents already recorded per attempt (so it survives restarts and
+ * covers all senders of the same lead).
+ * - Per-lead interval: prevents repeated sends to the same contact within an
+ *   abusive interval, regardless of which staff member sends.
+ * - Per-sender hourly cap: prevents mass blasting across many leads.
+ * Throws on a transient DB failure? No — fails CLOSED (not allowed) so a
+ * monitoring outage can never open a spam window.
+ */
+export async function checkClientEmailPermission(
+  leadId: string,
+  userId: string,
+): Promise<SendPermission> {
+  try {
+    const perLeadSince = new Date(
+      Date.now() - EMAIL_MIN_INTERVAL_PER_LEAD_SECONDS * 1000,
+    );
+    const recentForLead = await prisma.leadEvent.count({
+      where: {
+        leadId,
+        type: "communication",
+        createdAt: { gte: perLeadSince },
+        metadata: { path: ["channel"], equals: "email" },
+      },
+    });
+    if (recentForLead > 0) {
+      return {
+        allowed: false,
+        reason: `An email to this contact was attempted recently. Please wait ${EMAIL_MIN_INTERVAL_PER_LEAD_SECONDS} seconds before sending another one.`,
+      };
+    }
+
+    const hourAgo = new Date(Date.now() - 3_600_000);
+    const sentLastHour = await prisma.leadEvent.count({
+      where: {
+        type: "communication",
+        userId,
+        createdAt: { gte: hourAgo },
+        metadata: { path: ["channel"], equals: "email" },
+      },
+    });
+    if (sentLastHour >= EMAIL_MAX_PER_SENDER_PER_HOUR) {
+      return {
+        allowed: false,
+        reason: `Hourly sending limit of ${EMAIL_MAX_PER_SENDER_PER_HOUR} emails reached. Please try again later.`,
+      };
+    }
+
+    return { allowed: true };
+  } catch {
+    // Fail closed: don't send while we cannot verify the limits.
+    return {
+      allowed: false,
+      reason: "Sending is temporarily unavailable. Please try again shortly. Nothing was sent.",
+    };
+  }
+}
 
 export type SendClientEmailResult =
   | { ok: true; provider: string; status: "sent" | "logged" }

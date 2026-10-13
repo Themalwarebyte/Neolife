@@ -147,6 +147,16 @@ export function ReferralLinkRow({
           </p>
         ) : null}
       </form>
+
+      {/* Revoke result is reported OUTSIDE the active-conditional block:
+          after a successful revocation the row re-renders as inactive, and
+          rendering the status inside that block would erase the message
+          immediately (Task #027 E2E surfaced this). */}
+      {revState?.message ? (
+        <p className="mt-2 text-xs text-neutral-500" role="status">
+          {revState.message}
+        </p>
+      ) : null}
     </div>
   );
 }

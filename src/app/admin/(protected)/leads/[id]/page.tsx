@@ -134,12 +134,25 @@ export default async function LeadDetailPage({
                 />
               ) : null}
               {/* D-034: original referrer is visibly distinct from the current
-                  assignee — reassignment never rewrites it. */}
+                  assignee — reassignment never rewrites it. Shows the
+                  visitor's self-reported spelling for manual attribution when
+                  available, otherwise the creation-time APPROVED public
+                  referrer snapshot (code-based attribution), Task #027. */}
               <Field
                 label="Referred by (original)"
                 value={
-                  lead.referredByName
-                    ? `${lead.referredByName}${lead.referralMethod ? ` · via ${lead.referralMethod === "link" ? "referral link" : "manual entry"}` : ""}`
+                  lead.referredByName || lead.referredBySnapshot
+                    ? `${
+                        lead.referredByName ?? lead.referredBySnapshot
+                      }${
+                        lead.referralMethod
+                          ? ` · via ${
+                              lead.referralMethod === "link"
+                                ? "referral link"
+                                : "manual entry"
+                            }`
+                          : ""
+                      }`
                     : null
                 }
               />
