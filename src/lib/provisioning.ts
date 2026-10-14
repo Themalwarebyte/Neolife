@@ -94,15 +94,244 @@ export function generateTemporaryPassword(): string {
   return randomBytes(18).toString("base64url");
 }
 
+// ─── Task #038 Fix 1 — password↔account delivery binding ──────────────────
+
+/**
+ * Binds each generated temporary password to the EXACT account email it is
+ * delivered to. Passwords are memoized per intent email and consumed only
+ * when a NEW account is actually created, so the credentials file always
+ * records the password Better Auth really received — never a positional
+ * neighbor's (the Task #037 defect when only some intents were new).
+ */
+export type PasswordVault = {
+  /** Called by provisionCrmUser exactly when a new account is created. */
+  get(intent: ProvisioningIntent): string;
+  /** Password actually delivered to `email`, or undefined if never used. */
+  passwordFor(email: string): string | undefined;
+  /** Emails whose passwords were consumed during provisioning. */
+  deliveredEmails(): string[];
+};
+
+export function createPasswordVault(
+  generate: () => string = generateTemporaryPassword,
+): PasswordVault {
+  const byEmail = new Map<string, string>();
+  const delivered = new Set<string>();
+  return {
+    get(intent: ProvisioningIntent): string {
+      const email = intent.email.trim().toLowerCase();
+      let password = byEmail.get(email);
+      if (!password) {
+        password = generate();
+        byEmail.set(email, password);
+      }
+      delivered.add(email);
+      return password;
+    },
+    passwordFor(email: string): string | undefined {
+      const normalized = email.trim().toLowerCase();
+      return delivered.has(normalized) ? byEmail.get(normalized) : undefined;
+    },
+    deliveredEmails(): string[] {
+      return [...delivered];
+    },
+  };
+}
+
+/**
+ * Task #038 Fix 1 requirement 6 — post-provision credential verification.
+ * Attempts a real Better Auth sign-in for one newly created account. Never
+ * throws, never logs or returns the password; the boolean is the only output.
+ */
+export async function verifyProvisionedCredential(
+  email: string,
+  password: string,
+): Promise<boolean> {
+  try {
+    const { auth } = await import("@/lib/auth");
+    const result = await auth.api.signInEmail({
+      body: { email, password },
+      headers: new Headers({ origin: "http://localhost:3000" }),
+    });
+    return Boolean((result as { user?: { id?: string } })?.user?.id);
+  } catch {
+    return false;
+  }
+}
+
+// ─── Task #038 Fix 1 — failure recovery (deliverable credentials file) ────
+
+export type RollbackOutcome =
+  | { email: string; status: "deleted" }
+  | { email: string; status: "skipped_has_crm_data"; leads: number }
+  | { email: string; status: "not_found" }
+  | { email: string; status: "failed"; error: string };
+
+/**
+ * Safe, explicit recovery when an account was created but its credentials
+ * could NOT be delivered (credentials-file write failed, verification
+ * failed). Deletes ONLY brand-new rows that have accumulated no CRM data;
+ * any account that already has leads or a referral code is left untouched
+ * and reported for manual review. Never touches any other account.
+ */
+export async function rollbackProvisionedAccounts(
+  emails: string[],
+): Promise<RollbackOutcome[]> {
+  const outcomes: RollbackOutcome[] = [];
+  for (const raw of emails) {
+    const email = raw.trim().toLowerCase();
+    try {
+      const user = await prisma.user.findUnique({
+        where: { email },
+        select: {
+          id: true,
+          referralCode: { select: { id: true } },
+          _count: { select: { assignedLeads: true, referredLeads: true } },
+        },
+      });
+      if (!user) {
+        outcomes.push({ email, status: "not_found" });
+        continue;
+      }
+      const leadUsage =
+        user._count.assignedLeads + user._count.referredLeads + (user.referralCode ? 1 : 0);
+      if (leadUsage > 0 || (user.referralCode ?? null) !== null) {
+        // A safety guard: never auto-delete an account that is already wired
+        // into the CRM. Manual review decides what happens to it.
+        outcomes.push({ email, status: "skipped_has_crm_data", leads: leadUsage });
+        continue;
+      }
+      await prisma.user.delete({ where: { id: user.id } });
+      outcomes.push({ email, status: "deleted" });
+    } catch (error) {
+      outcomes.push({
+        email,
+        status: "failed",
+        error: error instanceof Error ? error.message : "unknown_error",
+      });
+    }
+  }
+  return outcomes;
+}
+
+// ─── Task #038 Fix 3 — read-only two-user preflight ───────────────────────
+
+export type PreflightIntentState = {
+  email: string;
+  kind: ProvisionKind;
+  action: "would_create" | "preserved";
+  existingRole?: string;
+  /** Existing role differs from the role the intent would set on creation. */
+  roleMismatch: boolean;
+  isActive?: boolean;
+};
+
+export type PreflightReport = {
+  intents: PreflightIntentState[];
+  /** Every ACTIVE CRM-role user (admin/staff) currently in the database. */
+  activeCrmUsers: Array<{ email: string; role: string; name: string }>;
+  /** Active CRM users beyond the intended email addresses. */
+  additionalActiveUsers: Array<{ email: string; role: string; name: string }>;
+  /** The intended Owner email is NOT the existing Owner identity: a separate
+   * Owner decision is required before any provisioning run (Task #038). */
+  ownerIdentityMismatch: boolean;
+  existingOwnerEmails: string[];
+  /** True when provisioning must STOP pending an explicit Owner decision. */
+  blocking: boolean;
+};
+
+/**
+ * Read-only, non-destructive preflight: it WRITES NOTHING and deletes
+ * NOTHING. It answers, before any mutation:
+ *   - which intended users would be CREATED vs PRESERVED;
+ *   - existing role mismatches for the intended addresses;
+ *   - every active CRM-role account present (surfaces "three active human
+ *     users" situations);
+ *   - whether the existing Owner identity DIFFERS from the intended Owner
+ *     login (blocking: requires a separate Owner decision — the existing
+ *     Owner is never silently renamed, replaced, disabled or deleted).
+ */
+export async function preflightProvisioning(
+  intents: ProvisioningIntent[],
+): Promise<PreflightReport> {
+  const crmRoles = ["admin", "staff"];
+  const crmUsers = await prisma.user.findMany({
+    where: { role: { in: crmRoles } },
+    select: { email: true, role: true, name: true, isActive: true },
+    orderBy: { email: "asc" },
+  });
+
+  const intentStates: PreflightIntentState[] = [];
+  let ownerIdentityMismatch = false;
+  const intendedEmails = new Set<string>();
+
+  for (const intent of intents) {
+    const validationError = validateProvisioningIntent(intent);
+    if (validationError) {
+      throw new Error(`Preflight: ${validationError}`);
+    }
+    const email = intent.email.trim().toLowerCase();
+    intendedEmails.add(email);
+    const desiredRole = intent.kind === "owner" ? "admin" : "staff";
+    const exEmail = intent.email; // prisma case-sensitivity: emails are unique
+    const existing = await prisma.user.findUnique({
+      where: { email: exEmail },
+      select: { role: true, isActive: true },
+    });
+    intentStates.push({
+      email,
+      kind: intent.kind,
+      action: existing ? "preserved" : "would_create",
+      existingRole: existing?.role,
+      roleMismatch: Boolean(existing && existing.role !== desiredRole),
+      isActive: existing?.isActive,
+    });
+  }
+
+  const activeCrmUsers = crmUsers
+    .filter((user) => user.isActive)
+    .map(({ email, role, name }) => ({ email, role, name }));
+  const additionalActiveUsers = activeCrmUsers.filter(
+    (user) => !intendedEmails.has(user.email.trim().toLowerCase()),
+  );
+
+  const ownerIntent = intents.find((intent) => intent.kind === "owner");
+  const ownerEmail = ownerIntent?.email?.trim().toLowerCase();
+  const existingOwnerEmails = activeCrmUsers
+    .filter((user) => user.role === "admin")
+    .map((user) => user.email);
+  if (
+    ownerIntent &&
+    ownerEmail &&
+    !intentStates.find((state) => state.email === ownerEmail)?.action.includes("preserved") &&
+    existingOwnerEmails.some((email) => email.trim().toLowerCase() !== ownerEmail)
+  ) {
+    ownerIdentityMismatch = true;
+  }
+
+  return {
+    intents: intentStates,
+    activeCrmUsers,
+    additionalActiveUsers,
+    ownerIdentityMismatch,
+    existingOwnerEmails,
+    blocking: ownerIdentityMismatch,
+  };
+}
+
 /**
  * Provision one intended human user, idempotently.
  *
  * @param getTemporaryPassword — injectable for deterministic tests; the CLI
- *   passes `generateTemporaryPassword`.
+ *   supplies a delivery recorder (createPasswordVault) so each password is
+ *   bound to the EXACT account for which Better Auth uses it. It receives
+ *   the intent so callers can key deliveries by account email instead of
+ *   by positional index (Task #038 Fix 1).
  */
 export async function provisionCrmUser(
   intent: ProvisioningIntent,
-  getTemporaryPassword: () => Promise<string> | string = generateTemporaryPassword,
+  getTemporaryPassword: (intent: ProvisioningIntent) => Promise<string> | string = () =>
+    generateTemporaryPassword(),
 ): Promise<ProvisionOutcome> {
   const validationError = validateProvisioningIntent(intent);
   if (validationError) {
@@ -160,7 +389,7 @@ export async function provisionCrmUser(
   // NEW ACCOUNT — actual creation goes through Better Auth so the password
   // is hashed by the auth library (never stored in plaintext by this app).
   const { auth } = await import("@/lib/auth");
-  const temporaryPassword = await getTemporaryPassword();
+  const temporaryPassword = await getTemporaryPassword(intent);
   if (temporaryPassword.length < 8) {
     throw new Error("Generated temporary password is too short.");
   }
@@ -205,7 +434,7 @@ export interface ProvisioningReportEntry {
  */
 export async function provisionCrmUsers(
   intents: ProvisioningIntent[],
-  getTemporaryPassword?: () => Promise<string> | string,
+  getTemporaryPassword?: (intent: ProvisioningIntent) => Promise<string> | string,
 ): Promise<ProvisioningReportEntry[]> {
   const entries: ProvisioningReportEntry[] = [];
   for (const intent of intents) {

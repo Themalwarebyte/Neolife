@@ -21,7 +21,7 @@ import {
 
 const baseIntent: ProvisioningIntent = {
   kind: "owner",
-  name: "Glen Fixture",
+  name: "Example Owner",
   email: "provisioner-owner@test.local",
   phone: "07189990000",
 };
@@ -114,7 +114,7 @@ describe("Task #037 — privacy-conscious alert email content (requirement 12)",
   it("assignment alert carries the CRM link and NO client PII", () => {
     const email = buildNewLeadAlertEmail(
       { kind: "assigned_to_you", baseUrl: "https://neolife.ooflowdesk.com", leadId },
-      "Glen",
+      "Example",
     );
     expect(email?.subject).toContain("assigned to you");
     expect(email?.html).toContain("/admin/leads/11111111-2222-3333-4444-555555555555");
@@ -127,7 +127,7 @@ describe("Task #037 — privacy-conscious alert email content (requirement 12)",
   it("queue alert is addressed as an Owner-queue event", () => {
     const email = buildNewLeadAlertEmail(
       { kind: "owner_queue", baseUrl: "https://neolife.ooflowdesk.com/", leadId },
-      "Rahab",
+      "Partner",
     );
     expect(email?.subject).toContain("unassigned queue");
   });

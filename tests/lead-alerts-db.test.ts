@@ -3,7 +3,7 @@ import { prisma } from "../src/server/db/prisma";
 
 /**
  * Task #037 — DB tests for operational lead alerts:
- * routing (Glen/Owner vs Rahab/Partner vs Owner queue), the durable
+ * routing (Owner vs Partner assignees vs the Owner queue), the durable
  * in-app Notification records, and Owner-queue privacy (never staff).
  *
  * The EMAIL send itself is covered by the unit tests in

@@ -322,7 +322,7 @@ export async function persistLead(
         body: "A contact arrived via your referral link and has been added to your Contacts.",
         dedupKey: `lead_assigned:${lead.id}`,
       });
-      // Task #037 email alert to the new assignee (Glen or Rahab).
+      // Task #037 email alert to the new assignee (Owner or Partner).
       const assignee = await prisma.user.findUnique({
         where: { id: referral.userId },
         select: { name: true, email: true, notificationEmail: true, isActive: true },
