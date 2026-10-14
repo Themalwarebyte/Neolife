@@ -174,6 +174,13 @@ model User {
   emailVerified Boolean   @default(false)
   image         String?
   role          String    @default("staff")
+  // Task #037 — contactable profile and notification preference. Both are
+  // optional and NON-AUTHORIZING: they never affect role/isActive checks.
+  // `phone` supports e.g. click-to-call for the two office users;
+  // `notificationEmail` overrides WHERE operational notifications are sent
+  // (falls back to the Better Auth login `email` when null/blank).
+  phone             String?
+  notificationEmail String?
   mustChangePassword Boolean @default(false)
   isActive      Boolean   @default(true)
   createdAt     DateTime  @default(now())

@@ -5,6 +5,12 @@ import {
   NOTIFICATION_TYPES,
   tryNewNotification,
 } from "@/lib/notifications";
+import {
+  activeAdminsForQueueAlert,
+  notificationRecipientEmail,
+  tryRecordAssignmentNotification,
+  trySendLeadAlertEmail,
+} from "@/lib/notificationsEmail";
 
 /**
  * Task 1.5 — lead-capture validation & persistence (public, untrusted input).
@@ -297,15 +303,64 @@ export async function persistLead(
   // only prevents duplicate rows, not loss. Staff always discover assigned
   // leads through their Contacts view; durable retry is a future
   // enhancement, and delivery is never claimed as guaranteed.
-  if (referral) {
-    await tryNewNotification({
-      userId: referral.userId,
-      leadId: lead.id,
-      type: "lead_assigned" satisfies (typeof NOTIFICATION_TYPES)[number],
-      title: "New referral contact",
-      body: "A contact arrived via your referral link and has been added to your Contacts.",
-      dedupKey: `lead_assigned:${lead.id}`,
-    });
+  //
+  // Task #037 — operational EMAIL alerts (same contract, same guarantees):
+  // the assignee (active Staff OR the active Owner with their own referral
+  // link) and — when a lead lands in the UNASSIGNED Owner queue — every
+  // ACTIVE admin each receive a privacy-conscious new-lead alert email
+  // (no client PII, authenticated CRM link only). Email delivery is gated
+  // by the operational-email configuration (disabled in production pending
+  // Owner approval); failures and disabled state can never block or roll
+  // back the committed lead.
+  try {
+    if (referral) {
+      await tryNewNotification({
+        userId: referral.userId,
+        leadId: lead.id,
+        type: "lead_assigned" satisfies (typeof NOTIFICATION_TYPES)[number],
+        title: "New referral contact",
+        body: "A contact arrived via your referral link and has been added to your Contacts.",
+        dedupKey: `lead_assigned:${lead.id}`,
+      });
+      // Task #037 email alert to the new assignee (Owner or Partner).
+      const assignee = await prisma.user.findUnique({
+        where: { id: referral.userId },
+        select: { name: true, email: true, notificationEmail: true, isActive: true },
+      });
+      if (assignee?.isActive) {
+        await trySendLeadAlertEmail({
+          recipientEmail: notificationRecipientEmail(assignee),
+          recipientName: assignee.name,
+          kind: "assigned_to_you",
+          leadId: lead.id,
+        });
+      }
+    } else {
+      // Unassigned / Owner queue capture (Task #037 requirement 11):
+      // notify every ACTIVE admin only — staff NEVER receive queue alerts
+      // (the queue is Owner data under D-027), so unauthorized Staff can
+      // never be exposed to queue existence or content.
+      const admins = await activeAdminsForQueueAlert();
+      for (const admin of admins) {
+        await tryRecordAssignmentNotification({
+          recipientUserId: admin.id,
+          leadId: lead.id,
+          kind: "owner_queue",
+          dedupKey: `lead_alert:owner_queue:${lead.id}:${admin.id}`,
+        });
+        await trySendLeadAlertEmail({
+          recipientEmail: notificationRecipientEmail(admin),
+          recipientName: admin.name,
+          kind: "owner_queue",
+          leadId: lead.id,
+        });
+      }
+    }
+  } catch {
+    // Alert orchestration failures are swallowed entirely: the lead is
+    // already committed and capture MUST never fail on an alert (Task #037
+    // requirement 13). Expected failures (email send, DB hiccup) resolve
+    // inside the best-effort helpers above.
   }
 
   return lead;

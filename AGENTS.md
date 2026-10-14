@@ -25,15 +25,13 @@ This project uses **pnpm** (see `pnpm-lock.yaml` / `pnpm-workspace.yaml`). Do no
 | Seed Owner | `ADMIN_EMAIL=… ADMIN_PASSWORD=… pnpm exec tsx scripts/seed-admin.ts` |
 | Seed Staff | `STAFF_EMAIL=… STAFF_PASSWORD=… STAFF_NAME=… pnpm exec tsx scripts/seed-staff.ts` |
 
-## Testing conventions
-
-- **Official total: 295 tests** — **201** run without `DATABASE_URL`, plus **94**
-  DB-enabled tests that require a local PostgreSQL instance. (Task #025 added the
-  referral suite; Task #029's audit-actor, normalization, and email-reservation
-  suites superseded the Task #027 figures of 284 = 201 + 83. Excludes E2E:
-  **23 Playwright tests** — 11 pre-existing specs plus 12 referral-workflow
-  tests (13 lettered scenarios, B+C combined); no other current-state E2E
-  totals are authoritative.)
+## Testing conventions- **Official total: 333 tests** — **222** run without `DATABASE_URL`, plus **111**
+  DB-enabled tests that require a local PostgreSQL instance. (Supersedes the Task
+  #037 figure of 324 = 222 + 102 and, before that, the Task #029 figure of 295 and
+  the Task #027 figures of 284/247. Current on `master` + Tasks #037+#038 feature
+  work; Task #038 adds 9 DB-enabled provisioning-safety tests. E2E total: **29
+  Playwright tests** — 23 pre-existing specs plus 6 Task #037 two-user scenarios in
+  `e2e/two-user-roles.spec.ts`; run against a series of 7 spec files.)
 - DB-dependent suites gate on `const DB_AVAILABLE = Boolean(process.env.DATABASE_URL)`.
   A run without that variable legitimately reports fewer tests; that is not a failure.
 - `vitest` and `tsx` do **not** auto-load `.env`. Next.js does. To run DB-enabled
@@ -101,6 +99,6 @@ This project uses **pnpm** (see `pnpm-lock.yaml` / `pnpm-workspace.yaml`). Do no
 
 1. `pnpm typecheck` — must pass
 2. `pnpm exec eslint . --max-warnings 0` — must pass
-3. `pnpm test` — all non-DB tests must pass (201); DB tests skip without `DATABASE_URL`
-   (94) and must pass when PostgreSQL is available (295 total)
+3. `pnpm test` — all non-DB tests must pass (222); DB tests skip without `DATABASE_URL`
+   (111) and must pass when PostgreSQL is available (333 total)
 4. Confirm no secrets, credentials, or production configuration are staged

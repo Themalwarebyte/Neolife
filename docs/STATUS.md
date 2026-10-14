@@ -11,18 +11,17 @@ Phase/step-by-step implementation status. Authoritative scope lives in `PROJECT_
 > that were true *at the time they were written* — they are a log, not a status
 > page. This summary is authoritative. Where the two disagree, this summary wins.
 
-**As of: 2026-10-01**
+**As of: 2026-10-14**
 
 | | |
 |---|---|
-| **Current phase** | PHASE 1 — Traffic MVP · 🟩 COMPLETE (deployed) |
-| **Production** | 🟩 **LIVE** at `https://neolife.ooflowdesk.com` |
-| **Production image** | **`neolife-web:92ee361`** · deployed 2026-10-02 · 🟩 verified |
-| **Deployed SHA** | `92ee3610fbd4b704886a40f726af6ef52de6f14a` |
-| **Branch** | `master` |
-| **Official test count** | **247 total** = 179 (no `DATABASE_URL`) + 68 (DB-enabled) |
-| **E2E** | 🟩 **11/11 PASS** — 5 specs, 0 failed, 0 skipped, 0 flaky |
-| **Database** | 10 Prisma migrations — 🟩 **10/10 applied in production** |
+| **Current phase** | PHASE 1 complete + CRM phases (D-027/D-033/D-034 merged into `master`); Task #037 two-user configuration 🟩 MERGE-CANDIDATE (feature branch, NOT deployed) |
+| **Production** | 🟩 **LIVE** at `https://neolife.ooflowdesk.com` — image `neolife-web:32b6c27`, commit `32b6c27…` (see `docs/DEPLOYMENT.md` §0) |
+| **Deployed SHA** | `32b6c272e63236c18d51d3ed5e867dece0e56c4f` — referral/notification/Task #037 features are all **NOT in production** |
+| **Branch** | `master` at `011c835` (= merge of `feature/referrals-communications-mulberry`); active feature work on `feature/two-user-resend-notifications` |
+| **Official test count** | **333 total** = 222 (no `DATABASE_URL`) + 111 (DB-enabled) — figures supersede both the 247 (pre-referrals) and 295 (Task #029) counts for CURRENT master + Task #037/#038 work |
+| **E2E** | 🟩 **29/29 PASS** — 7 specs, 0 failed, 0 skipped, 0 flaky (23 pre-existing + 6 Task #037) |
+| **Database** | Local: 16 migrations applied. Production: still 11 applied — the referral-era and Task #037 migrations are **NOT DEPLOYED** |
 
 ### 🟩 Completed
 
@@ -31,6 +30,22 @@ Phase/step-by-step implementation status. Authoritative scope lives in `PROJECT_
   attribution, CRM, meetings, follow-ups, audit trail
 - **CRM phases A–D** — ownership scoping, Owner-controlled lead assignment,
   role-aware authorization, staff status changes
+- **Task #037 — two-user configuration, Owner referral link, operational
+  email notifications 🟩 DONE (feature branch,
+  `feature/two-user-resend-notifications`, NOT deployed).** Idempotent
+  `scripts/seed-neolife-users.ts` provisioning (Owner + Partner accounts;
+  144-bit CSPRNG temp passwords delivered via 0600 file;
+  `mustChangePassword` forced; existing accounts preserved). Referral
+  eligibility extended to the active Owner (`REFERRAL_ELIGIBLE_ROLES`);
+  privacy-conscious new-lead alert emails routed per-assignee via
+  `User.notificationEmail`; Owner-queue alerts never reach Staff;
+  "Partner" is a display label only; client-email `Reply-To` = sending
+  user's CRM address. External email stays DISABLED (provider flag +
+  `NEOLIFE_OPERATIONAL_EMAIL_ENABLED`, docs/DEPLOYMENT.md §4.2). New
+  migration `20261014000000_add_user_phone_notification_email` (additive).
+  Checks: 333/333 unit+DB tests (after the Task #038 provisioning-safety
+  regression suite), ESLint `--max-warnings 0`, prisma validate,
+  typecheck, build, E2E 29/29.
 - **P-1 — Registration / business-interest flow** (2026-09-18, D-026 + D-032) —
   single-use qualification tokens, registration capture, transactional persistence
 - **Funnel tracking** — first-party `FunnelEvent` capture (D-029), no-PII device

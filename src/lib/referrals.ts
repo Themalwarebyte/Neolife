@@ -2,17 +2,35 @@ import { randomBytes } from "node:crypto";
 import { prisma } from "@/server/db/prisma";
 
 /**
- * Staff referral links (D-034).
+ * Staff referral links (D-034, extended by Task #037).
  *
  * Codes are 128 bits of random data, base64url-encoded, and completely
  * opaque: they never embed Better Auth user IDs. Resolution happens
  * server-side only — a public request may carry a code but never the user
  * id it wants attributed.
+ *
+ * Task #037 (Owner-approved): referral eligibility is extended from Staff
+ * only to ALSO include the ACTIVE Owner (role "admin", is active). This is
+ * a strictly additive eligibility widening — it changes nothing about
+ * authorization (staff remain scoped to their own leads; the Owner keeps
+ * full-CRM access per D-027) and preserves both auto-assignment on capture
+ * and Owner reassignment rules unchanged.
  */
 
 export const REFERRAL_CODE_LENGTH = 22; // 22 base64url chars ≈ 132 bits
 
 export const MAX_PUBLIC_NAME_LENGTH = 60;
+
+/**
+ * A user is referral-eligible when their account is active AND their role is
+ * one of these values. Keep BOTH resolution paths (code + manual name) keyed
+ * off this single predicate so eligibility can never diverge between them.
+ */
+export const REFERRAL_ELIGIBLE_ROLES = ["staff", "admin"] as const;
+
+export function isReferralEligibleRole(role: string): boolean {
+  return (REFERRAL_ELIGIBLE_ROLES as readonly string[]).includes(role);
+}
 
 const CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
@@ -39,9 +57,10 @@ export type ResolvedReferral = {
 };
 
 /**
- * Resolves a referral code to the Staff user it belongs to — only when the
+ * Resolves a referral code to the eligible user it belongs to — only when the
  * code exists, is active (not revoked), and its owner exists, is active and
- * is role "staff". Anything else fails safely to null (unassigned / Owner
+ * is referral-eligible (active Staff OR the active Owner, Task #037).
+ * Anything else fails safely to null (unassigned / Owner
  * pool), per D-034.
  */
 export async function resolveReferralCode(
@@ -64,7 +83,9 @@ export async function resolveReferralCode(
     });
     if (!record) return null;
     if (!record.isActive || record.revokedAt) return null;
-    if (!record.user.isActive || record.user.role !== "staff") return null;
+    if (!record.user.isActive || !isReferralEligibleRole(record.user.role)) {
+      return null;
+    }
     return {
       userId: record.userId,
       code: record.code,
@@ -104,8 +125,8 @@ export function publicNameKey(normalized: string): string {
 
 /**
  * Manual fallback: resolve an approved publicName typed by the visitor
- * ("Who referred you?") to the single active Staff member with that
- * public name.
+ * ("Who referred you?") to the single active referral-eligible member with
+ * that public name (active Staff OR the active Owner, Task #037).
  *
  * AMBIGUITY RULE (Task #027/#029): the name must resolve to EXACTLY ONE
  * eligible Staff member. Zero matches fails safely to null (no such
@@ -127,7 +148,7 @@ export async function resolveReferralByName(
         isActive: true,
         revokedAt: null,
         publicNameNormal: publicNameKey(normalized),
-        user: { isActive: true, role: "staff" },
+        user: { isActive: true, role: { in: [...REFERRAL_ELIGIBLE_ROLES] } },
       },
       select: {
         userId: true,
@@ -151,8 +172,8 @@ export async function resolveReferralByName(
 
 /**
  * Duplicate-public-name guard for Owner management (Task #027/#029): an
- * ACTIVE, non-revoked referral code may not reuse another Staff member's
- * active public referral name. Revoked names do not block reuse (their
+ * ACTIVE, non-revoked referral code may not reuse another referral-eligible
+ * member's active public referral name. Revoked names do not block reuse (their
  * normalized key is NULL); quarantined legacy collisions are also inert.
  * This is primarily a friendly pre-check: the unique constraint on
  * ReferralCode.publicNameNormal enforces the rule race-safe under concurrent

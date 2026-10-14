@@ -3,7 +3,15 @@
 import { useActionState } from "react";
 import type { CrmActionResult } from "@/app/admin/(protected)/actions";
 
-type Member = { id: string; name: string; email: string; isActive: boolean };
+type Member = {
+  id: string;
+  name: string;
+  email: string;
+  isActive: boolean;
+  /** Task #037 — display-only role label ("Owner"/"Partner"); never used
+   * for authorization. */
+  roleLabel?: string;
+};
 
 type ReferralInfo = {
   code: string;
@@ -59,6 +67,14 @@ export function ReferralLinkRow({
         <div>
           <p className="font-semibold text-neutral-900">
             {member.name}
+            {member.roleLabel ? (
+              <span
+                data-testid={`referral-role-${member.id}`}
+                className="ml-2 rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-semibold text-neutral-600"
+              >
+                {member.roleLabel}
+              </span>
+            ) : null}
             {!member.isActive ? (
               <span className="ml-2 rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700">
                 deactivated

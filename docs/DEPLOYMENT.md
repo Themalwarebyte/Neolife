@@ -8,12 +8,16 @@
 > `32b6c272e63236c18d51d3ed5e867dece0e56c4f`, verified 2026-10-13** (Task #029
 > record correction: the previously listed `92ee361` / 10-migration state was
 > superseded per the independently verified production record). Production
-> has **11 migrations applied**. The referral/notification feature branch's
-> migrations — `20261010000000_add_referrals_notifications` and everything
-> built on it (referral links, notifications, communications) — are **NOT
-> DEPLOYED**: they remain feature-branch work awaiting review, and none of
-> those features are live in production. Local development has more
-> migrations applied than production; never confuse the two states.
+> has **11 migrations applied**. The referral/notification migrations —
+> `20261010000000_add_referrals_notifications` and everything built on it —
+> are merged into `master` (`011c835`) but remain **NOT DEPLOYED**, and the
+> Task #037 work (`feature/two-user-resend-notifications`, incl. the additive
+> `20261014000000_add_user_phone_notification_email`) is likewise **NOT
+> DEPLOYED**: none of those features are live in production. External email
+> sending stays DISABLED in production until the email-enablement step in
+> §4.2 is explicitly approved (see also docs/DECISIONS.md, Task #037). Local
+> development has more migrations applied than production; never confuse the
+> two states.
 >
 > This document contains **no production secrets**. Production values must never
 > be committed to Git, documentation, `.env.example`, test fixtures, or logs.
@@ -146,8 +150,33 @@ root-only secret file referenced by the deploy command (see §6 step 2).
 | `ADMIN_EMAIL` | Admin account email for `scripts/seed-admin.ts` | Yes (one-time seed) |
 | `ADMIN_PASSWORD` | Admin account password (≥12 chars) for the seed | Yes (one-time seed) |
 | `NEXT_PUBLIC_SITE_URL` | Public site origin | Baked into `compose.production.yaml` as a literal |
+| `PROVISION_OWNER_NAME` / `_EMAIL` / `_PHONE` | Task #037 two-user provisioning (Owner) — see §4.1 | When running `scripts/seed-neolife-users.ts` |
+| `PROVISION_PARTNER_NAME` / `_EMAIL` / `_PHONE` | Task #037 two-user provisioning (Partner) — see §4.1 | When running `scripts/seed-neolife-users.ts` |
+| `EMAIL_PROVIDER` | Email delivery provider (`resend` enables real sending; anything else keeps it disabled) — see §4.2 | Yes, for email features |
+| `EMAIL_FROM` | Approved business sender identity, `GHub Technologies-Neolife <noreply@mail.ooflowdesk.com>` — see §4.2 | Yes, for email features |
+| `RESEND_API_KEY` | Resend API key — a production credential; lives ONLY in the server secret file — see §4.2 | Yes, for email features |
+| `NEOLIFE_OPERATIONAL_EMAIL_ENABLED` | Explicit Owner-approval flag that turns OPERATIONAL alert emails on (`1`) — see §4.2 | Only after Owner approval |
 
 > `NODE_ENV=production` and `PORT`/`HOSTNAME` are set by the container runtime as needed.
+
+### 4.1 Task #037 — two-user provisioning variables (`scripts/seed-neolife-users.ts`)
+
+The two named/platform-intended human users are provisioned idempotently:
+
+- **Owner (role `admin`):** `PROVISION_OWNER_NAME`, `PROVISION_OWNER_EMAIL`, `PROVISION_OWNER_PHONE`, optional `PROVISION_OWNER_NOTIFICATION_EMAIL`.
+- **Partner (role `staff`, DISPLAY label "Partner" only):** `PROVISION_PARTNER_NAME`, `PROVISION_PARTNER_EMAIL`, `PROVISION_PARTNER_PHONE`, optional `PROVISION_PARTNER_NOTIFICATION_EMAIL`.
+
+Real values are supplied at run time through the server secret file — never committed, never logged. The script:
+
+1. Matches accounts by unique email; an **existing account is never deleted or overwritten** (identity, credentials, role, activation are preserved) — only EMPTY profile fields (`phone`, `notificationEmail`) are backfilled. Any pre-existing Owner account therefore keeps full access and continuity.
+2. Generates a fresh **144-bit CSPRNG temporary password per new account**, written to a mode-0600 file in the server's temp dir (never stdout, never Git). New accounts get `mustChangePassword=true` (forced change at first sign-in, D-033). Delete the credentials file immediately after secure handover.
+
+### 4.2 Task #037 — Resend sender identity and external-email gating
+
+- **Sender identity (Owner-approved):** `EMAIL_FROM="GHub Technologies-Neolife <noreply@mail.ooflowdesk.com>"` on the verified Resend domain **`mail.ooflowdesk.com`**. The domain verification lives in the Resend dashboard; only the From value is set here.
+- **RESEND_API_KEY** is a production credential: place it only in the root-owned secret file (`/opt/ooflowdesk/secrets`), never in Git, docs, `.env.example` or logs.
+- **Gating (defence in depth):** real external email (both client emails and operational alerts) requires `EMAIL_PROVIDER=resend` AND `RESEND_API_KEY` AND `EMAIL_FROM`; operational assignment/queue alerts additionally require the explicit flag `NEOLIFE_OPERATIONAL_EMAIL_ENABLED=1`. Until the Owner approves the separate email-enablement deployment, external sending remains fully disabled in production — the app records events and in-app notifications either way.
+- **Reply-To:** client-sent emails carry `Reply-To` of the authenticated sending user's CRM address; the From identity stays the business sender. Inbound replies are NOT synchronized into the CRM (no inbound integration).
 
 ## 5. Database & migration strategy
 
@@ -196,7 +225,7 @@ deployment; it is invoked explicitly only when a new Owner account must be creat
 5. **Start the dedicated NEOLIFE service** — `docker compose up -d` for the `neolife` project (isolated network).
 6. **Cloudflare Tunnel routing** — the `neolife-tunnel` route for `neolife.ooflowdesk.com` → `neolife-web:3000` already exists; confirm it is healthy after each release.
 7. **Hostname/HTTPS verification** — confirm `https://neolife.ooflowdesk.com` serves over HTTPS via Cloudflare; verify `/health`.
-8. **Admin provisioning** — `scripts/seed-admin.ts` is required only when a new Owner account must be created; it runs via the `seed` profile and never on the long-running `web` service.
+8. **Admin provisioning** — `scripts/seed-admin.ts` is required only when a new Owner account must be created; it runs via the `seed` profile and never on the long-running `web` service. For the Task #037 two intended users, run `scripts/seed-neolife-users.ts` instead (idempotent; preserves every existing account — see §4.1).
 9. **Production health check** — `GET https://neolife.ooflowdesk.com/health` → 200 `{"status":"ok"}`.
 10. **Public-route smoke tests** — `/`, `/campaign/launch`, `/register-interest`, `/privacy`, `/terms`, `/disclosures` all 200.
 11. **Lead submission test** — submit a test lead; verify it reaches the CRM.

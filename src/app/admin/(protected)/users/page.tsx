@@ -1,6 +1,7 @@
 import { prisma } from "@/server/db/prisma";
 import { requireAdmin } from "@/server/auth/requireCrmUser";
 import { toggleUserActive } from "../actions";
+import { displayRoleLabel } from "@/lib/user-management";
 import CreateUserForm from "./create-user-form";
 
 export default async function UsersPage() {
@@ -60,7 +61,7 @@ export default async function UsersPage() {
                           : "inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800"
                       }
                     >
-                      {u.role === "admin" ? "Owner" : "Staff"}
+                      {displayRoleLabel(u.role)}
                     </span>
                   </td>
                   <td className="py-3">

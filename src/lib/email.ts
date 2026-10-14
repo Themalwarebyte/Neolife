@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Transactional email abstraction (provider-agnostic).
  *
  * Provider is selected by EMAIL_PROVIDER (resend|sendgrid|mailgun|ses|none).
@@ -14,6 +14,14 @@ export type SendMailInput = {
   subject: string;
   text: string;
   html: string;
+  /**
+   * Optional Reply-To address (Task #037). Used ONLY for client-facing email
+   * where the authorized CRM sender wants replies in their own mailbox; the
+   * From identity always remains the business sender (EMAIL_FROM). Never
+   * derived from untrusted input — callers resolve it from the authenticated
+   * user record server-side.
+   */
+  replyTo?: string;
 };
 
 export type SendMailResult = { ok: true } | { ok: false; error: string };
@@ -95,6 +103,7 @@ async function sendResend(input: SendMailInput): Promise<SendMailResult> {
         subject: input.subject,
         text: input.text,
         html: input.html,
+        ...(input.replyTo ? { reply_to: input.replyTo } : {}),
       }),
     });
     if (!res.ok) {

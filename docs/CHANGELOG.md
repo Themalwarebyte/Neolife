@@ -2,6 +2,93 @@
 
 ## Unreleased
 
+### Task #038 — provisioning safety corrections (feature branch, NOT deployed)
+
+Corrections to the Task #037 provisioning before Kilo validation; no feature
+redesign, no production access, external email still disabled.
+
+- **Fix 1 (critical) — temporary-password account mismatch.** Passwords are
+  now bound to the EXACT account email they are delivered to
+  (`createPasswordVault` in `src/lib/provisioning.ts`): a password is consumed
+  only when an account is actually CREATED, so mixed scenarios (Owner already
+  exists, Partner new) never hand the Partner a positional neighbor's
+  password. Every password is verified via a real Better Auth sign-in BEFORE
+  the credentials file is written. All four cases are regression-tested new
+  vs new,existing,new,new,existing,existing(existing vs existing).
+- **Failure recovery (Fix 1).** If the credentials file cannot be written or
+  a delivered password fails verification, brand-new data-less accounts are
+  rolled back (`rollbackProvisionedAccounts` — deletes ONLY accounts with no
+  leads and no referral row) and the outcome is reported explicitly; an
+  account already wired into the CRM is never auto-deleted and is reported
+  for manual Owner review. No inaccessible account is ever reported as
+  "preserved".
+- **Fix 2 — personal data removed from source.** Real names/phones in the
+  provisioning script's configuration examples were replaced with generic
+  `Example Owner/Partner` placeholders; incidental name mentions in code
+  comments and test fixture names were cleaned. NOTE (for the Owner):
+  earlier Task #037 commits (`6961e18`, `409cee9`) still expose "Glen
+  Mainga"/"Rahab Nyokabi 🌹" and the two phone numbers in the script comment
+  history — a corrective commit does not erase Git history; rotation/remediation
+  is an Owner decision.
+- **Fix 3 — two-user preflight/stop gate.** `preflightProvisioning` (read-only)
+  reports active CRM users, per-intent create/preserve, role mismatches and —
+  critically — an OWNER IDENTITY MISMATCH when the intended Owner login is a
+  new account while a different active Owner account exists. `--dry-run`
+  makes no changes (exit 2 = STOP); a real run aborts (exit 1, nothing
+  changed) unless `PROVISION_ACKNOWLEDGE_OWNER_MISMATCH=1` is set explicitly.
+  The existing Owner is never silently renamed, replaced, disabled or
+  migrated.
+- **Checks:** 333/333 unit+DB tests (222 non-DB + 111 DB-enabled), E2E
+  29/29, typecheck, ESLint `--max-warnings 0`, build, prisma validate. Script
+defect-case verified end-to-end locally (PRESERVED Owner + CREATED Partner,
+exact credentials-file mapping, verified sign-in, original credentials
+intact, idempotent re-run).
+
+### Task #037 — two-user configuration, Owner referral link, operational email alerts (feature branch `feature/two-user-resend-notifications`, NOT deployed)
+
+Built on `master` `011c835`. All changes merge-candidate only; production
+(`neolife-web:32b6c27`, 11 migrations) is untouched and external email sending
+remains disabled there.
+
+- **Provisioning:** idempotent, secure two-user provisioning
+  (`scripts/seed-neolife-users.ts` + `src/lib/provisioning.ts`). Owner
+  (role `admin`) and Partner (role `staff`; "Partner" is a display label
+  only). Matching by unique email — existing accounts are never deleted or
+  overwritten (identity/credentials/role continuity); only EMPTY optional
+  profile fields are backfilled. Fresh 144-bit CSPRNG temporary passwords
+  per NEW account, delivered only through a mode-0600 temp file (never
+  stdout/Git); `mustChangePassword` forced on first login (D-033).
+- **Schema:** additive `User.phone` + `User.notificationEmail`
+  (migration `20261014000000_add_user_phone_notification_email`); the
+  notification address falls back to the login email.
+- **Referral links:** eligibility extended to the ACTIVE Owner
+  (`REFERRAL_ELIGIBLE_ROLES`); the Owner can generate/rotate/revoke his own
+  personal link and leads captured through it are auto-assigned to him with
+  immutable Owner attribution. D-027 assignment rules and Staff
+  auto-assignment are unchanged.
+- **Operational email notifications** through the provider-agnostic
+  `src/lib/email.ts`: privacy-conscious new-lead alerts (no client PII,
+  authenticated CRM link) to the new assignee on referral capture or Owner
+  manual assignment, and to every ACTIVE admin when a lead enters the
+  unassigned Owner queue (never Staff — D-027). Recipient:
+  `User.notificationEmail ?? User.email`. Sending is best-effort and
+  non-blocking: no durable outbox or auto-retry; a failed/disabled alert is
+  dropped and the unique-dedupKey in-app Notification remains the durable
+  record; "accepted" never means "delivered".
+- **Client email:** `Reply-To` = the authenticated sending user's CRM
+  address; `From` remains the business sender `GHub Technologies-Neolife
+  <noreply@mail.ooflowdesk.com>` (verified Resend domain
+  `mail.ooflowdesk.com`). Inbound replies are NOT synchronized into the CRM.
+- **Gating:** external sending requires `EMAIL_PROVIDER=resend` +
+  `RESEND_API_KEY` + `EMAIL_FROM`, and — for operational alerts only —
+  `NEOLIFE_OPERATIONAL_EMAIL_ENABLED=1`. Production stays disabled pending
+  the separate email-enablement deployment (docs/DEPLOYMENT.md §4.2); keys
+  live only in the server secret file.
+- **Tests:** validation battery recorded — 324/324 unit+DB tests (222
+  non-DB + 102 DB-enabled), `pnpm prisma validate`, `pnpm typecheck`,
+  `pnpm build`, ESLint `--max-warnings 0`, and Playwright E2E **29/29**
+  (23 pre-existing + 6 new Task #037 scenarios). No real email was ever sent.
+
 ### 🟩 Deployed: `92ee361` to production (2026-10-02)
 
 Image `neolife-web:92ee361` deployed to `https://neolife.ooflowdesk.com`; SHA recorded
