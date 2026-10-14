@@ -90,9 +90,9 @@ is at `/admin/login`.
 
 ## Testing
 
-The suite contains **322 tests**:
+The suite contains **324 tests**:
 
-- **220** unit / pure-logic tests that run with no database.
+- **222** unit / pure-logic tests that run with no database.
 - **102** additional DB-enabled tests that require a local PostgreSQL instance.
 
 DB-dependent suites gate on the presence of `DATABASE_URL`, so a run without it reports

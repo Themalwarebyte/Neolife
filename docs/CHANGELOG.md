@@ -42,7 +42,7 @@ remains disabled there.
   `NEOLIFE_OPERATIONAL_EMAIL_ENABLED=1`. Production stays disabled pending
   the separate email-enablement deployment (docs/DEPLOYMENT.md §4.2); keys
   live only in the server secret file.
-- **Tests:** validation battery recorded — 322/322 unit+DB tests (220
+- **Tests:** validation battery recorded — 324/324 unit+DB tests (222
   non-DB + 102 DB-enabled), `pnpm prisma validate`, `pnpm typecheck`,
   `pnpm build`, ESLint `--max-warnings 0`, and Playwright E2E **29/29**
   (23 pre-existing + 6 new Task #037 scenarios). No real email was ever sent.
