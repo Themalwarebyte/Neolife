@@ -33,10 +33,16 @@ import {
 } from "@/lib/communications";
 import {
   findActivePublicNameConflict,
+  isReferralEligibleRole,
   normalizePublicName,
   publicNameKey,
 } from "@/lib/referrals";
 import { sendMail } from "@/lib/email";
+import {
+  notificationRecipientEmail,
+  tryRecordAssignmentNotification,
+  trySendLeadAlertEmail,
+} from "@/lib/notificationsEmail";
 import { Prisma } from "@/generated/prisma/client";
 
 // ─── Referral link management (D-034) ────────────────────────────────────
@@ -53,9 +59,11 @@ function newReferralCode(): string {
 }
 
 /**
- * Owner-only: (re)generate the referral link for a Staff user.
- * Regenerating replaces the old code — a previously shared link stops
- * resolving, which is an intentional, Owner-controlled rotation.
+ * Owner-only: (re)generate the referral link for a referral-eligible user.
+ * Task #037: eligibility is active Staff AND the active Owner, so the Owner
+ * can hold his own personal referral link. Regenerating replaces the old
+ * code — a previously shared link stops resolving, which is an intentional,
+ * Owner-controlled rotation.
  */
 export async function generateStaffReferralLink(formData: FormData): Promise<CrmActionResult> {
   await requireAdmin();
@@ -63,7 +71,7 @@ export async function generateStaffReferralLink(formData: FormData): Promise<Crm
   const publicName = String(formData.get("publicName") ?? "").trim();
 
   if (!isValidBetterAuthUserId(staffUserId)) {
-    return { status: "error", message: "Invalid staff user." };
+    return { status: "error", message: "Invalid user." };
   }
   const normalizedPublicName = normalizePublicName(publicName);
   if (
@@ -82,8 +90,8 @@ export async function generateStaffReferralLink(formData: FormData): Promise<Crm
       where: { id: staffUserId },
       select: { id: true, role: true, isActive: true, name: true },
     });
-    if (!target || target.role !== "staff" || !target.isActive) {
-      return { status: "error", message: "Active staff user not found." };
+    if (!target || !target.isActive || !isReferralEligibleRole(target.role)) {
+      return { status: "error", message: "Active referral-eligible user not found." };
     }
 
     // Task #027 — prevent duplicate ACTIVE public referral names: an
@@ -97,7 +105,7 @@ export async function generateStaffReferralLink(formData: FormData): Promise<Crm
       return {
         status: "error",
         message:
-          "That public name is already used by another active staff member. Pick a different one.",
+          "That public name is already used by another active team member with a referral link. Pick a different one.",
       };
     }
 
@@ -136,7 +144,7 @@ export async function generateStaffReferralLink(formData: FormData): Promise<Crm
         return {
           status: "error",
           message:
-            "That public name is already used by another active staff member. Pick a different one.",
+            "That public name is already used by another active team member with a referral link. Pick a different one.",
         };
       }
       throw error;
@@ -152,7 +160,7 @@ export async function generateStaffReferralLink(formData: FormData): Promise<Crm
   }
 }
 
-/** Owner-only: revoke a Staff referral link (existing links fail safely). */
+/** Owner-only: revoke a referral link (existing links fail safely). */
 export async function revokeStaffReferralLink(formData: FormData): Promise<CrmActionResult> {
   await requireAdmin();
   const staffUserId = String(formData.get("staffUserId") ?? "").trim();
@@ -459,9 +467,10 @@ export async function assignLead(
     }
 
     // Validate target: must be a Staff user (not admin, not arbitrary ID).
+    // Task #037: notificationEmail is selected for the non-blocking alert.
     const target = await prisma.user.findUnique({
       where: { id: targetUserId },
-      select: { id: true, role: true, name: true },
+      select: { id: true, role: true, name: true, email: true, notificationEmail: true },
     });
     if (!target) {
       return { status: "error", message: "Assignee not found." };
@@ -496,6 +505,29 @@ export async function assignLead(
         },
       }),
     ]);
+
+    // Task #037 — privacy-conscious operational alert to the new assignee,
+    // strictly AFTER the committed transaction and best-effort: every alert
+    // helper swallows its own errors, so an email outage can never fail the
+    // assignment mutation. The in-app row is durable (own dedup domain per
+    // lead+user so reassignment away-and-back still notifies once each); the
+    // email carries NO client PII — only an authenticated CRM link.
+    try {
+      await tryRecordAssignmentNotification({
+        recipientUserId: target.id,
+        leadId,
+        kind: "assigned_to_you",
+        dedupKey: `lead_alert:assigned_to_you:${leadId}:${target.id}`,
+      });
+      await trySendLeadAlertEmail({
+        recipientEmail: notificationRecipientEmail(target),
+        recipientName: target.name,
+        kind: "assigned_to_you",
+        leadId,
+      });
+    } catch {
+      // Never propagate: the assignment itself is already committed.
+    }
 
     revalidatePath("/admin/leads");
     revalidatePath(`/admin/leads/${leadId}`);
@@ -675,10 +707,18 @@ export async function sendClientEmail(
       .replace(/>/g, "&gt;")
       .replace(/\n/g, "<br>");
     const provider = currentEmailProvider();
+    // Task #037 — Reply-To (requirement 14): replies to a client email land
+    // in the AUTHORIZED SENDER's own CRM mailbox (their authenticated User
+    // email). The From identity still remains the business sender
+    // (EMAIL_FROM = "GHub Technologies-Neolife <noreply@mail.ooflowdesk.com>"),
+    // so the mailbox never depends on a client-controlled value and replies
+    // can never be redirected by crafted content. Inbound replies are NOT
+    // synchronized into the CRM (no inbound mail integration is implemented).
     const result = await sendMail({
       to: lead.email,
       subject,
       text: body,
+      replyTo: user.email,
       html: `<p style="font-family:system-ui,sans-serif;font-size:14px;line-height:1.6;color:#1f2937;">${escaped}</p><p style="font-family:system-ui,sans-serif;font-size:12px;color:#6b7280;">NEOLIFE Office Team</p>`,
     });
 

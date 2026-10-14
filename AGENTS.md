@@ -25,15 +25,12 @@ This project uses **pnpm** (see `pnpm-lock.yaml` / `pnpm-workspace.yaml`). Do no
 | Seed Owner | `ADMIN_EMAIL=… ADMIN_PASSWORD=… pnpm exec tsx scripts/seed-admin.ts` |
 | Seed Staff | `STAFF_EMAIL=… STAFF_PASSWORD=… STAFF_NAME=… pnpm exec tsx scripts/seed-staff.ts` |
 
-## Testing conventions
-
-- **Official total: 295 tests** — **201** run without `DATABASE_URL`, plus **94**
-  DB-enabled tests that require a local PostgreSQL instance. (Task #025 added the
-  referral suite; Task #029's audit-actor, normalization, and email-reservation
-  suites superseded the Task #027 figures of 284 = 201 + 83. Excludes E2E:
-  **23 Playwright tests** — 11 pre-existing specs plus 12 referral-workflow
-  tests (13 lettered scenarios, B+C combined); no other current-state E2E
-  totals are authoritative.)
+## Testing conventions- **Official total: 322 tests** — **220** run without `DATABASE_URL`, plus **102**
+  DB-enabled tests that require a local PostgreSQL instance. (Supersedes the Task
+  #029 figure of 295 = 201 + 94 and the Task #027 figures of 284/247; current on
+  `master` + Task #037 feature work, which adds 19 unit + 8 DB tests. E2E total: **29
+  Playwright tests** — 23 pre-existing specs plus 6 Task #037 two-user scenarios in
+  `e2e/two-user-roles.spec.ts`; run against a series of 7 spec files.)
 - DB-dependent suites gate on `const DB_AVAILABLE = Boolean(process.env.DATABASE_URL)`.
   A run without that variable legitimately reports fewer tests; that is not a failure.
 - `vitest` and `tsx` do **not** auto-load `.env`. Next.js does. To run DB-enabled
@@ -101,6 +98,6 @@ This project uses **pnpm** (see `pnpm-lock.yaml` / `pnpm-workspace.yaml`). Do no
 
 1. `pnpm typecheck` — must pass
 2. `pnpm exec eslint . --max-warnings 0` — must pass
-3. `pnpm test` — all non-DB tests must pass (201); DB tests skip without `DATABASE_URL`
-   (94) and must pass when PostgreSQL is available (295 total)
+3. `pnpm test` — all non-DB tests must pass (220); DB tests skip without `DATABASE_URL`
+   (102) and must pass when PostgreSQL is available (322 total)
 4. Confirm no secrets, credentials, or production configuration are staged

@@ -2,6 +2,51 @@
 
 ## Unreleased
 
+### Task #037 — two-user configuration, Owner referral link, operational email alerts (feature branch `feature/two-user-resend-notifications`, NOT deployed)
+
+Built on `master` `011c835`. All changes merge-candidate only; production
+(`neolife-web:32b6c27`, 11 migrations) is untouched and external email sending
+remains disabled there.
+
+- **Provisioning:** idempotent, secure two-user provisioning
+  (`scripts/seed-neolife-users.ts` + `src/lib/provisioning.ts`). Owner
+  (role `admin`) and Partner (role `staff`; "Partner" is a display label
+  only). Matching by unique email — existing accounts are never deleted or
+  overwritten (identity/credentials/role continuity); only EMPTY optional
+  profile fields are backfilled. Fresh 144-bit CSPRNG temporary passwords
+  per NEW account, delivered only through a mode-0600 temp file (never
+  stdout/Git); `mustChangePassword` forced on first login (D-033).
+- **Schema:** additive `User.phone` + `User.notificationEmail`
+  (migration `20261014000000_add_user_phone_notification_email`); the
+  notification address falls back to the login email.
+- **Referral links:** eligibility extended to the ACTIVE Owner
+  (`REFERRAL_ELIGIBLE_ROLES`); the Owner can generate/rotate/revoke his own
+  personal link and leads captured through it are auto-assigned to him with
+  immutable Owner attribution. D-027 assignment rules and Staff
+  auto-assignment are unchanged.
+- **Operational email notifications** through the provider-agnostic
+  `src/lib/email.ts`: privacy-conscious new-lead alerts (no client PII,
+  authenticated CRM link) to the new assignee on referral capture or Owner
+  manual assignment, and to every ACTIVE admin when a lead enters the
+  unassigned Owner queue (never Staff — D-027). Recipient:
+  `User.notificationEmail ?? User.email`. Sending is best-effort and
+  non-blocking: no durable outbox or auto-retry; a failed/disabled alert is
+  dropped and the unique-dedupKey in-app Notification remains the durable
+  record; "accepted" never means "delivered".
+- **Client email:** `Reply-To` = the authenticated sending user's CRM
+  address; `From` remains the business sender `GHub Technologies-Neolife
+  <noreply@mail.ooflowdesk.com>` (verified Resend domain
+  `mail.ooflowdesk.com`). Inbound replies are NOT synchronized into the CRM.
+- **Gating:** external sending requires `EMAIL_PROVIDER=resend` +
+  `RESEND_API_KEY` + `EMAIL_FROM`, and — for operational alerts only —
+  `NEOLIFE_OPERATIONAL_EMAIL_ENABLED=1`. Production stays disabled pending
+  the separate email-enablement deployment (docs/DEPLOYMENT.md §4.2); keys
+  live only in the server secret file.
+- **Tests:** validation battery recorded — 322/322 unit+DB tests (220
+  non-DB + 102 DB-enabled), `pnpm prisma validate`, `pnpm typecheck`,
+  `pnpm build`, ESLint `--max-warnings 0`, and Playwright E2E **29/29**
+  (23 pre-existing + 6 new Task #037 scenarios). No real email was ever sent.
+
 ### 🟩 Deployed: `92ee361` to production (2026-10-02)
 
 Image `neolife-web:92ee361` deployed to `https://neolife.ooflowdesk.com`; SHA recorded

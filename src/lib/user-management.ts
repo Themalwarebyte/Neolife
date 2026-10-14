@@ -1,5 +1,20 @@
 import { z } from "zod";
 
+/**
+ * UI role labels (Task #037). "Partner" is a DISPLAY label only: the
+ * authorization role stays "staff" (D-027/D-033/D-034) and authorization is
+ * NEVER derived from these strings — server-side checks always compare the
+ * actual `User.role` value. Owner = admin (unchanged), Partner = staff.
+ */
+export const ROLE_DISPLAY_LABELS: Record<string, string> = {
+  admin: "Owner",
+  staff: "Partner",
+};
+
+export function displayRoleLabel(role: string): string {
+  return ROLE_DISPLAY_LABELS[role] ?? role;
+}
+
 export const createUserSchema = z.object({
   name: z.string().min(1, "Name is required."),
   email: z.string().email("Valid email is required."),
