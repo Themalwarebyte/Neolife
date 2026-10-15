@@ -15,10 +15,10 @@ Phase/step-by-step implementation status. Authoritative scope lives in `PROJECT_
 
 | | |
 |---|---|
-| **Current phase** | PHASE 1 complete + CRM phases (D-027/D-033/D-034 merged into `master`); Task #037 two-user configuration 🟩 MERGE-CANDIDATE (feature branch, NOT deployed) |
+| **Current phase** | PHASE 1 complete + CRM phases (D-027/D-033/D-034 merged into `master`); P-3 Referral + Communications feature 🟩 MERGED (feature branch merged into `master`; NOT deployed) |
 | **Production** | 🟩 **LIVE** at `https://neolife.ooflowdesk.com` — image `neolife-web:32b6c27`, commit `32b6c27…` (see `docs/DEPLOYMENT.md` §0) |
 | **Deployed SHA** | `32b6c272e63236c18d51d3ed5e867dece0e56c4f` — referral/notification/Task #037 features are all **NOT in production** |
-| **Branch** | `master` at `011c835` (= merge of `feature/referrals-communications-mulberry`); active feature work on `feature/two-user-resend-notifications` |
+| **Branch** | `master` at `f176a77` (= merge of `feature/two-user-resend-notifications`); active feature work completed |
 | **Official test count** | **333 total** = 222 (no `DATABASE_URL`) + 111 (DB-enabled) — figures supersede both the 247 (pre-referrals) and 295 (Task #029) counts for CURRENT master + Task #037/#038 work |
 | **E2E** | 🟩 **29/29 PASS** — 7 specs, 0 failed, 0 skipped, 0 flaky (23 pre-existing + 6 Task #037) |
 | **Database** | Local: 16 migrations applied. Production: still 11 applied — the referral-era and Task #037 migrations are **NOT DEPLOYED** |

@@ -5,9 +5,9 @@
 > Every future implementation task MUST begin by reading this document and identifying the current phase, task, dependencies, required decisions, and completion criteria.
 
 **Current Phase:** PHASE 1 — TRAFFIC MVP
-**Status:** 🟩 PHASE 1 COMPLETE — Phase 0 🟩 COMPLETE. All Phase 1 tasks 1.1–1.11 🟩 DONE. **247/247 tests PASS** (179 without `DATABASE_URL` + 68 DB-enabled) · E2E **11/11 PASS** via system Chrome. P-1 (Registration/business-interest flow) 🟩 DONE. P-2 (Admin user management) 🟩 **DONE**. **Production deployment 🟩 LIVE** at `https://neolife.ooflowdesk.com`. See `docs/STATUS.md`.
+**Status:** 🟩 PHASE 1 COMPLETE — Phase 0 🟩 COMPLETE. All Phase 1 tasks 1.1–1.11 🟩 DONE. **333/333 tests PASS** (222 without `DATABASE_URL` + 111 DB-enabled) · E2E **29/29 PASS** via system Chrome. P-1 (Registration/business-interest flow) 🟩 DONE. P-2 (Admin user management) 🟩 **DONE**. P-3 Referral + Communications: COMPLETE IN MASTER / NOT DEPLOYED. **Production deployment 🟩 LIVE** at `https://neolife.ooflowdesk.com`. See `docs/STATUS.md`.
 
-> **Test-count convention (official):** the suite contains **247 tests** in total — **179** run without `DATABASE_URL` set, plus **68** additional DB-enabled tests that require a local PostgreSQL instance. Any documentation quoting a different total (e.g. `222`, `2026/206`, `43/43`, `29/29`, `36/36`) refers to a superseded, historical baseline and must not be used as the current figure.
+> **Test-count convention (official):** the suite contains **333 tests** in total — **222** run without `DATABASE_URL`, plus **111** additional DB-enabled tests that require a local PostgreSQL instance. Any documentation quoting a different total (e.g. `222`, `2026/206`, `43/43`, `29/29`, `36/36`) refers to a superseded, historical baseline and must not be used as the current figure.
 
 ---
 
@@ -166,7 +166,9 @@ Do NOT allow the MVP to expand into the full platform.
 | PHASE 3 | Promoter System | ⚪ NOT STARTED |
 | PHASE 4 | Commerce (Customer / Product / Orders) | ⚪ NOT STARTED |
 | PHASE 5 | Network (Referrals / Team / Downline) | ⚪ NOT STARTED |
-| PHASE 6 | Education & Marketing Resources | ⚪ NOT STARTED |
+| PHASE 6 | P-3 Referral + Communications | 🟩 COMPLETE IN MASTER / NOT DEPLOYED |
+| PHASE 6 | Two-user & Resend Framework | COMPLETE IN MASTER / NOT DEPLOYED |
+| PHASE 7 | Education & Marketing Resources | ⚪ NOT STARTED |
 | PHASE 7 | Commission-related functionality | ⚪ NOT STARTED |
 | PHASE 8 | Platform Operations (Automation / Notifications / Monitoring / Scaling / Hardening) | ⚪ NOT STARTED |
 
@@ -628,8 +630,8 @@ When a phase meets its completion criteria, explicitly report: **"PHASE X IS COM
 | P-1 Registration / business-interest flow | 🟩 DONE (2026-09-18, D-026 + D-032) |
 | P-2 Admin user management | 🟩 **DONE** — Better Auth user-ID defect fixed (`73d73e0`), E2E environment made deterministic (`7c31712`), schema alignment (`f709b64`); Admin E2E PASS and full Playwright 11/11 PASS |
 | Application implementation | Tasks 1.1 🟩 · 1.2 🟩 · 1.3 🟩 · 1.4 🟩 · 1.5 🟩 · 1.6 🟩 · 1.7 🟩 · 1.8 🟩 · 1.9 🟩 · 1.10 🟩 · 1.11 🟩 — see `docs/STATUS.md` |
-| Production deployment | 🟩 LIVE — `https://neolife.ooflowdesk.com`, image **`neolife-web:92ee361`** at commit `92ee361`, deployed and verified 2026-10-02 · 10/10 migrations applied |
-| Test suite | 🟩 247/247 PASS (179 non-DB + 68 DB-enabled) · E2E **11/11 PASS** |
+| Production deployment | 🟩 LIVE — `https://neolife.ooflowdesk.com`, image **`neolife-web:32b6c27`** at commit `32b6c27`, deployed and verified 2026-10-13 · 10/10 migrations applied |
+| Test suite | 🟩 333/333 PASS (222 non-DB + 111 DB-enabled) · E2E **29/29 PASS** (1 flaky) |
 
 **Next action:** Resolve the residual Prisma drift as a dedicated investigation *before*
 running any future `prisma migrate dev`, then reconcile the local test-hygiene items

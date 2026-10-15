@@ -40,16 +40,14 @@ This project uses **pnpm** (see `pnpm-lock.yaml` / `pnpm-workspace.yaml`). Do no
   `DATABASE_URL` alone produces 6 failures in `tests/qualification.test.ts`.
 - E2E runs against **system Chrome** (`channel: "chrome"`); no browser download needed.
 
-### E2E environment
-
-- `pnpm build` first, then `pnpm playwright test` **(23 tests)**. The Playwright
-  `webServer` command runs `node e2e/prepare-standalone.mjs` before starting the
+- `pnpm build` first, then `pnpm playwright test` **(29 tests)**. The Playwright
+  `webServer` command runs `node .next/standalone/server.js` before starting the
   standalone server, because `next build` does not copy `.next/static/` or `public/`
   into `.next/standalone/`. Without that step the server returns HTML with no client
   JavaScript or CSS.
 - `reuseExistingServer: false`. If anything already holds port 3000 — for example an
-  `ssh -L 3000:...` tunnel to a remote host — the run fails loudly instead of adopting
-  that service as its test target.
+  `ssh -L 3000:...` tunnel to a remote host — the run fails loudly instead of
+  adopting that service as its test target.
 - `e2e/seed-e2e-users.ts` resets two local fixture accounts before each run
   (`office@test.local`, `colleague1@neolife.local`) so their passwords are
   deterministic. It refuses to run unless `E2E_SEED_USERS=1`, `NODE_ENV` is not

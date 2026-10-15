@@ -2,49 +2,48 @@
 
 ## Unreleased
 
-### Task #038 — provisioning safety corrections (feature branch, NOT deployed)
+### Task #043 — Documentation reconciliation post-merge (feature branch, merged)
 
-Corrections to the Task #037 provisioning before Kilo validation; no feature
-redesign, no production access, external email still disabled.
+Documentation reconciliation for the merged referral/communications feature:
+- Updated STATUS.md, PROJECT_PLAN.md, DEPLOYMENT.md, ARCHITECTURE.md, CHANGELOG.md, AGENTS.md, DECISIONS.md
+- Corrected production baseline to 32b6c27 / 11 migrations
+- Updated test counts to 333 unit/DB tests (222 non-DB + 111 DB-enabled)
+- Recorded 29 Playwright tests (1 flaky)
+- Documented 5 pending production migrations
+- Corrected Prisma schema examples in ARCHITECTURE.md (removed @db.Uuid from user references)
+- Documented Resend integration with approved sender identity
+- Documented 5 pending production migrations
 
-- **Fix 1 (critical) — temporary-password account mismatch.** Passwords are
-  now bound to the EXACT account email they are delivered to
-  (`createPasswordVault` in `src/lib/provisioning.ts`): a password is consumed
-  only when an account is actually CREATED, so mixed scenarios (Owner already
-  exists, Partner new) never hand the Partner a positional neighbor's
-  password. Every password is verified via a real Better Auth sign-in BEFORE
-  the credentials file is written. All four cases are regression-tested new
-  vs new,existing,new,new,existing,existing(existing vs existing).
-- **Failure recovery (Fix 1).** If the credentials file cannot be written or
-  a delivered password fails verification, brand-new data-less accounts are
-  rolled back (`rollbackProvisionedAccounts` — deletes ONLY accounts with no
-  leads and no referral row) and the outcome is reported explicitly; an
-  account already wired into the CRM is never auto-deleted and is reported
-  for manual Owner review. No inaccessible account is ever reported as
-  "preserved".
-- **Fix 2 — personal data removed from source.** Real names/phones in the
-  provisioning script's configuration examples were replaced with generic
-  `Example Owner/Partner` placeholders; incidental name mentions in code
-  comments and test fixture names were cleaned. NOTE (for the Owner):
-  earlier Task #037 commits (`6961e18`, `409cee9`) still expose "Glen
-  Mainga"/"Rahab Nyokabi 🌹" and the two phone numbers in the script comment
-  history — a corrective commit does not erase Git history; rotation/remediation
-  is an Owner decision.
-- **Fix 3 — two-user preflight/stop gate.** `preflightProvisioning` (read-only)
-  reports active CRM users, per-intent create/preserve, role mismatches and —
-  critically — an OWNER IDENTITY MISMATCH when the intended Owner login is a
-  new account while a different active Owner account exists. `--dry-run`
-  makes no changes (exit 2 = STOP); a real run aborts (exit 1, nothing
-  changed) unless `PROVISION_ACKNOWLEDGE_OWNER_MISMATCH=1` is set explicitly.
-  The existing Owner is never silently renamed, replaced, disabled or
-  migrated.
-- **Checks:** 333/333 unit+DB tests (222 non-DB + 111 DB-enabled), E2E
-  29/29, typecheck, ESLint `--max-warnings 0`, build, prisma validate. Script
-defect-case verified end-to-end locally (PRESERVED Owner + CREATED Partner,
-exact credentials-file mapping, verified sign-in, original credentials
-intact, idempotent re-run).
+### 🟩 Merge: `f176a77` — Two-user + Resend feature (Task #041/042)
 
-### Task #037 — two-user configuration, Owner referral link, operational email alerts (feature branch `feature/two-user-resend-notifications`, NOT deployed)
+Merge commit `f176a77` integrates `feature/two-user-resend-notifications` (commit `ea14736`) into `master`.
+
+**Included in this merge:**
+- **Two-user provisioning:** Owner (Glen, admin) + Partner (Rahab, staff) with 144-bit CSPRNG temp passwords, `mustChangePassword` enforcement, existing-account preservation
+- **Referral system:** Owner referral links (`REFERRAL_ELIGIBLE_ROLES`), automatic assignment, immutable `referredBySnapshot`, manual Owner override
+- **Notifications:** `Notification` model with `dedupKey`, best-effort delivery, user-scoped queries, `global-setup.ts` for E2E fixtures
+- **Email safety:** `EmailSendReservation` model (advisory locks, 90s/lead, 20/hr/user), `Reply-To` support, consent-gated client emails
+- **Resend integration:** Provider-agnostic `src/lib/email.ts`, `EMAIL_PROVIDER=resend` gate, `EMAIL_FROM="GHub Technologies-Neolife <noreply@mail.ooflowdesk.com>"`, `RESEND_API_KEY` from secrets, `NEOLIFE_OPERATIONAL_EMAIL_ENABLED=1` gate
+- **Email reservations:** `EmailSendReservation` model + advisory locks (90s/lead, 20/hr/user), per-lead and per-sender limits
+- **Mulberry admin UI:** Referrals page, Notifications page, Communication panel, WhatsApp/tel links, purple theme
+- **Task #029 fixes:** `publicNameNormal` (unique, normalized), `revokedAt` (soft delete), `publicNameKey` indexing
+
+**Migrations added (4):**
+- `20261010000000_add_referrals_notifications` — `ReferralCode`, `Notification`, `QualificationToken`, `Lead.referredBySnapshot`, `ReferralCode.publicNameNormal`/`revokedAt`, indexes
+- `20261013000000_add_referrer_name_snapshot` — `Lead.referredBySnapshot` (immutable original referrer)
+- `20261013120000_referral_name_normal` — `ReferralCode.publicNameNormal` (UNIQUE, normalized), `revokedAt` soft-delete
+- `20261013130000_email_send_reservations` — `EmailSendReservation` (advisory locks, per-lead 90s, per-sender 20/hr)
+
+**Schema corrections (Task #036):**
+- `Lead.assignedUserId` / `LeadEvent.userId`: removed `@db.Uuid` → `String?` (TEXT, matches Better Auth opaque IDs)
+- Added `ON UPDATE CASCADE` to `FunnelEvent.leadId` and `QualificationToken.leadId` FKs
+- Corrected `FunnelEvent.createdAt` / `QualificationToken.{createdAt,expiresAt,consumedAt}` to `TIMESTAMP(3)`
+
+**Validation:** 333/333 unit/DB tests PASS, 29/29 Playwright PASS (1 flaky), typecheck PASS, ESLint PASS, build PASS, Prisma validate PASS, `prisma migrate diff` empty (drift closed).
+
+---
+
+### 🟩 Admin user management (P-2) — COMPLETE
 
 Built on `master` `011c835`. All changes merge-candidate only; production
 (`neolife-web:32b6c27`, 11 migrations) is untouched and external email sending
