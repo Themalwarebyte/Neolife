@@ -204,7 +204,7 @@ model User {
 ```prisma
 model LeadEvent {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  leadId    String?  // FK to Lead, ON DELETE SET NULL
+  leadId    String?  @db.Uuid  // FK to Lead, ON DELETE SET NULL
   type      String   // event type (lead_assigned, status_changed, etc.) — kept as String, not enum (D-028)
   metadata  Json?    // structured metadata (e.g. { by, from, to } for assignment)
   userId    String?  // canonical audit actor — the authenticated CRM user who performed the action (D-028)
@@ -221,7 +221,7 @@ model LeadEvent {
 model FunnelEvent {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   type      String   // approved event type (D-029)
-  leadId    String?  // FK to Lead, ON DELETE SET NULL
+  leadId    String?  @db.Uuid  // FK to Lead, ON DELETE SET NULL
   attribution Json?   // validated first-party UTM attribution
   deviceId  String?   // anonymous client-generated UUID (no IP/userAgent/PII — D-031)
   metadata  Json?     // sanitized event-specific metadata
@@ -251,7 +251,7 @@ model FunnelEvent {
 ```prisma
 model QualificationToken {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  leadId    String   // FK to Lead, ON DELETE CASCADE
+  leadId    String   @db.Uuid  // FK to Lead, ON DELETE CASCADE
   nonce     String   @unique   // random UUID for DB-backed single-use enforcement
   expiresAt DateTime
   consumedAt DateTime?
