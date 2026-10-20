@@ -8,6 +8,7 @@ import {
   parseFollowUpNote,
   parseStatusChange,
 } from "@/lib/leadManagement";
+import { parseFollowUpDueAt } from "@/lib/crm-phase2";
 import {
   parseMeetingStatus,
   parseOptionalText,
@@ -289,24 +290,96 @@ export async function addFollowUp(
   const user = await requireCrmUser();
   const id = String(formData.get("id") ?? "");
   const note = parseFollowUpNote(formData.get("note"));
+  const schedule = parseFollowUpDueAt(formData.get("dueAtIso"));
   if (!UUID.test(id)) return { status: "error", message: "Invalid lead." };
   if (!note) return { status: "error", message: "Please enter a follow-up note." };
+  if (!schedule.valid) return { status: "error", message: "Choose a valid future date/time, or leave the task date empty." };
 
   try {
     const [leadId, ownershipErr] = await verifyLeadOwnership(user, id);
     if (!leadId || ownershipErr) return ownershipErr!;
 
     await prisma.$transaction([
-      prisma.followUp.create({ data: { leadId, note } }),
+      prisma.followUp.create({
+        data: { leadId, note, ...(schedule.dueAt ? { dueAt: schedule.dueAt } : {}) },
+      }),
       prisma.leadEvent.create({
-        data: { leadId, type: "follow_up_added", userId: user.id },
+        data: {
+          leadId,
+          type: schedule.dueAt ? "follow_up_scheduled" : "follow_up_added",
+          userId: user.id,
+          metadata: schedule.dueAt ? { dueAt: schedule.dueAt.toISOString() } : undefined,
+        },
       }),
     ]);
 
     revalidatePath(`/admin/leads/${id}`);
-    return { status: "success", message: "Follow-up recorded." };
+    revalidatePath("/admin/follow-ups");
+    revalidatePath("/admin/leads");
+    revalidatePath("/admin/analytics");
+    return {
+      status: "success",
+      message: schedule.dueAt ? "Follow-up task scheduled." : "Follow-up note recorded.",
+    };
   } catch {
     return { status: "error", message: "Could not record the follow-up." };
+  }
+}
+
+/** Mark an outstanding scheduled task complete; plain historical notes are not tasks. */
+export async function completeFollowUp(
+  _previous: CrmActionResult | null,
+  formData: FormData,
+): Promise<CrmActionResult> {
+  const user = await requireCrmUser();
+  const followUpId = String(formData.get("followUpId") ?? "");
+  if (!UUID.test(followUpId)) return { status: "error", message: "Invalid follow-up." };
+
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const where = user.role === "admin"
+        ? { id: followUpId }
+        : { id: followUpId, lead: { assignedUserId: user.id } };
+      const task = await tx.followUp.findFirst({
+        where,
+        select: { id: true, leadId: true, dueAt: true, completedAt: true },
+      });
+      if (!task) return { kind: "missing" as const };
+      if (!task.dueAt) return { kind: "note" as const };
+      if (task.completedAt) return { kind: "completed" as const };
+
+      // Keep ownership scoping in the WRITE predicate too, not only the read.
+      // The count gate makes duplicate submissions idempotent with one event.
+      const changed = await tx.followUp.updateMany({
+        where: {
+          ...where,
+          dueAt: { not: null },
+          completedAt: null,
+        },
+        data: { completedAt: new Date() },
+      });
+      if (changed.count !== 1) return { kind: "stale" as const };
+      await tx.leadEvent.create({
+        data: {
+          leadId: task.leadId,
+          type: "follow_up_completed",
+          userId: user.id,
+          metadata: { followUpId },
+        },
+      });
+      return { kind: "success" as const, leadId: task.leadId };
+    });
+    if (result.kind === "missing") return { status: "error", message: "Follow-up not found or not assigned to you." };
+    if (result.kind === "note") return { status: "error", message: "This is a note, not a scheduled task." };
+    if (result.kind === "completed") return { status: "success", message: "Task was already completed." };
+    if (result.kind === "stale") return { status: "error", message: "Task changed; refresh and try again." };
+    revalidatePath("/admin/follow-ups");
+    revalidatePath("/admin/leads");
+    revalidatePath("/admin/analytics");
+    revalidatePath(`/admin/leads/${result.leadId}`);
+    return { status: "success", message: "Follow-up completed." };
+  } catch {
+    return { status: "error", message: "Could not complete follow-up." };
   }
 }
 

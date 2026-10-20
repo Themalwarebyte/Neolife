@@ -155,11 +155,16 @@ model FollowUp {
   leadId  String @db.Uuid
   note    String
 
-  createdAt DateTime @default(now())
+  // Phase 2: null dueAt means an ordinary existing CRM note, not a task.
+  // completedAt remains null while a scheduled task is outstanding.
+  dueAt       DateTime?
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
 
   lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
   @@index([leadId])
+  @@index([dueAt, completedAt])
 }
 
 // ---------------------------------------------------------------------------

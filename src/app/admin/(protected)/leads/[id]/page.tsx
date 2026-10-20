@@ -6,6 +6,8 @@ import { getCrmUsers } from "@/app/admin/(protected)/actions";
 import { AssignmentForm, type StaffUser } from "@/components/admin/AssignmentForm";
 import { LeadStatusForm } from "@/components/admin/LeadStatusForm";
 import { FollowUpForm } from "@/components/admin/FollowUpForm";
+import { CompleteFollowUpButton } from "@/components/admin/CompleteFollowUpButton";
+import { followUpLabel, formatCrmStatus } from "@/lib/crm-phase2";
 import { MeetingForm } from "@/components/admin/MeetingForm";
 import { MeetingUpdateForm } from "@/components/admin/MeetingUpdateForm";
 import { CommunicationPanel } from "@/components/admin/CommunicationPanel";
@@ -51,7 +53,10 @@ export default async function LeadDetailPage({
     include: {
       meetings: { orderBy: { scheduledAt: "desc" } },
       followUps: { orderBy: { createdAt: "desc" } },
-      events: { orderBy: { createdAt: "desc" }, take: 25 },
+      events: {
+        orderBy: { createdAt: "desc" }, take: 25,
+        include: { user: { select: { name: true } } },
+      },
     },
   });
   if (!lead) notFound();
@@ -250,17 +255,22 @@ export default async function LeadDetailPage({
               Follow-up
             </h2>
             {lead.followUps.length === 0 ? (
-              <p className="mt-3 text-sm text-neutral-500">No follow-up notes yet.</p>
+              <p className="mt-3 text-sm text-neutral-500">No follow-up notes or tasks yet.</p>
             ) : (
               <ul className="mt-3 space-y-3">
-                {lead.followUps.map((followUp) => (
-                  <li key={followUp.id} className="rounded-xl border border-neutral-100 p-4 text-sm text-neutral-700">
-                    <div className="text-xs text-neutral-400">
-                      {followUp.createdAt.toLocaleString()}
+                {lead.followUps.map((followUp) => {
+                  const label = followUpLabel(followUp.dueAt, followUp.completedAt, new Date());
+                  return <li key={followUp.id} className="rounded-xl border border-neutral-100 p-4 text-sm text-neutral-700">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-xs text-neutral-500">Added {followUp.createdAt.toLocaleString()}</span>
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${label === "Overdue" ? "bg-rose-50 text-rose-700" : label === "Completed" ? "bg-emerald-50 text-emerald-700" : "bg-mulberry-50 text-mulberry-800"}`}>{label}</span>
                     </div>
-                    {followUp.note}
-                  </li>
-                ))}
+                    <p className="mt-2 whitespace-pre-wrap break-words">{followUp.note}</p>
+                    {followUp.dueAt && <p className="mt-2 text-xs text-neutral-500">Due {followUp.dueAt.toLocaleString()}</p>}
+                    {followUp.completedAt && <p className="mt-1 text-xs text-emerald-700">Completed {followUp.completedAt.toLocaleString()}</p>}
+                    {followUp.dueAt && !followUp.completedAt && <div className="mt-3"><CompleteFollowUpButton id={followUp.id} /></div>}
+                  </li>;
+                })}
               </ul>
             )}
             <div className="mt-4 border-t border-neutral-100 pt-4">
@@ -307,13 +317,12 @@ export default async function LeadDetailPage({
             ) : (
               <ul className="mt-3 space-y-2 text-sm">
                 {lead.events.map((event) => (
-                  <li key={event.id} className="flex items-center justify-between gap-2">
+                  <li key={event.id} className="flex flex-wrap items-baseline justify-between gap-2 border-b border-neutral-50 py-1 last:border-0">
                     <span className="font-medium text-neutral-700">
-                      {event.type.replaceAll("_", " ")}
+                      {formatCrmStatus(event.type)}
+                      {event.user ? <span className="ml-2 font-normal text-neutral-500">by {event.user.name}</span> : null}
                     </span>
-                    <span className="text-xs text-neutral-400">
-                      {event.createdAt.toLocaleString()}
-                    </span>
+                    <span className="text-xs text-neutral-400">{event.createdAt.toLocaleString()}</span>
                   </li>
                 ))}
               </ul>

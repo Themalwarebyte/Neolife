@@ -12,6 +12,8 @@ export function AdminNav({ role }: { role: string }) {
 
   const links = [
     { href: "/admin/leads", label: "Contacts", show: true },
+    { href: "/admin/follow-ups", label: "Follow-ups", show: true },
+    { href: "/admin/analytics", label: "Insights", show: true },
     { href: "/admin/notifications", label: "Notifications", show: true },
     { href: "/admin/referrals", label: "Referral links", show: role === "admin" },
     { href: "/admin/users", label: "Users", show: role === "admin" },
