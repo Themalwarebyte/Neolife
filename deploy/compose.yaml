@@ -10,7 +10,7 @@ name: neolife
 
 services:
   web:
-    image: neolife-web:b371fcf
+    image: neolife-web:cf07cf6
     container_name: neolife-web
     restart: unless-stopped
     environment:
@@ -61,7 +61,7 @@ services:
   # One-time admin seed — does NOT run on `up -d` (profiles: ["seed"]).
   # Invoked explicitly: sudo docker compose --env-file <secretfile> run --rm seed
   seed:
-    image: neolife-web:b371fcf
+    image: neolife-web:cf07cf6
     container_name: neolife-seed
     profiles: ["seed"]
     restart: "no"
