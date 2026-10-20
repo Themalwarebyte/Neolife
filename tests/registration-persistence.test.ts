@@ -18,7 +18,7 @@ import { join } from "node:path";
  * Run from WSL: DATABASE_URL=postgresql://... pnpm test
  */
 const testPhone = "+254711000801";
-const VALID_PRODUCT_ID = "0193a000-0000-0000-0000-000000000001";
+const TEST_PRODUCT_SLUG = "neolife-registration-persistence-test";
 
 const DB_AVAILABLE = Boolean(process.env.DATABASE_URL);
 const runIfDb = DB_AVAILABLE ? describe : describe.skip;
@@ -81,33 +81,66 @@ runIfDb("ProductInterest persistence (registration flow)", () => {
   let productId: string;
 
   beforeAll(async () => {
-    await prisma.lead.deleteMany({ where: { phone: testPhone } });
-    await prisma.productInterest.deleteMany({
-      where: { product: { sku: "942" } },
+    // Remove only stale records belonging to this test.
+    const oldLeads = await prisma.lead.findMany({
+      where: { phone: testPhone },
+      select: { id: true },
     });
-    await prisma.funnelEvent.deleteMany({ where: { type: "registration_complete" } });
-    await prisma.funnelEvent.deleteMany({ where: { type: "registration_start" } });
+    const oldLeadIds = oldLeads.map((lead) => lead.id);
+
+    if (oldLeadIds.length > 0) {
+      await prisma.productInterest.deleteMany({
+        where: { leadId: { in: oldLeadIds } },
+      });
+      await prisma.funnelEvent.deleteMany({
+        where: { leadId: { in: oldLeadIds } },
+      });
+      await prisma.lead.deleteMany({
+        where: { id: { in: oldLeadIds } },
+      });
+    }
+
+    const oldProduct = await prisma.product.findUnique({
+      where: { slug: TEST_PRODUCT_SLUG },
+      select: { id: true },
+    });
+
+    if (oldProduct) {
+      await prisma.productInterest.deleteMany({
+        where: { productId: oldProduct.id },
+      });
+      await prisma.product.deleteMany({
+        where: { id: oldProduct.id },
+      });
+    }
+
+    // Create a dedicated fixture; never depend on catalogue seed data.
+    const product = await prisma.product.create({
+      data: {
+        name: "NEOLIFE Registration Test Product",
+        slug: TEST_PRODUCT_SLUG,
+        sku: "TEST-REGISTRATION-PERSISTENCE",
+      },
+      select: { id: true },
+    });
+    productId = product.id;
 
     const lead = await createTestLead();
     leadId = lead.id;
-
-    // Use an actual seeded product (Pro Vitality, SKU 942)
-    const product = await prisma.product.findFirst({
-      where: { sku: "942" },
-      select: { id: true, name: true },
-    });
-    if (product) {
-      productId = product.id;
-    } else {
-      // Fallback to a test UUID if product not seeded
-      productId = VALID_PRODUCT_ID;
-    }
   });
 
   afterAll(async () => {
-    await prisma.productInterest.deleteMany({ where: { leadId } });
-    await prisma.funnelEvent.deleteMany({ where: { leadId } });
-    await prisma.lead.deleteMany({ where: { id: leadId } });
+    if (leadId) {
+      await prisma.productInterest.deleteMany({ where: { leadId } });
+      await prisma.funnelEvent.deleteMany({ where: { leadId } });
+      await prisma.lead.deleteMany({ where: { id: leadId } });
+    }
+
+    if (productId) {
+      await prisma.productInterest.deleteMany({ where: { productId } });
+      await prisma.product.deleteMany({ where: { id: productId } });
+    }
+
     await prisma.$disconnect();
   });
 

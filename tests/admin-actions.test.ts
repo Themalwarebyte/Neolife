@@ -218,7 +218,6 @@ runIfDb("toggleUserActive through the real Server Action (DB integration)", () =
 
   afterAll(async () => {
     await prisma.user.deleteMany({ where: { id: { in: [OWNER_ID, STAFF1_ID, STAFF2_ID] } } });
-    await prisma.$disconnect();
   });
 
   beforeEach(() => {
