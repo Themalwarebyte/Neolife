@@ -244,6 +244,49 @@ async function verifyLeadOwnership(
   return [leadId, null];
 }
 
+/** Marks a qualified lead as reviewed by an authorized CRM user. Idempotent on repeat submissions. */
+export async function markQualificationReviewed(
+  _previous: CrmActionResult | null,
+  formData: FormData,
+): Promise<CrmActionResult> {
+  const user = await requireCrmUser();
+  const id = String(formData.get("id") ?? "").trim();
+  if (!UUID.test(id)) return { status: "error", message: "Invalid lead." };
+
+  try {
+    // Authorization and qualification state are enforced in the database predicate.
+    const where = user.role === "admin"
+      ? { id, status: LeadStatus.QUALIFIED }
+      : { id, status: LeadStatus.QUALIFIED, assignedUserId: user.id };
+    const lead = await prisma.lead.findFirst({ where, select: { id: true } });
+    if (!lead) {
+      return { status: "error", message: "Qualified contact not found or not accessible." };
+    }
+
+    const existing = await prisma.leadEvent.findFirst({
+      where: { leadId: id, type: "qualification_reviewed" },
+      select: { id: true },
+    });
+    if (!existing) {
+      await prisma.leadEvent.create({
+        data: {
+          leadId: id,
+          type: "qualification_reviewed",
+          userId: user.id,
+          metadata: { source: "qualification_queue" },
+        },
+      });
+    }
+
+    revalidatePath("/admin/qualification");
+    revalidatePath("/admin/analytics");
+    revalidatePath(`/admin/leads/${id}`);
+    return { status: "success", message: existing ? "Qualification was already reviewed." : "Qualification marked as reviewed." };
+  } catch {
+    return { status: "error", message: "Could not record the qualification review." };
+  }
+}
+
 /** Updates a lead's lifecycle status and records a status-change event. */
 export async function updateLeadStatus(
   _previous: CrmActionResult | null,
