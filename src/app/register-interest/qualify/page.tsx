@@ -7,55 +7,13 @@ import { Container } from "@/components/ui/Section";
 import { Reveal } from "@/components/ui/Reveal";
 import { Leaf, Sprig } from "@/components/ui/Botanical";
 import { QualificationForm } from "@/components/leads/QualificationForm";
-import {
-  RegistrationForm,
-  type SelectableProduct,
-} from "@/components/leads/RegistrationForm";
-import { prisma } from "@/server/db/prisma";
-import { CATALOGUE_CATEGORIES } from "@/lib/catalogue-data";
+import { RegistrationForm } from "@/components/leads/RegistrationForm";
 
 export const metadata: Metadata = {
   title: "Qualify Your Interest — NEOLIFE",
   description:
     "Tell us more about your interest in the NEOLIFE business opportunity.",
 };
-
-/**
- * Fetches the first product per category group from the database for the
- * registration-interest form (D-026). Returns an empty array if the catalogue
- * has not been seeded yet.
- */
-async function getFeaturedProducts(): Promise<SelectableProduct[]> {
-  const products = await prisma.product.findMany({
-    where: {
-      categories: {
-        some: {
-          category: {
-            slug: { in: CATALOGUE_CATEGORIES.map((c) => c.slug) },
-          },
-        },
-      },
-    },
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      description: true,
-      imageUrl: true,
-      displayOrder: true,
-    },
-    orderBy: { displayOrder: "asc" },
-    take: 20,
-  });
-
-  return products.map((p) => ({
-    id: p.id,
-    name: p.name,
-    slug: p.slug,
-    description: p.description ?? null,
-    image: p.imageUrl ?? null,
-  }));
-}
 
 /**
  * Phase D — post-capture qualification flow (D-030).
@@ -76,7 +34,6 @@ export default async function QualifyPage({
   searchParams: Promise<{ token?: string }>;
 }) {
   const { token } = await searchParams;
-  const featuredProducts = await getFeaturedProducts();
 
   return (
     <>
@@ -117,15 +74,12 @@ export default async function QualifyPage({
                     Product interest
                   </h2>
                   <p className="mt-3 text-center text-sm text-neutral-600">
-                    Optionally let us know which product you are most curious
-                    about and how you'd prefer to meet.
+                    Optionally choose an area of interest, even if you do not
+                    know the exact products yet, and tell us how you would prefer to meet.
                   </p>
                   <div className="mt-6">
                     <Suspense fallback={<RegistrationLoading />}>
-                      <RegistrationForm
-                        token={token ?? ""}
-                        products={featuredProducts}
-                      />
+                      <RegistrationForm token={token ?? ""} />
                     </Suspense>
                   </div>
                 </div>

@@ -24,11 +24,23 @@ export const INTEREST_STATUS_OPTIONS = [
   "NOT_INTERESTED",
 ] as const;
 
+// These are the four established NeoLife catalogue categories, plus a
+// no-pressure option. We never invent a specific product for a category choice.
+export const PRODUCT_INTEREST_CATEGORIES = [
+  { slug: "nutritionals", name: "Nutritionals" },
+  { slug: "weight-management", name: "Weight Management" },
+  { slug: "personal-care", name: "Personal Care" },
+  { slug: "home-care", name: "Home Care" },
+  { slug: "not-sure-yet", name: "Not sure yet - please advise" },
+] as const;
+
+export type ProductInterestCategory = (typeof PRODUCT_INTEREST_CATEGORIES)[number]["slug"];
 export type MeetingPreference = (typeof MEETING_PREFERENCE_OPTIONS)[number];
 export type InterestStatus = (typeof INTEREST_STATUS_OPTIONS)[number];
 
 export type RegisterInterestInput = {
   productId?: unknown;
+  categorySlug?: unknown;
   meetingPreference?: unknown;
   additionalContext?: unknown;
 };
@@ -38,7 +50,8 @@ export type RegistrationParseResult =
   | { ok: false; message: string; fieldErrors: Record<string, string> };
 
 export interface RegistrationParsedData {
-  productId: string;
+  productId: string; // legacy product-specific route; empty for category selection
+  categorySlug: ProductInterestCategory | null;
   meetingPreference: MeetingPreference;
   additionalContext: string | null;
 }
@@ -52,11 +65,21 @@ export function parseRegisterInterestInput(
 ): RegistrationParseResult {
   const fieldErrors: Record<string, string> = {};
 
-  // productId — required UUID
+  // Prospect-facing flow asks for a category, never a specific SKU.
+  // Legacy productId submissions remain supported for existing integrations.
+  const rawCategory = typeof input.categorySlug === "string"
+    ? input.categorySlug.trim()
+    : "";
+  const categorySlug = PRODUCT_INTEREST_CATEGORIES.find(
+    (option) => option.slug === rawCategory,
+  )?.slug ?? null;
   const productId =
     typeof input.productId === "string" ? input.productId.trim() : "";
-  if (!UUID.test(productId)) {
-    fieldErrors.productId = "Please select a product.";
+
+  if (rawCategory) {
+    if (!categorySlug) fieldErrors.categorySlug = "Please choose a valid product category.";
+  } else if (!UUID.test(productId)) {
+    fieldErrors.productId = "Please choose a product category.";
   }
 
   // meetingPreference — required enum
@@ -94,7 +117,8 @@ export function parseRegisterInterestInput(
   return {
     ok: true,
     data: {
-      productId,
+      productId: categorySlug ? "" : productId,
+      categorySlug,
       meetingPreference: meetingPreference as MeetingPreference,
       additionalContext,
     },

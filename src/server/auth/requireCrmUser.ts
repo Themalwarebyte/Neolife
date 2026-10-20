@@ -1,21 +1,17 @@
 /**
- * Role-aware CRM authorization (Phase A: Two-user support).
- *
- * Extends the original admin-only guard to support two roles:
- * - "admin" (Owner): full access to all CRM data, user/role management
- * - "staff" (Colleague): CRM access scoped to assigned leads only
- *
- * Better Auth is loaded lazily (dynamic import) so its Node-only dependencies
- * stay out of the static import graph of Server Actions referenced by client
- * components. This avoids Turbopack's "external modules" bundling error.
+ * Authoritative CRM authorization. Better Auth validates the cookie, then the
+ * database supplies CURRENT role, activity, and password-change flags. This
+ * rejects a previously issued session after an Owner deactivates the user.
+ * Lazy imports keep Node-only auth code out of client action bundles.
  */
 import { redirect } from "next/navigation";
+import { isAllowedCrmAccount, type CrmRole } from "@/lib/crm-login-policy";
 
-type CrmUser = {
+export type CrmUser = {
   id: string;
   email: string;
   name: string;
-  role: string;
+  role: CrmRole;
   mustChangePassword: boolean;
 };
 
@@ -25,39 +21,46 @@ async function loadSession() {
   return auth.api.getSession({ headers: await nextHeaders() });
 }
 
-/** Returns the authenticated CRM user (any role), or null if unauthenticated/inactive. */
+/** Return only an active Owner/Staff user whose DB account still exists. */
 export async function getCrmUser(): Promise<CrmUser | null> {
   const session = await loadSession();
-  const user = session?.user;
-  if (!user) return null;
-  if (!user.isActive) return null;
+  if (!session?.user?.id) return null;
+
+  const { prisma } = await import("@/server/db/prisma");
+  const account = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      role: true,
+      isActive: true,
+      mustChangePassword: true,
+    },
+  });
+  if (!isAllowedCrmAccount(account)) return null;
+
   return {
-    id: user.id,
-    email: user.email,
-    name: user.name,
-    role: user.role,
-    mustChangePassword: user.mustChangePassword ?? false,
+    id: account.id,
+    email: account.email,
+    name: account.name,
+    role: account.role,
+    mustChangePassword: account.mustChangePassword,
   };
 }
 
-/** Returns the authenticated CRM user, redirecting to login if unauthenticated. */
 export async function requireCrmUser(): Promise<CrmUser> {
   const user = await getCrmUser();
   if (!user) redirect("/admin/login");
   return user;
 }
 
-/** Returns the authenticated admin user, redirecting if unauthenticated or non-admin. */
 export async function requireAdmin(): Promise<CrmUser> {
   const user = await requireCrmUser();
-  if (user.role !== "admin") {
-    redirect("/admin");
-  }
+  if (user.role !== "admin") redirect("/admin");
   return user;
 }
 
-/** Returns true if the current session is an admin. */
 export async function isAdminSession(): Promise<boolean> {
-  const user = await getCrmUser();
-  return user !== null && user.role === "admin";
+  return (await getCrmUser())?.role === "admin";
 }

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { validateCountryPhone } from "@/lib/phone-country";
 import { prisma } from "@/server/db/prisma";
 import { parseAttribution, type Attribution } from "@/lib/attribution";
 import {
@@ -32,6 +33,7 @@ export type SubmitLeadInput = {
   firstName?: unknown;
   lastName?: unknown;
   phone?: unknown;
+  phoneCountry?: unknown;
   email?: unknown;
   city?: unknown;
   interestType?: unknown;
@@ -70,9 +72,9 @@ export const leadSchema = z.object({
   phone: z
     .string()
     .trim()
-    .max(24, "Phone number is too long.")
+    .max(32, "Phone number is too long.")
     .refine(
-      (value) => /^\+?\d[\d\s\-()]{6,23}$/.test(value),
+      (value) => /^\+?\d[\d\s\-()]{3,31}$/.test(value),
       "Please enter a valid phone number.",
     )
     .transform(normalizePhone),
@@ -138,10 +140,17 @@ export function parseLeadInput(
     return { ok: false, message: "", fieldErrors: {} };
   }
 
+  // A selected country means the phone must satisfy that country's actual
+  // numbering rules, not a hard-coded global digit count.
+  const usingCountry = input.phoneCountry !== undefined && input.phoneCountry !== null;
+  const validated = usingCountry
+    ? validateCountryPhone(input.phoneCountry, input.phone)
+    : null;
+
   const candidate = {
     firstName: input.firstName,
     lastName: input.lastName,
-    phone: input.phone,
+    phone: validated?.ok ? validated.e164 : input.phone,
     email: input.email,
     city: input.city,
     interestType: input.interestType,
@@ -149,12 +158,24 @@ export function parseLeadInput(
   };
 
   const parsed = leadSchema.safeParse(candidate);
-  if (!parsed.success) {
-    const flat = z.flattenError(parsed.error);
+  const fieldErrors: Record<string, string> = parsed.success
+    ? {}
+    : (z.flattenError(parsed.error).fieldErrors as Record<string, string>);
+
+  if (validated && !validated.ok) {
+    fieldErrors[validated.field] = validated.error;
+  }
+  // Preserve the old parser's minimum length when no country is supplied.
+  // The public Server Action itself requires country selection.
+  if (!usingCountry && typeof input.phone === "string" &&
+      !/^\+?\d[\d\s\-()]{6,23}$/.test(input.phone.trim())) {
+    fieldErrors.phone = "Please enter a valid phone number.";
+  }
+  if (Object.keys(fieldErrors).length > 0 || !parsed.success) {
     return {
       ok: false,
       message: "Please check the highlighted fields.",
-      fieldErrors: flat.fieldErrors as Record<string, string>,
+      fieldErrors,
     };
   }
   return { ok: true, data: parsed.data };

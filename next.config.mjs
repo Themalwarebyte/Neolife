@@ -12,6 +12,10 @@ const scriptSrc = `'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`;
 
 const nextConfig = {
   output: "standalone",
+  // Compile and type-check application code without importing unrelated,
+  // untracked local recovery scripts from the broad developer tsconfig.
+  // TypeScript checking stays ON; only its input scope is narrowed.
+  typescript: { tsconfigPath: "./tsconfig.next-build.json" },
   // Landing photography is self-hosted and pre-optimized WebP; serve it directly
   // to avoid a native `sharp` dependency (and its alpine platform binaries) in the
   // standalone image. next/image still provides lazy-loading and layout stability.

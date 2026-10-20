@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useActionState } from "react";
 import { submitLeadAction, type SubmitLeadResult } from "@/app/actions/lead";
 import { CtaLink } from "@/components/ui/CtaLink";
+import { CountryPhoneField } from "@/components/leads/CountryPhoneField";
 import {
   ATTRIBUTION_STORAGE_KEY,
   deserializeAttribution,
@@ -202,28 +203,7 @@ export function LeadForm({ referralCode }: { referralCode?: string }) {
         </div>
       </div>
       <div className="grid gap-5 sm:grid-cols-2">
-        <div>
-          <label htmlFor="phone" className={labelClass}>
-            Phone <span aria-hidden="true">*</span>
-          </label>
-          <input
-            id="phone"
-            name="phone"
-            type="tel"
-            required
-            autoComplete="tel"
-            maxLength={24}
-            placeholder="+254 7XX XXX XXX"
-            className={`mt-1.5 ${fieldClass}`}
-            aria-invalid={Boolean(errors?.phone)}
-            aria-describedby={errors?.phone ? "phone-error" : undefined}
-          />
-          {errors?.phone ? (
-            <p id="phone-error" className={errorClass} role="alert">
-              {errors.phone}
-            </p>
-          ) : null}
-        </div>
+        <CountryPhoneField errors={errors} pending={pending} />
         <div>
           <label htmlFor="email" className={labelClass}>
             Email

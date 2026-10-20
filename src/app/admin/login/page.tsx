@@ -1,25 +1,33 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { LoginForm } from "@/components/admin/LoginForm";
-import { Container } from "@/components/ui/Section";
+import { OfficeAuthShell } from "@/components/admin/OfficeAuthShell";
+import { getCrmUser } from "@/server/auth/requireCrmUser";
+import { getCrmLoginDestination } from "@/lib/crm-login-policy";
 
-export const metadata: Metadata = { title: "Office Sign in — NEOLIFE" };
+export const metadata: Metadata = {
+  title: "Office Sign In — NEOLIFE",
+  robots: { index: false, follow: false },
+};
+export const dynamic = "force-dynamic";
 
-export default function AdminLoginPage() {
+export default async function AdminLoginPage() {
+  const user = await getCrmUser();
+  if (user) {
+    const destination = getCrmLoginDestination({
+      isActive: true,
+      role: user.role,
+      mustChangePassword: user.mustChangePassword,
+    });
+    if (destination) redirect(destination);
+  }
   return (
-    <main id="main-content">
-      <Container className="flex min-h-[70vh] items-center justify-center py-16">
-        <div className="w-full max-w-sm">
-          <p className="text-center text-sm font-semibold uppercase tracking-widest text-brand-600">
-            Office
-          </p>
-          <h1 className="mt-2 text-center text-2xl font-bold text-neutral-900">
-            Sign in to the CRM
-          </h1>
-          <div className="mt-6 rounded-3xl border border-neutral-100 bg-white p-6 shadow-xl shadow-neutral-900/5 sm:p-8">
-            <LoginForm />
-          </div>
-        </div>
-      </Container>
-    </main>
+    <OfficeAuthShell
+      eyebrow="Welcome back"
+      title="Sign in to your office."
+      description="Access your workspace with your authorized NEOLIFE account."
+    >
+      <LoginForm />
+    </OfficeAuthShell>
   );
 }

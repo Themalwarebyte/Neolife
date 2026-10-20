@@ -56,6 +56,29 @@ export default async function LeadDetailPage({
   });
   if (!lead) notFound();
 
+  // Category-only prospect interests are stored as audit events, not
+  // misleading synthetic ProductInterest rows. This scoped read happens only
+  // after the existing ownership-authorized lead lookup succeeds.
+  const categoryInterest = await prisma.leadEvent.findFirst({
+    where: { leadId: lead.id, type: "product_category_interest" },
+    orderBy: { createdAt: "desc" },
+    select: { metadata: true },
+  });
+  const categoryMeta =
+    categoryInterest?.metadata &&
+    typeof categoryInterest.metadata === "object" &&
+    !Array.isArray(categoryInterest.metadata)
+      ? categoryInterest.metadata
+      : null;
+  const categoryName =
+    categoryMeta && typeof categoryMeta.categoryName === "string"
+      ? categoryMeta.categoryName
+      : null;
+  const preferredMeeting =
+    categoryMeta && typeof categoryMeta.meetingPreference === "string"
+      ? categoryMeta.meetingPreference.replaceAll("_", " ")
+      : null;
+
   const isOwner = user.role === "admin";
 
   // D-034 Phase 4 — communications (Owner + current assignee only, which the
@@ -112,6 +135,8 @@ export default async function LeadDetailPage({
               <Field label="Email" value={lead.email} />
               <Field label="City / area" value={lead.city} />
               <Field label="Interest" value={lead.interestType.replaceAll("_", " ")} />
+              {categoryName ? <Field label="Product category" value={categoryName} /> : null}
+              {preferredMeeting ? <Field label="Preferred meeting format" value={preferredMeeting} /> : null}
               <Field label="Created" value={lead.createdAt.toLocaleString()} />
               <Field
                 label="Consent"

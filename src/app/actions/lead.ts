@@ -11,6 +11,7 @@ import {
   type SubmitLeadInput,
 } from "@/lib/leads";
 import { generateQualificationToken } from "@/lib/qualification";
+import { validateCountryPhone } from "@/lib/phone-country";
 import { recordFunnelEvent } from "@/lib/funnel";
 import { clientKeyFromHeaders, isRateLimited } from "@/lib/rateLimit";
 import {
@@ -103,6 +104,7 @@ export async function submitLeadAction(
     firstName: formData.get("firstName") ?? undefined,
     lastName: formData.get("lastName") ?? undefined,
     phone: formData.get("phone") ?? undefined,
+    phoneCountry: formData.get("phoneCountry") ?? undefined,
     email: formData.get("email") ?? undefined,
     city: formData.get("city") ?? undefined,
     interestType: formData.get("interestType") ?? undefined,
@@ -120,10 +122,20 @@ export async function submitLeadAction(
   const parsed = parseLeadInput(input);
   if (!parsed.ok) {
     if (parsed.message === "") {
-      // Honeypot hit — respond neutrally.
+      // Honeypot hit — respond neutrally, even without a selected country.
       return { status: "success", message: "" };
     }
     return { status: "error", message: parsed.message, fieldErrors: parsed.fieldErrors };
+  }
+  // Require a country for every NEW public submission. The pure parser also
+  // supports legacy country-less values used in earlier internal flows.
+  const selectedCountry = validateCountryPhone(input.phoneCountry, input.phone);
+  if (!selectedCountry.ok) {
+    return {
+      status: "error",
+      message: "Please check the highlighted fields.",
+      fieldErrors: { [selectedCountry.field]: selectedCountry.error },
+    };
   }
 
   // Phase D: extract deviceId for funnel correlation (non-PII UUID v4).

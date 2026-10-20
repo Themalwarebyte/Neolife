@@ -5,23 +5,15 @@ import { useActionState } from "react";
 import { registerInterestAction, type RegisterInterestResult } from "@/app/actions/register-interest";
 import { recordFunnelEventClient } from "@/lib/funnel-client";
 import { getOrCreateDeviceId } from "@/lib/funnel-device";
+import { PRODUCT_INTEREST_CATEGORIES } from "@/lib/registration";
 
 const fieldClass =
   "w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-neutral-900 placeholder:text-neutral-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30";
 const labelClass = "block text-sm font-semibold text-neutral-800";
 const errorClass = "mt-1.5 text-sm font-medium text-red-600";
 
-export type SelectableProduct = {
-  id: string;
-  name: string;
-  slug: string;
-  description: string | null;
-  image: string | null;
-};
-
 interface RegistrationFormProps {
   token: string;
-  products: SelectableProduct[];
 }
 
 /**
@@ -40,7 +32,7 @@ interface RegistrationFormProps {
  * Authorization is via the token only — the leadId is never taken from
  * client form input.
  */
-export function RegistrationForm({ token, products }: RegistrationFormProps) {
+export function RegistrationForm({ token }: RegistrationFormProps) {
   const [state, action, pending] = useActionState<
     RegisterInterestResult | null,
     FormData
@@ -71,14 +63,6 @@ export function RegistrationForm({ token, products }: RegistrationFormProps) {
   }
 
   const formError = state?.status === "error" ? state.message : undefined;
-
-  if (products.length === 0) {
-    return (
-      <p className="text-sm text-neutral-500">
-        No products are currently available. Please try again later.
-      </p>
-    );
-  }
 
   return (
     <form action={action} noValidate>
@@ -112,30 +96,33 @@ export function RegistrationForm({ token, products }: RegistrationFormProps) {
       ) : (
         <>
           <div className="mb-5">
-            <label htmlFor="productId" className={labelClass}>
-              Product I am most interested in *
+            <label htmlFor="categorySlug" className={labelClass}>
+              Product category I would like to explore *
             </label>
             <p className="mt-1 text-sm text-neutral-500">
-              Select the product you would like to learn more about.
+              You don't need to know the product names yet. Choose a general interest.
             </p>
             <select
-              id="productId"
-              name="productId"
+              id="categorySlug"
+              name="categorySlug"
               defaultValue=""
+              required
               className={`mt-1.5 ${fieldClass}`}
               disabled={pending}
+              aria-invalid={Boolean(state?.fieldErrors?.categorySlug)}
+              aria-describedby={state?.fieldErrors?.categorySlug ? "categorySlug-error" : undefined}
             >
-              <option value="" disabled>
-                Choose a product…
-              </option>
-              {products.map((product) => (
-                <option key={product.id} value={product.id}>
-                  {product.name} (SKU: {product.slug})
+              <option value="" disabled>Choose a category...</option>
+              {PRODUCT_INTEREST_CATEGORIES.map((category) => (
+                <option key={category.slug} value={category.slug}>
+                  {category.name}
                 </option>
               ))}
             </select>
-            {state?.fieldErrors?.productId ? (
-              <p className={errorClass}>{state.fieldErrors.productId}</p>
+            {state?.fieldErrors?.categorySlug ? (
+              <p id="categorySlug-error" role="alert" className={errorClass}>
+                {state.fieldErrors.categorySlug}
+              </p>
             ) : null}
           </div>
 

@@ -5,7 +5,11 @@ import { headers } from "next/headers";
 import { prisma } from "@/server/db/prisma";
 import { validateQualificationToken } from "@/lib/qualification";
 import { clientKeyFromHeaders, isRateLimited } from "@/lib/rateLimit";
-import { parseRegisterInterestInput, type RegisterInterestInput } from "@/lib/registration";
+import {
+  PRODUCT_INTEREST_CATEGORIES,
+  parseRegisterInterestInput,
+  type RegisterInterestInput,
+} from "@/lib/registration";
 
 export type RegisterInterestResult =
   | { status: "success"; message: string }
@@ -53,6 +57,7 @@ export async function registerInterestAction(
   // Step 2: Validate form input.
   const input: RegisterInterestInput = {
     productId: formData.get("productId"),
+    categorySlug: formData.get("categorySlug"),
     meetingPreference: formData.get("meetingPreference"),
     additionalContext: formData.get("additionalContext"),
   };
@@ -66,54 +71,84 @@ export async function registerInterestAction(
     };
   }
 
-  // Step 3: Verify the product exists (prevents fabricating productIds).
-  const product = await prisma.product.findUnique({
-    where: { id: parsed.data.productId },
-    select: { id: true, name: true },
-  });
-  if (!product) {
-    return {
-      status: "error",
-      message: "The selected product is not available.",
-    };
+  // Historical product-specific submissions are still honored. New public
+  // submissions select only a category and must NOT be attributed to a random
+  // product, since that would misrepresent the prospect's actual interest.
+  let product: { id: string; name: string } | null = null;
+  if (!parsed.data.categorySlug) {
+    product = await prisma.product.findUnique({
+      where: { id: parsed.data.productId },
+      select: { id: true, name: true },
+    });
+    if (!product) {
+      return { status: "error", message: "The selected product is not available." };
+    }
   }
 
   try {
-    // Step 4: Persist ProductInterest alongside the registration_complete
-    // funnel event (D-026, D-005) within a transaction.
-    // Note: registration_start is emitted client-side when the form is
-    // displayed — it is NOT recorded here.
     await prisma.$transaction(async (tx) => {
-      await tx.productInterest.create({
-        data: {
-          productId: parsed.data.productId,
-          leadId,
-          status: "NEW",
-          message: parsed.data.additionalContext ?? undefined,
-        },
-      });
-
-      await tx.funnelEvent.create({
-        data: {
-          type: "registration_complete",
-          leadId,
-          metadata: {
-            productId: parsed.data.productId,
-            productName: product.name,
-            meetingPreference: parsed.data.meetingPreference,
+      if (parsed.data.categorySlug) {
+        const selectedCategory = PRODUCT_INTEREST_CATEGORIES.find(
+          (option) => option.slug === parsed.data.categorySlug,
+        );
+        if (!selectedCategory) throw new Error("Invalid category selection.");
+        // Durable, lead-linked CRM audit history. ProductInterest deliberately
+        // remains untouched until the prospect chooses an actual product.
+        await tx.leadEvent.create({
+          data: {
+            leadId,
+            type: "product_category_interest",
+            metadata: {
+              categorySlug: selectedCategory.slug,
+              categoryName: selectedCategory.name,
+              meetingPreference: parsed.data.meetingPreference,
+              additionalContext: parsed.data.additionalContext,
+            },
           },
-        },
-      });
+        });
+        await tx.funnelEvent.create({
+          data: {
+            type: "registration_complete",
+            leadId,
+            metadata: {
+              categorySlug: selectedCategory.slug,
+              categoryName: selectedCategory.name,
+              meetingPreference: parsed.data.meetingPreference,
+            },
+          },
+        });
+      } else if (product) {
+        // Legacy product-specific route (kept for compatibility and tests).
+        await tx.productInterest.create({
+          data: {
+            productId: product.id,
+            leadId,
+            status: "NEW",
+            message: parsed.data.additionalContext ?? undefined,
+          },
+        });
+        await tx.funnelEvent.create({
+          data: {
+            type: "registration_complete",
+            leadId,
+            metadata: {
+              productId: product.id,
+              productName: product.name,
+              meetingPreference: parsed.data.meetingPreference,
+            },
+          },
+        });
+      }
     });
 
-    // Step 6: Revalidate CRM pages.
+  // Step 6: Revalidate CRM pages.
     revalidatePath("/admin/leads");
     revalidatePath(`/admin/leads/${leadId}`);
 
     return {
       status: "success",
       message:
-        "Your product interest has been recorded. Our office team will review your preferred meeting option and contact you to arrange a discussion.",
+        "Your area of interest has been recorded. Our team will review your preferred meeting option and contact you to arrange a discussion.",
     };
   } catch {
     return {
