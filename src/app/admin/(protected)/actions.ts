@@ -470,7 +470,7 @@ export async function assignLead(
     // Task #037: notificationEmail is selected for the non-blocking alert.
     const target = await prisma.user.findUnique({
       where: { id: targetUserId },
-      select: { id: true, role: true, name: true, email: true, notificationEmail: true },
+      select: { id: true, role: true, name: true, email: true, notificationEmail: true, isActive: true },
     });
     if (!target) {
       return { status: "error", message: "Assignee not found." };
@@ -480,6 +480,9 @@ export async function assignLead(
       return { status: "error", message: "Assignee must be a staff user." };
     }
 
+    if (!target.isActive) {
+      return { status: "error", message: "Assignee is inactive." };
+    }
     if (target.id === lead.assignedUserId) {
       return {
         status: "success",

@@ -361,6 +361,35 @@ runIfDb("assignLead through the real Server Action (DB integration)", () => {
     await prisma.lead.delete({ where: { id: leadId } });
   });
 
+  it("rejects assignment to an inactive Staff user without changing the lead", async () => {
+    asUser(ownerCaller);
+    const leadId = await createLead(PHONE_A, "AssignInactive");
+
+    try {
+      await prisma.user.update({
+        where: { id: STAFF1_ID },
+        data: { isActive: false },
+      });
+
+      const result = await assignLead(
+        null,
+        formData({ leadId, assignedUserId: STAFF1_ID }),
+      );
+
+      expect(result).toEqual({
+        status: "error",
+        message: "Assignee is inactive.",
+      });
+      expect((await getLead(leadId))?.assignedUserId).toBeNull();
+      expect(await getLatestEvent(leadId, "lead_assigned")).toBeNull();
+    } finally {
+      await prisma.user.update({
+        where: { id: STAFF1_ID },
+        data: { isActive: true },
+      });
+      await prisma.lead.deleteMany({ where: { id: leadId } });
+    }
+  });
   it("reassigns from Staff One to Staff Two with from/to audit metadata", async () => {
     asUser(ownerCaller);
     const leadId = await createLead(PHONE_A, "AssignReassign");
