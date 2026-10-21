@@ -3,6 +3,8 @@ import { requireCrmUser } from "@/server/auth/requireCrmUser";
 import { prisma } from "@/server/db/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { CompleteFollowUpButton } from "@/components/admin/CompleteFollowUpButton";
+import { BulkCompleteFollowUpsForm } from "@/components/admin/BulkCompleteFollowUpsForm";
+import { RescheduleFollowUpForm } from "@/components/admin/RescheduleFollowUpForm";
 import { FOLLOW_UP_PAGE_SIZE, formatCrmStatus, parseFollowUpWindow } from "@/lib/crm-phase2";
 
 export const dynamic = "force-dynamic";
@@ -71,6 +73,7 @@ export default async function FollowUpsPage({ searchParams }: { searchParams: Pr
       <section className="rounded-2xl border border-neutral-200 bg-white shadow-sm">
         <div className="border-b border-neutral-100 px-5 py-4 text-sm text-neutral-600">
           <strong className="text-neutral-900">{total}</strong> outstanding task{total === 1 ? "" : "s"} in this view
+          {tasks.length > 0 && <div className="mt-3"><BulkCompleteFollowUpsForm /></div>}
         </div>
         {tasks.length === 0 ? (
           <div className="px-6 py-12 text-center text-neutral-600">
@@ -82,7 +85,10 @@ export default async function FollowUpsPage({ searchParams }: { searchParams: Pr
           <ul className="divide-y divide-neutral-100">
             {tasks.map((task) => {
               const overdue = !!task.dueAt && task.dueAt.getTime() < now.getTime();
-              return <li key={task.id} className="grid gap-3 px-5 py-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+              return <li key={task.id} className="grid gap-3 px-5 py-4 lg:grid-cols-[auto_minmax(0,1fr)] lg:items-center">
+                <input form="phase28-bulk-follow-ups" type="checkbox" name="followUpIds" value={task.id}
+                  aria-label={`Select follow-up for ${task.lead.firstName} ${task.lead.lastName ?? ""}`}
+                  className="h-4 w-4 accent-mulberry-700" />
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <Link href={`/admin/leads/${task.lead.id}`} className="font-semibold text-mulberry-800 hover:underline">
@@ -98,7 +104,10 @@ export default async function FollowUpsPage({ searchParams }: { searchParams: Pr
                     {user.role === "admin" && !task.lead.assignedUser ? " · Unassigned" : ""}
                   </p>
                 </div>
-                <CompleteFollowUpButton id={task.id} />
+                <div className="col-start-2 flex flex-wrap items-center justify-between gap-3">
+                  {task.dueAt && <RescheduleFollowUpForm id={task.id} dueAtIso={task.dueAt.toISOString()} />}
+                  <CompleteFollowUpButton id={task.id} />
+                </div>
               </li>;
             })}
           </ul>

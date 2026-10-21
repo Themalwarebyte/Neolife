@@ -9,6 +9,7 @@ import {
   parseStatusChange,
 } from "@/lib/leadManagement";
 import { parseFollowUpDueAt } from "@/lib/crm-phase2";
+import { isChangedTaskDueAt, parseExpectedTaskDate, parseWorkflowSelection } from "@/lib/crm-workflows";
 import {
   parseMeetingStatus,
   parseOptionalText,
@@ -423,6 +424,198 @@ export async function completeFollowUp(
     return { status: "success", message: "Follow-up completed." };
   } catch {
     return { status: "error", message: "Could not complete follow-up." };
+  }
+}
+
+/**
+ * Manual Owner decision: assign up to 25 currently UNASSIGNED contacts to one
+ * active Staff user. The entire batch and its audit events commit atomically.
+ * Existing assignments and immutable referral attribution are never altered.
+ */
+export async function assignUnassignedLeadsBulk(
+  _previous: CrmActionResult | null,
+  formData: FormData,
+): Promise<CrmActionResult> {
+  const owner = await requireAdmin();
+  const selection = parseWorkflowSelection(formData.getAll("leadIds"));
+  if (!selection.valid) return { status: "error", message: selection.message };
+  const targetId = String(formData.get("targetUserId") ?? "").trim();
+  if (!isValidBetterAuthUserId(targetId)) {
+    return { status: "error", message: "Choose an active Staff member." };
+  }
+
+  try {
+    const outcome = await prisma.$transaction(async tx => {
+      const target = await tx.user.findUnique({
+        where: { id: targetId },
+        select: { id: true, name: true, role: true, isActive: true },
+      });
+      if (!target || target.role !== "staff" || !target.isActive) {
+        return { kind: "invalid_target" as const };
+      }
+      const available = await tx.lead.findMany({
+        where: { id: { in: selection.ids }, assignedUserId: null },
+        select: { id: true },
+      });
+      if (available.length !== selection.ids.length) {
+        return { kind: "changed" as const };
+      }
+      const updated = await tx.lead.updateMany({
+        where: { id: { in: selection.ids }, assignedUserId: null },
+        data: { assignedUserId: target.id },
+      });
+      if (updated.count !== selection.ids.length) {
+        throw new Error("CONCURRENT_BULK_ASSIGNMENT");
+      }
+      await tx.leadEvent.createMany({
+        data: selection.ids.map(leadId => ({
+          leadId, userId: owner.id, type: "lead_assigned",
+          metadata: { by: owner.id, from: null, to: target.id, source: "bulk_unassigned_queue" },
+        })),
+      });
+      return { kind: "success" as const, name: target.name, targetId: target.id };
+    });
+    if (outcome.kind === "invalid_target") {
+      return { status: "error", message: "The assignee is not an active Staff member." };
+    }
+    if (outcome.kind === "changed") {
+      return { status: "error", message: "One or more contacts are no longer unassigned. Refresh the queue." };
+    }
+
+    // Durable in-app notifications are best-effort AFTER the DB transaction.
+    // No email or automatic redistribution is performed by this batch.
+    for (const leadId of selection.ids) {
+      try {
+        await tryRecordAssignmentNotification({
+          recipientUserId: outcome.targetId,
+          leadId,
+          kind: "assigned_to_you",
+          dedupKey: `lead_alert:assigned_to_you:${leadId}:${outcome.targetId}`,
+        });
+      } catch { /* Keep a committed assignment even if a notification fails. */ }
+    }
+    revalidatePath("/admin/workflows");
+    revalidatePath("/admin/leads");
+    revalidatePath("/admin/analytics");
+    for (const leadId of selection.ids) revalidatePath(`/admin/leads/${leadId}`);
+    return {
+      status: "success",
+      message: `${selection.ids.length} contact(s) assigned to ${outcome.name}.`,
+    };
+  } catch {
+    return { status: "error", message: "Could not assign the selected contacts. No partial batch was saved." };
+  }
+}
+
+/**
+ * Manually reschedule one outstanding task. The original due date acts as an
+ * optimistic-lock token so stale forms cannot overwrite someone else's work.
+ */
+export async function rescheduleFollowUp(
+  _previous: CrmActionResult | null,
+  formData: FormData,
+): Promise<CrmActionResult> {
+  const user = await requireCrmUser();
+  const followUpId = String(formData.get("followUpId") ?? "").trim();
+  if (!UUID.test(followUpId)) return { status: "error", message: "Invalid follow-up." };
+  const expected = parseExpectedTaskDate(formData.get("expectedDueAt"));
+  const requested = parseFollowUpDueAt(formData.get("dueAtIso"));
+  if (!expected || !requested.valid || !requested.dueAt) {
+    return { status: "error", message: "Select a valid future date and refresh any stale task." };
+  }
+
+  try {
+    const outcome = await prisma.$transaction(async tx => {
+      const scope = user.role === "admin"
+        ? { id: followUpId }
+        : { id: followUpId, lead: { assignedUserId: user.id } };
+      const task = await tx.followUp.findFirst({
+        where: scope,
+        select: { id: true, leadId: true, dueAt: true, completedAt: true },
+      });
+      if (!task || !task.dueAt || task.completedAt) return { kind: "missing" as const };
+      if (task.dueAt.getTime() !== expected.getTime()) return { kind: "changed" as const };
+      if (!isChangedTaskDueAt(task.dueAt, requested.dueAt!)) {
+        return { kind: "unchanged" as const };
+      }
+      const updated = await tx.followUp.updateMany({
+        where: { ...scope, dueAt: expected, completedAt: null },
+        data: { dueAt: requested.dueAt! },
+      });
+      if (updated.count !== 1) throw new Error("CONCURRENT_RESCHEDULE");
+      await tx.leadEvent.create({
+        data: {
+          leadId: task.leadId, userId: user.id, type: "follow_up_rescheduled",
+          metadata: {
+            followUpId, from: expected.toISOString(), to: requested.dueAt!.toISOString(),
+          },
+        },
+      });
+      return { kind: "success" as const, leadId: task.leadId };
+    });
+    if (outcome.kind === "missing") return { status: "error", message: "Task not found, already completed, or not assigned to you." };
+    if (outcome.kind === "changed") return { status: "error", message: "Task was rescheduled elsewhere; refresh and retry." };
+    if (outcome.kind === "unchanged") return { status: "success", message: "Due date is unchanged." };
+    revalidatePath("/admin/follow-ups");
+    revalidatePath("/admin/workflows");
+    revalidatePath("/admin/analytics");
+    revalidatePath(`/admin/leads/${outcome.leadId}`);
+    return { status: "success", message: "Follow-up rescheduled." };
+  } catch {
+    return { status: "error", message: "Could not reschedule task. No partial change was saved." };
+  }
+}
+
+/** Complete 1–25 selected scheduled tasks atomically with one audit per task. */
+export async function completeFollowUpsBulk(
+  _previous: CrmActionResult | null,
+  formData: FormData,
+): Promise<CrmActionResult> {
+  const user = await requireCrmUser();
+  const selection = parseWorkflowSelection(formData.getAll("followUpIds"));
+  if (!selection.valid) return { status: "error", message: selection.message };
+  try {
+    const result = await prisma.$transaction(async tx => {
+      const scope = user.role === "admin" ? {} : { lead: { assignedUserId: user.id } };
+      const tasks = await tx.followUp.findMany({
+        where: { id: { in: selection.ids }, ...scope },
+        select: { id: true, leadId: true, dueAt: true, completedAt: true },
+      });
+      if (tasks.length !== selection.ids.length) return { kind: "inaccessible" as const };
+      if (tasks.some(task => !task.dueAt)) return { kind: "note" as const };
+      const pending = tasks.filter(task => !task.completedAt);
+      if (!pending.length) return { kind: "already" as const };
+      const completedAt = new Date();
+      const updated = await tx.followUp.updateMany({
+        where: {
+          id: { in: pending.map(task => task.id) }, completedAt: null,
+          dueAt: { not: null }, ...scope,
+        },
+        data: { completedAt },
+      });
+      if (updated.count !== pending.length) throw new Error("CONCURRENT_BULK_COMPLETION");
+      await tx.leadEvent.createMany({
+        data: pending.map(task => ({
+          leadId: task.leadId, userId: user.id, type: "follow_up_completed",
+          metadata: { followUpId: task.id, source: "bulk_follow_up_queue" },
+        })),
+      });
+      return {
+        kind: "success" as const,
+        count: pending.length,
+        leadIds: [...new Set(pending.map(task => task.leadId))],
+      };
+    });
+    if (result.kind === "inaccessible") return { status: "error", message: "A selected task is no longer accessible. Refresh the queue." };
+    if (result.kind === "note") return { status: "error", message: "Plain CRM notes cannot be completed as tasks." };
+    if (result.kind === "already") return { status: "success", message: "All selected tasks were already completed." };
+    revalidatePath("/admin/follow-ups");
+    revalidatePath("/admin/workflows");
+    revalidatePath("/admin/analytics");
+    for (const leadId of result.leadIds) revalidatePath(`/admin/leads/${leadId}`);
+    return { status: "success", message: `${result.count} follow-up task(s) completed.` };
+  } catch {
+    return { status: "error", message: "Could not complete the selected tasks. No partial batch was saved." };
   }
 }
 
