@@ -1,13 +1,13 @@
-﻿# NEOLIFE — Master Project Plan
+# NEOLIFE � Master Project Plan
 
 > **Authoritative project control document.**
 > The single source of truth for the scope, order, decisions, and completion rules of the NEOLIFE business platform.
 > Every future implementation task MUST begin by reading this document and identifying the current phase, task, dependencies, required decisions, and completion criteria.
 
-**Current Phase:** PHASE 1 — TRAFFIC MVP
-**Status:** 🟩 PHASE 1 COMPLETE — Phase 0 🟩 COMPLETE. All Phase 1 tasks 1.1–1.11 🟩 DONE. **333/333 tests PASS** (222 without `DATABASE_URL` + 111 DB-enabled) · E2E **29/29 PASS** via system Chrome. P-1 (Registration/business-interest flow) 🟩 DONE. P-2 (Admin user management) 🟩 **DONE**. P-3 Referral + Communications: COMPLETE IN MASTER / NOT DEPLOYED. **Production deployment 🟩 LIVE** at `https://neolife.ooflowdesk.com`. See `docs/STATUS.md`.
+**Current Phase:** PHASE 28B � CRM OPERATIONAL TRIAGE (COMPLETE, DEPLOYED & OWNER-ACCEPTED)
+**Status:** ?? PHASE 28B COMPLETE, DEPLOYED & OWNER-ACCEPTED (Phase 1 complete; Phases 26-28 complete) � Phase 0 ?? COMPLETE. All Phase 1 tasks 1.1�1.11 ?? DONE. **333/333 tests PASS** (222 without `DATABASE_URL` + 111 DB-enabled) � E2E **29/29 PASS** via system Chrome. P-1 (Registration/business-interest flow) ?? DONE. P-2 (Admin user management) ?? **DONE**. P-3 Referral + Communications: COMPLETE IN MASTER / NOT DEPLOYED. **Production deployment ?? LIVE** at `https://neolife.ooflowdesk.com`. See `docs/STATUS.md`.
 
-> **Test-count convention (official):** the suite contains **333 tests** in total — **222** run without `DATABASE_URL`, plus **111** additional DB-enabled tests that require a local PostgreSQL instance. Any documentation quoting a different total (e.g. `222`, `2026/206`, `43/43`, `29/29`, `36/36`) refers to a superseded, historical baseline and must not be used as the current figure.
+> **Test-count convention (official):** the suite contains **333 tests** in total � **222** run without `DATABASE_URL`, plus **111** additional DB-enabled tests that require a local PostgreSQL instance. Any documentation quoting a different total (e.g. `222`, `2026/206`, `43/43`, `29/29`, `36/36`) refers to a superseded, historical baseline and must not be used as the current figure.
 
 ---
 
@@ -15,11 +15,11 @@
 
 **NEOLIFE** is a direct-selling / network-marketing business opportunity (nutritional/wellness products) targeting the Kenyan market.
 
-**What this platform is intended to accomplish:** to be the digital business-acquisition engine for the NEOLIFE organization — receiving paid advertising traffic, converting visitors into identifiable and trackable business prospects, qualifying them, and moving qualified prospects toward registration and an office meeting, then follow-up and promoter/business-builder conversion.
+**What this platform is intended to accomplish:** to be the digital business-acquisition engine for the NEOLIFE organization � receiving paid advertising traffic, converting visitors into identifiable and trackable business prospects, qualifying them, and moving qualified prospects toward registration and an office meeting, then follow-up and promoter/business-builder conversion.
 
 **Long-term vision:** a complete business platform (marketing, advertising, lead generation, advertising attribution, lead qualification, CRM, registration/application, office meeting management, follow-up, promoter onboarding/dashboard, customer management, product management, orders/sales, referrals, team/downline, training/business academy, marketing resources, business analytics, commission-related architecture, administration, security, audit logging, reporting, notifications, automation, monitoring, performance/scaling, production deployment, post-launch optimization).
 
-**MVP strategy:** *Full platform blueprint → Traffic MVP → launch paid ads → collect real traffic/lead data → iterate → progressively build the full platform.*
+**MVP strategy:** *Full platform blueprint ? Traffic MVP ? launch paid ads ? collect real traffic/lead data ? iterate ? progressively build the full platform.*
 
 The first objective is **NOT** to finish the entire platform. The first objective is to create a professional, secure, measurable destination for paid advertising traffic.
 
@@ -29,14 +29,14 @@ The first objective is **NOT** to finish the entire platform. The first objectiv
 
 | Role | Authority |
 |---|---|
-| 👤 **Owner** | Final decision-maker on all business, product, architecture, security, UX/UI, technology, budget, and launch decisions. |
-| 🧠 **ChatGPT** | Architect / researcher / security advisor. Researches, recommends, analyzes, challenges assumptions, reviews architecture and security, helps define requirements. Does NOT make final owner decisions. |
-| 🤖 **Kilo** | Implementation agent. Inspects the codebase, implements approved work, tests, reports results, and updates this plan. Does NOT silently make critical business or architectural decisions. |
+| ?? **Owner** | Final decision-maker on all business, product, architecture, security, UX/UI, technology, budget, and launch decisions. |
+| ?? **ChatGPT** | Architect / researcher / security advisor. Researches, recommends, analyzes, challenges assumptions, reviews architecture and security, helps define requirements. Does NOT make final owner decisions. |
+| ?? **Kilo** | Implementation agent. Inspects the codebase, implements approved work, tests, reports results, and updates this plan. Does NOT silently make critical business or architectural decisions. |
 
 **Decision rule:** when a decision is required, Kilo stops that work item and clearly reports:
 
 
-🟨 OWNER DECISION REQUIRED
+?? OWNER DECISION REQUIRED
 - Phase:
 - Decision:
 - Option A:
@@ -59,7 +59,7 @@ Kilo does not implement beyond the decision unless the owner approves it.
 6. Security by design.
 7. Do not silently make owner decisions.
 8. Do not build outside approved scope.
-9. Local-first development (build → test → validate → deploy → verify).
+9. Local-first development (build ? test ? validate ? deploy ? verify).
 10. Production isolation.
 11. Design for expansion; do not build future features speculatively.
 
@@ -69,11 +69,11 @@ Kilo does not implement beyond the decision unless the owner approves it.
 
 | Status | Meaning |
 |---|---|
-| 🟩 DONE | completed, tested and accepted |
-| 🔵 IN PROGRESS | currently being worked on |
-| 🟨 AWAITING DECISION | requires owner decision |
-| ⚪ NOT STARTED | planned but not started |
-| 🔴 BLOCKED | cannot proceed due to dependency/problem |
+| ?? DONE | completed, tested and accepted |
+| ?? IN PROGRESS | currently being worked on |
+| ?? AWAITING DECISION | requires owner decision |
+| ? NOT STARTED | planned but not started |
+| ?? BLOCKED | cannot proceed due to dependency/problem |
 
 Never mark something DONE merely because it is planned.
 
@@ -90,18 +90,18 @@ This is more important than having every page or feature of the eventual platfor
 ## 6. Core Funnel
 
 
-PAID AD → LANDING PAGE → LEAD CAPTURE → QUALIFICATION / EDUCATION → REGISTRATION / BUSINESS INTEREST → OFFICE MEETING → FOLLOW-UP → PROMOTER / BUSINESS BUILDER
+PAID AD ? LANDING PAGE ? LEAD CAPTURE ? QUALIFICATION / EDUCATION ? REGISTRATION / BUSINESS INTEREST ? OFFICE MEETING ? FOLLOW-UP ? PROMOTER / BUSINESS BUILDER
 
 
 **North-star measurement chain (architected now, refined later):**
 
-`Ad spend → visitors → leads → qualified leads → registrations → meetings → attendance → promoters
+`Ad spend ? visitors ? leads ? qualified leads ? registrations ? meetings ? attendance ? promoters
 
 The first implementation does not need advanced analytics, but the architecture must not prevent this tracking.
 
 ---
 
-## 7. Full Platform Vision (long-term — NOT the MVP)
+## 7. Full Platform Vision (long-term � NOT the MVP)
 
 The complete platform is expected to eventually include:
 
@@ -142,9 +142,9 @@ The architecture must account for future expansion without implementing all of i
 
 ## 8. MVP Strategy & Timeframe
 
-**Not** "build everything → finish → launch." Instead:
+**Not** "build everything ? finish ? launch." Instead:
 
-**FULL PLATFORM BLUEPRINT → TRAFFIC MVP → LAUNCH PAID ADS → COLLECT REAL TRAFFIC/LEAD DATA → ITERATE → PROGRESSIVELY BUILD THE FULL PLATFORM**
+**FULL PLATFORM BLUEPRINT ? TRAFFIC MVP ? LAUNCH PAID ADS ? COLLECT REAL TRAFFIC/LEAD DATA ? ITERATE ? PROGRESSIVELY BUILD THE FULL PLATFORM**
 
 Target MVP timeframe:
 
@@ -160,23 +160,23 @@ Do NOT allow the MVP to expand into the full platform.
 
 | Phase | Name | Status |
 |---|---|---|
-| PHASE 0 | Project Foundation / Planning | 🟩 DONE (Owner authorization recorded 2026-09-08) |
-| PHASE 1 | Traffic MVP | 🟩 COMPLETE (deployed — production LIVE) |
-| PHASE 2 | Conversion & CRM Deepening | ⚪ NOT STARTED |
-| PHASE 3 | Promoter System | ⚪ NOT STARTED |
-| PHASE 4 | Commerce (Customer / Product / Orders) | ⚪ NOT STARTED |
-| PHASE 5 | Network (Referrals / Team / Downline) | ⚪ NOT STARTED |
-| PHASE 6 | P-3 Referral + Communications | 🟩 COMPLETE IN MASTER / NOT DEPLOYED |
+| PHASE 0 | Project Foundation / Planning | ?? DONE (Owner authorization recorded 2026-09-08) |
+| PHASE 1 | Traffic MVP | ?? COMPLETE (deployed � production LIVE) |
+| PHASE 2 | Conversion & CRM Deepening | ? NOT STARTED |
+| PHASE 3 | Promoter System | ? NOT STARTED |
+| PHASE 4 | Commerce (Customer / Product / Orders) | ? NOT STARTED |
+| PHASE 5 | Network (Referrals / Team / Downline) | ? NOT STARTED |
+| PHASE 6 | P-3 Referral + Communications | ?? COMPLETE IN MASTER / NOT DEPLOYED |
 | PHASE 6 | Two-user & Resend Framework | COMPLETE IN MASTER / NOT DEPLOYED |
-| PHASE 7 | Education & Marketing Resources | ⚪ NOT STARTED |
-| PHASE 7 | Commission-related functionality | ⚪ NOT STARTED |
-| PHASE 8 | Platform Operations (Automation / Notifications / Monitoring / Scaling / Hardening) | ⚪ NOT STARTED |
+| PHASE 7 | Education & Marketing Resources | ? NOT STARTED |
+| PHASE 7 | Commission-related functionality | ? NOT STARTED |
+| PHASE 8 | Platform Operations (Automation / Notifications / Monitoring / Scaling / Hardening) | ? NOT STARTED |
 
 Cross-cutting concerns (security, audit logging, reporting) are introduced in Phase 0/1 and deepened throughout, rather than deferred wholesale.
 
 ---
 
-## 10. PHASE 0 — Project Foundation / Planning
+## 10. PHASE 0 � Project Foundation / Planning
 
 **Purpose:** establish the authoritative project plan, technology baseline, scope, and decisions before any implementation.
 
@@ -189,14 +189,14 @@ Cross-cutting concerns (security, audit logging, reporting) are introduced in Ph
 
 **Tasks:**
 
-- [x] Inspect workspace and environment (DONE — greenfield confirmed).
+- [x] Inspect workspace and environment (DONE � greenfield confirmed).
 - [x] Draft and write the Master Project Plan (this document).
 - [x] Owner + ChatGPT review and approve/revise the plan.
 - [x] Owner authorization to begin Phase 1 recorded (2026-09-08).
 
 **Dependencies:** none.
 
-**Owner decisions required:** approval of this plan; the decisions in §19.
+**Owner decisions required:** approval of this plan; the decisions in �19.
 
 **Risks:** scope creep; premature technical commitment.
 
@@ -206,21 +206,21 @@ Cross-cutting concerns (security, audit logging, reporting) are introduced in Ph
 
 **Documentation requirements:** this `docs/PROJECT_PLAN.md`.
 
-**Completion criteria:** Owner explicitly approves the written plan. — **MET (2026-09-08).**
+**Completion criteria:** Owner explicitly approves the written plan. � **MET (2026-09-08).**
 
-**Current status:** 🟩 DONE — plan approved; Phase 1 authorized by Owner (see `docs/DECISIONS.md`, D-001).
+**Current status:** ?? DONE � plan approved; Phase 1 authorized by Owner (see `docs/DECISIONS.md`, D-001).
 
-**Next action:** Begin Phase 1 — record the approved technology decision, then foundation/scaffolding.
+**Next action:** Begin Phase 1 � record the approved technology decision, then foundation/scaffolding.
 
 ---
 
-## 11. PHASE 1 — Traffic MVP
+## 11. PHASE 1 � Traffic MVP
 
 **Purpose:** create the smallest production-ready, measurable paid-advertising funnel that takes a stranger to a lead and moves them into the office pipeline.
 
-**MVP North Star:** see §5.
+**MVP North Star:** see �5.
 
-### 11.1 🟢 REQUIRED FOR FIRST PAID-TRAFFIC LAUNCH
+### 11.1 ?? REQUIRED FOR FIRST PAID-TRAFFIC LAUNCH
 
 **Public side:**
 
@@ -244,7 +244,7 @@ Cross-cutting concerns (security, audit logging, reporting) are introduced in Ph
 - Server-side validation
 - Consent handling
 - Consent record + consent timestamp stored with each lead
-- PII minimization — collect only Owner-approved fields; no unnecessary personal information
+- PII minimization � collect only Owner-approved fields; no unnecessary personal information
 - Lead stored in database (with source/campaign)
 
 **Qualification:**
@@ -259,11 +259,11 @@ Cross-cutting concerns (security, audit logging, reporting) are introduced in Ph
 - Lead status managemen
 - Basic CRM/admin interface (view leads, view detail, update status, record follow-up, view campaign/source)
 
-> The CRM lifecycle is the Owner-approved **initial model** (§19 item 4, `docs/DECISIONS.md` D-003). Do not hard-code business assumptions beyond the approved MVP requirement; statuses must remain data-driven and extensible.
+> The CRM lifecycle is the Owner-approved **initial model** (�19 item 4, `docs/DECISIONS.md` D-003). Do not hard-code business assumptions beyond the approved MVP requirement; statuses must remain data-driven and extensible.
 
 **Registration & office pipeline:**
 
-- Registration / business-interest tracking — records business interest and entry into the office pipeline. The platform is **NOT** the authoritative NeoLife distributor-registration system; it tracks interest and internal pipeline state only.
+- Registration / business-interest tracking � records business interest and entry into the office pipeline. The platform is **NOT** the authoritative NeoLife distributor-registration system; it tracks interest and internal pipeline state only.
 - Office meeting request/record
 - Meeting date/time
 - Meeting status/outcome
@@ -271,7 +271,7 @@ Cross-cutting concerns (security, audit logging, reporting) are introduced in Ph
 
 **Analytics:**
 
-- First-party funnel event tracking (first-party events + attribution — this is NOT a custom analytics platform)
+- First-party funnel event tracking (first-party events + attribution � this is NOT a custom analytics platform)
 - Basic analytics (visitors, leads, lead source, conversion events) built on those first-party events
 
 **Security & quality:**
@@ -284,7 +284,7 @@ Cross-cutting concerns (security, audit logging, reporting) are introduced in Ph
 
 - Data-retention policy for lead/event data (documented; enforced where practical)
 - Lead correction/deletion mechanism (admin-accessible)
-- Access control — lead data restricted to authenticated admin role
+- Access control � lead data restricted to authenticated admin role
 - Privacy context documented (what is collected, why, how long kept)
 
 **Build & test:**
@@ -292,9 +292,9 @@ Cross-cutting concerns (security, audit logging, reporting) are introduced in Ph
 - Production build succeeds
 - Unit + E2E testing sufficient for launch confidence
 
-**Critical launch test:** `AD → LANDING PAGE → LEAD → QUALIFICATION → REGISTRATION → OFFICE PIPELINE → FOLLOW-UP` — we must be able to track this journey end-to-end.
+**Critical launch test:** `AD ? LANDING PAGE ? LEAD ? QUALIFICATION ? REGISTRATION ? OFFICE PIPELINE ? FOLLOW-UP` � we must be able to track this journey end-to-end.
 
-### 11.2 ⚪ POST-LAUNCH ENHANCEMENTS (NOT in the critical launch path)
+### 11.2 ? POST-LAUNCH ENHANCEMENTS (NOT in the critical launch path)
 
 - Advanced CRM automation
 - Sophisticated dashboards
@@ -314,14 +314,14 @@ Cross-cutting concerns (security, audit logging, reporting) are introduced in Ph
 
 These remain outside the MVP unless inspection proves a real architectural dependency exists.
 
-### 11.3 Office scheduling — deliberately simple
+### 11.3 Office scheduling � deliberately simple
 
 For first launch, DO NOT build a sophisticated calendar-booking system.
 
 Preferred MVP workflow:
 
 
-Prospect submits interest → Lead enters CRM → Office/admin contacts prospect → Meeting date/time recorded → Attendance recorded → Outcome recorded → Follow-up
+Prospect submits interest ? Lead enters CRM ? Office/admin contacts prospect ? Meeting date/time recorded ? Attendance recorded ? Outcome recorded ? Follow-up
 
 
 Self-service calendar booking is a later enhancement.
@@ -350,7 +350,7 @@ MVP is NOT complete merely because pages exist. ALL of the following must be ver
 18. Documentation is updated.
 19. Project plan is updated.
 20. Owner has reviewed/accepted the release.
-21. Paid-traffic launch gate (§11.6) has been passed.
+21. Paid-traffic launch gate (�11.6) has been passed.
 
 ### 11.6 Paid-traffic launch gate (pre-advertising review)
 
@@ -361,7 +361,7 @@ Actual advertising must NOT go live until the following have been reviewed and a
 - Consent and privacy implementation (consent capture, record, timestamp, privacy pages with approved content)
 - Relevant compliance requirements (NeoLife rules; Kenya data-protection context)
 
-This gate is an Owner (and where relevant legal) review step — a launch dependency, recorded in `docs/DECISIONS.md` when passed.
+This gate is an Owner (and where relevant legal) review step � a launch dependency, recorded in `docs/DECISIONS.md` when passed.
 
 ### 11.7 MVP Deployment Milestone
 
@@ -371,25 +371,25 @@ Once the public landing page has been implemented and passes its applicable loca
 
 
 Local implementation
-        ↓
+        ?
 Local testing
-        ↓
+        ?
 Landing page / MVP launch-readiness verification
-        ↓
+        ?
 Owner production deployment authorization
-        ↓
+        ?
 Connect/configure owner's production server
-        ↓
+        ?
 Configure domain/DNS/HTTPS/reverse proxy as required
-        ↓
+        ?
 Configure production environment/secrets
-        ↓
+        ?
 Deploy the approved build
-        ↓
+        ?
 Production smoke testing
-        ↓
+        ?
 Owner production review/acceptance
-        ↓
+        ?
 Paid advertising launch
 
 
@@ -408,25 +408,25 @@ Paid advertising launch
 
 **Important:** the ability to deploy the landing page early does NOT mean the complete NEOLIFE platform is finished. The landing page/MVP can be deployed as the first production slice while later platform capabilities continue to be developed progressively.
 
-**Deployment status:** 🟩 **DEPLOYED — production is LIVE** at `https://neolife.ooflowdesk.com`, managed through the Owner's existing infrastructure (Docker Compose + Cloudflare Tunnel). See `docs/DEPLOYMENT.md` for the current production record and runbook.
+**Deployment status:** ?? **DEPLOYED � production is LIVE** at `https://neolife.ooflowdesk.com`, managed through the Owner's existing infrastructure (Docker Compose + Cloudflare Tunnel). See `docs/DEPLOYMENT.md` for the current production record and runbook.
 
 ### 11.5 Phase 1 attributes
 
-**Dependencies:** Phase 0 approval; §19 "before coding" decisions for the relevant components.
+**Dependencies:** Phase 0 approval; �19 "before coding" decisions for the relevant components.
 
 **Owner decisions required:** stack, local DB, lead form fields, CRM statuses (before coding those components); hosting/domain, ad platforms, legal copy, meeting-model confirmation (before launch).
 
 **Risks:** scope creep; ad-platform policy; conversion uncertainty; legal wording pending.
 
-**Security requirements:** §15 baseline from the first commit (auth, validation, secrets, rate limiting, audit logging of funnel events).
+**Security requirements:** �15 baseline from the first commit (auth, validation, secrets, rate limiting, audit logging of funnel events).
 
 **Testing requirements:** unit + E2E coverage of the critical launch path; production build verification.
 
 **Documentation requirements:** keep this plan updated; add `STATUS.md`, `ARCHITECTURE.md`, `DECISIONS.md`, `CHANGELOG.md` as implementation begins.
 
-**Completion criteria:** §11.4 (all 20 items).
+**Completion criteria:** �11.4 (all 20 items).
 
-**Current status:** ⚪ NOT STARTED.
+**Current status:** ? NOT STARTED.
 
 **Next action:** owner approval of this plan, then stack confirmation and project scaffolding.
 
@@ -434,31 +434,31 @@ Paid advertising launch
 
 ## 12. Later Phases (progressive expansion after MVP launch)
 
-### PHASE 2 — Conversion & CRM Deepening
+### PHASE 2 � Conversion & CRM Deepening
 **Purpose:** improve conversion and follow-up using real traffic/lead data.
 Qualification automation, follow-up workflows, attribution/analytics depth, admin UX improvements.
 
-### PHASE 3 — Promoter System
+### PHASE 3 � Promoter System
 **Purpose:** onboard and support promoters/business builders.
 Promoter onboarding, promoter dashboard, promoter tools.
 
-### PHASE 4 — Commerce
+### PHASE 4 � Commerce
 **Purpose:** support customers and product sales.
 Customer management, product catalogue, orders/sales.
 
-### PHASE 5 — Network
+### PHASE 5 � Network
 **Purpose:** model relationships.
 Referrals, team/downline relationships.
 
-### PHASE 6 — Education & Marketing Resources
+### PHASE 6 � Education & Marketing Resources
 **Purpose:** enable training and marketing.
 Training/business academy, marketing resources.
 
-### PHASE 7 — Commission-related functionality
+### PHASE 7 � Commission-related functionality
 **Purpose:** compensation where appropriate (requires legal review).
 Commission calculation architecture (carefully; owner/legal approval).
 
-### PHASE 8 — Platform Operations
+### PHASE 8 � Platform Operations
 **Purpose:** scale and harden.
 Notifications, automation, monitoring, performance/scaling, security hardening, admin/reporting enhancements, deployment optimization.
 
@@ -471,7 +471,7 @@ Each later phase will be fully specified (with its 11 attributes) before it begi
 The architecture must support dedicated campaign destinations. Example:
 
 
-Paid Advertisement → neolife.ooflowdesk.com/business → Business opportunity presentation → CTA → Lead capture → Qualification → CRM → Office follow-up
+Paid Advertisement ? neolife.ooflowdesk.com/business ? Business opportunity presentation ? CTA ? Lead capture ? Qualification ? CRM ? Office follow-up
 
 
 The exact URL remains an owner decision, but the system must support campaign-specific landing pages/paths.
@@ -504,10 +504,10 @@ The platform must avoid deceptive marketing. Plan for:
 
 **Separation of concerns:**
 
-- **Technical implementation** (page structures, routes, consent capture) — can proceed during development.
-- **Owner/legal approval of content** — a **launch dependency**, not a blocker to early technical development.
+- **Technical implementation** (page structures, routes, consent capture) � can proceed during development.
+- **Owner/legal approval of content** � a **launch dependency**, not a blocker to early technical development.
 
-🟨 **OWNER / LEGAL REVIEW REQUIRED** — exact NeoLife compliance wording and Kenya-specific legal text.
+?? **OWNER / LEGAL REVIEW REQUIRED** � exact NeoLife compliance wording and Kenya-specific legal text.
 
 ---
 
@@ -538,14 +538,14 @@ The platform must avoid deceptive marketing. Plan for:
 ## 16. Local-First Development & Deploymen
 
 
-Local development → Local testing → MVP acceptance → Production deployment to owner's server → Paid advertising
+Local development ? Local testing ? MVP acceptance ? Production deployment to owner's server ? Paid advertising
 
 
 - Development happens locally first.
 - Production deployment does not happen immediately.
 - Deployment requirements (Docker, reverse proxy, tunnel) are documented here and finalized in a later task; production is isolated from development.
 
-**Definition of "production-ready":** for this project, production-ready means **MVP launch readiness** (§11.4) — a secure, tested, deployable Traffic MVP. It does NOT mean full-platform or enterprise completeness.
+**Definition of "production-ready":** for this project, production-ready means **MVP launch readiness** (�11.4) � a secure, tested, deployable Traffic MVP. It does NOT mean full-platform or enterprise completeness.
 
 ---
 
@@ -553,7 +553,7 @@ Local development → Local testing → MVP acceptance → Production deployment
 
 NEOLIFE must be independently deployable and independently usable. It must NOT depend on ZongFitness for traffic, authentication, functionality, or operation.
 
-The ecosystem may eventually allow controlled connections between NEOLIFE, ZongFitness, products, customers, business prospects, and promoters (e.g., a fitness customer later becomes a business prospect). These relationships are considered during architecture planning only — NOT implemented in this task.
+The ecosystem may eventually allow controlled connections between NEOLIFE, ZongFitness, products, customers, business prospects, and promoters (e.g., a fitness customer later becomes a business prospect). These relationships are considered during architecture planning only � NOT implemented in this task.
 
 ---
 
@@ -561,31 +561,31 @@ The ecosystem may eventually allow controlled connections between NEOLIFE, ZongF
 
 - **KNOWN:** workspace is an empty greenfield directory; not a git repository; no server target defined.
 - **ASSUMED:** owner has NEOLIFE business rights and will supply brand/compliance assets; Kenyan market is the primary target; paid ads are Meta/Instagram-led initially.
-- **REQUIRES OWNER DECISION:** see §19.
+- **REQUIRES OWNER DECISION:** see �19.
 
 ---
 
 ## 19. Owner Decisions Required
 
-> **Status note (2026-09-08):** Decisions 1–4 were Owner-approved together with plan acceptance and are recorded in `docs/DECISIONS.md` (D-001/D-002). Decisions 5–8 remain pre-launch decisions and do not block local development.
+> **Status note (2026-09-08):** Decisions 1�4 were Owner-approved together with plan acceptance and are recorded in `docs/DECISIONS.md` (D-001/D-002). Decisions 5�8 remain pre-launch decisions and do not block local development.
 
-### 🟨 MUST DECIDE BEFORE CODING THE RELEVANT COMPONENT
+### ?? MUST DECIDE BEFORE CODING THE RELEVANT COMPONENT
 
-1. **Technology stack** — recommended: Next.js 16 + React 19 + TypeScript + PostgreSQL 16 + Prisma 7 + Better Auth + Zod + Tailwind 4 + pnpm (matches the existing ecosystem). *Alternative:* simpler stack. Blocks: project scaffolding.
-2. **Database for local dev** — recommended: local Docker PostgreSQL. *Alternative:* managed/hosted. Blocks: data-layer development (schema design can precede final DB choice).
-3. **Lead form fields (exact)** — recommended: Name, Phone, Email, Country/City, interest type, consent. Blocks: lead capture component.
-4. **CRM lead status set (exact)** — recommended: New Lead → Contacted → Qualified → Registered → Meeting Scheduled → Meeting Attended → Follow-Up → Converted / Not Interested (+ Disqualified). Blocks: CRM status workflow.
+1. **Technology stack** � recommended: Next.js 16 + React 19 + TypeScript + PostgreSQL 16 + Prisma 7 + Better Auth + Zod + Tailwind 4 + pnpm (matches the existing ecosystem). *Alternative:* simpler stack. Blocks: project scaffolding.
+2. **Database for local dev** � recommended: local Docker PostgreSQL. *Alternative:* managed/hosted. Blocks: data-layer development (schema design can precede final DB choice).
+3. **Lead form fields (exact)** � recommended: Name, Phone, Email, Country/City, interest type, consent. Blocks: lead capture component.
+4. **CRM lead status set (exact)** � recommended: New Lead ? Contacted ? Qualified ? Registered ? Meeting Scheduled ? Meeting Attended ? Follow-Up ? Converted / Not Interested (+ Disqualified). Blocks: CRM status workflow.
 
-### 🟨 MUST DECIDE BEFORE PRODUCTION / PAID-TRAFFIC LAUNCH
+### ?? MUST DECIDE BEFORE PRODUCTION / PAID-TRAFFIC LAUNCH
 
-5. **Hosting / domain target** — recommended: subdomain on existing infra (e.g., `neolife.ooflowdesk.com`) or dedicated domain. Blocks: production deployment only.
-6. **Advertising platforms & tracking for MVP** — recommended: UTM + Meta Pixel + GA4. Blocks: paid-traffic launch measurement.
-7. **Legal/compliance content** — owner/legal supplies or approves NeoLife disclosures, Terms, Privacy, Disclaimers. Blocks: paid-traffic launch (placeholders allowed during development).
-8. **Meeting scheduling model (confirm simple workflow)** — recommended: office/admin-driven (prospect submits → office contacts). Blocks: final office workflow acceptance.
+5. **Hosting / domain target** � recommended: subdomain on existing infra (e.g., `neolife.ooflowdesk.com`) or dedicated domain. Blocks: production deployment only.
+6. **Advertising platforms & tracking for MVP** � recommended: UTM + Meta Pixel + GA4. Blocks: paid-traffic launch measurement.
+7. **Legal/compliance content** � owner/legal supplies or approves NeoLife disclosures, Terms, Privacy, Disclaimers. Blocks: paid-traffic launch (placeholders allowed during development).
+8. **Meeting scheduling model (confirm simple workflow)** � recommended: office/admin-driven (prospect submits ? office contacts). Blocks: final office workflow acceptance.
 
-### 🟨 CAN BE DECIDED LATER (do not block MVP)
+### ?? CAN BE DECIDED LATER (do not block MVP)
 
-Promoter dashboard scope · commission rules · product catalogue structure · team/downline structure · training academy content model · notification channels (SMS/WhatsApp/email) · email/SMS provider · analytics tooling depth · referral program rules · self-service calendar booking.
+Promoter dashboard scope � commission rules � product catalogue structure � team/downline structure � training academy content model � notification channels (SMS/WhatsApp/email) � email/SMS provider � analytics tooling depth � referral program rules � self-service calendar booking.
 
 ---
 
@@ -597,7 +597,7 @@ Promoter dashboard scope · commission rules · product catalogue structure · t
 - **Advertising:** ad-platform policy/account risk from income/health claims; weak attribution.
 - **Conversion:** unknown conversion rates until real traffic; mobile conversion quality.
 - **Compliance:** NeoLife marketing rules; Kenya data protection; no invented claims.
-- **Integration:** future NEOLIFE↔ZongFitness coupling done wrongly.
+- **Integration:** future NEOLIFE?ZongFitness coupling done wrongly.
 - **Performance:** landing page speed under paid traffic.
 
 ---
@@ -622,21 +622,21 @@ When a phase meets its completion criteria, explicitly report: **"PHASE X IS COM
 
 | Area | Status |
 |---|---|
-| Current phase | PHASE 1 — Traffic MVP |
-| Plan document | 🟩 Written and updated with Owner clarifications |
-| Owner authorization (Phase 1) | 🟩 Recorded 2026-09-08 (`docs/DECISIONS.md`) |
-| Phase 0 completion | 🟩 DONE |
-| Phase 1 (Traffic MVP) | 🟩 COMPLETE — all tasks 1.1–1.11 done; deployed to production |
-| P-1 Registration / business-interest flow | 🟩 DONE (2026-09-18, D-026 + D-032) |
-| P-2 Admin user management | 🟩 **DONE** — Better Auth user-ID defect fixed (`73d73e0`), E2E environment made deterministic (`7c31712`), schema alignment (`f709b64`); Admin E2E PASS and full Playwright 11/11 PASS |
-| Application implementation | Tasks 1.1 🟩 · 1.2 🟩 · 1.3 🟩 · 1.4 🟩 · 1.5 🟩 · 1.6 🟩 · 1.7 🟩 · 1.8 🟩 · 1.9 🟩 · 1.10 🟩 · 1.11 🟩 — see `docs/STATUS.md` |
-| Production deployment | 🟩 LIVE — `https://neolife.ooflowdesk.com`, image **`neolife-web:32b6c27`** at commit `32b6c27`, deployed and verified 2026-10-13 · 10/10 migrations applied |
-| Test suite | 🟩 333/333 PASS (222 non-DB + 111 DB-enabled) · E2E **29/29 PASS** (1 flaky) |
+| Current phase | PHASE 1 � Traffic MVP |
+| Plan document | ?? Written and updated with Owner clarifications |
+| Owner authorization (Phase 1) | ?? Recorded 2026-09-08 (`docs/DECISIONS.md`) |
+| Phase 0 completion | ?? DONE |
+| Phase 1 (Traffic MVP) | ?? COMPLETE � all tasks 1.1�1.11 done; deployed to production |
+| P-1 Registration / business-interest flow | ?? DONE (2026-09-18, D-026 + D-032) |
+| P-2 Admin user management | ?? **DONE** � Better Auth user-ID defect fixed (`73d73e0`), E2E environment made deterministic (`7c31712`), schema alignment (`f709b64`); Admin E2E PASS and full Playwright 11/11 PASS |
+| Application implementation | Tasks 1.1 ?? � 1.2 ?? � 1.3 ?? � 1.4 ?? � 1.5 ?? � 1.6 ?? � 1.7 ?? � 1.8 ?? � 1.9 ?? � 1.10 ?? � 1.11 ?? � see `docs/STATUS.md` |
+| Production deployment | ?? LIVE � `https://neolife.ooflowdesk.com`, image **`neolife-web:32b6c27`** at commit `32b6c27`, deployed and verified 2026-10-13 � 10/10 migrations applied |
+| Test suite | ?? 333/333 PASS (222 non-DB + 111 DB-enabled) � E2E **29/29 PASS** (1 flaky) |
 
 **Next action:** Resolve the residual Prisma drift as a dedicated investigation *before*
 running any future `prisma migrate dev`, then reconcile the local test-hygiene items
 (`admin-actions` parallel flakiness, `.kilo` artifact cleanup). Phase 2 remains no
-started, and paid advertising remains NOT AUTHORIZED, gated behind the §11.6 launch
+started, and paid advertising remains NOT AUTHORIZED, gated behind the �11.6 launch
 gate. See `docs/STATUS.md`.
 
 ---
@@ -644,9 +644,9 @@ gate. See `docs/STATUS.md`.
 *Full platform = the destination. Traffic MVP = the first launchable slice.*
 
 
-## PHASE 26 — UI/UX, Phone Validation, Product Registration & Deployment (2026-10-20)
+## PHASE 26 � UI/UX, Phone Validation, Product Registration & Deployment (2026-10-20)
 
-**Status:** ðŸŸ© DONE (deployed to production)
+**Status:** 🟩 DONE (deployed to production)
 **Commit:** 3fa329f | Image: neolife-web:3fa329f
 
 **Completed:** International phone validation (country selection, E.164), product-category-based registration with 'Not sure yet', office login redesign, auth hardening, password recovery, rate limiting, 364 tests passing, production deployment.
@@ -657,8 +657,9 @@ See docs/STATUS.md and docs/CHANGELOG.md for full details.
 
 ## PHASE 27A/B/C - CRM Deepening (2026-10-21)
 
-**Status:** ðŸŸ© DONE and DEPLOYED (f6049fb, migration 20261021000000_phase2_followup_scheduling)
+**Status:** 🟩 DONE and DEPLOYED (f6049fb, migration 20261021000000_phase2_followup_scheduling)
 
 **Completed:** Contact search/filtering/scheduled follow-ups; qualification review/authorization; pipeline/conversion analytics, cohorts, follow-up performance, CSV export. 391 tests passing.
 
 **Remaining (Phase 2):** CRM automation, deeper workflow automation, additional authorization/reporting polish, bulk actions where appropriate. Authenticated live CRM acceptance checks pending; email delivery unverified; rollback restoration untested.
+
