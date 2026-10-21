@@ -32,7 +32,7 @@ Phase/step-by-step implementation status. Authoritative scope lives in `PROJECT_
   role-aware authorization, staff status changes
 - **Task #037 — two-user configuration, Owner referral link, operational
   email notifications 🟩 DONE (feature branch,
-  `feature/two-user-resend-notifications`, NOT deployed).** Idempotent
+  `feature/two-user-resend-notifications`, NOT deployed).** Idempoten
   `scripts/seed-neolife-users.ts` provisioning (Owner + Partner accounts;
   144-bit CSPRNG temp passwords delivered via 0600 file;
   `mustChangePassword` forced; existing accounts preserved). Referral
@@ -50,8 +50,8 @@ Phase/step-by-step implementation status. Authoritative scope lives in `PROJECT_
   single-use qualification tokens, registration capture, transactional persistence
 - **Funnel tracking** — first-party `FunnelEvent` capture (D-029), no-PII device
   identity (D-031), full funnel flow `visitor_landing` → `lead_created` →
-  `lead_qualified` → `registration_start` → `registration_complete`
-- **P-2 — Admin user management 🟩 DONE.** Owner-only `/admin/users`; Staff account
+  `lead_qualified` → `registration_start` → `registration_complete
+- **P-2 — Admin user management 🟩 DONE.** Owner-only `/admin/users`; Staff accoun
   creation; temporary-password and forced password-change flow; Staff
   activation/deactivation; inactive Staff locked out of the CRM; Owner/admin protected
   from deactivation; Better Auth opaque user IDs supported; lead assignment working with
@@ -61,7 +61,7 @@ Phase/step-by-step implementation status. Authoritative scope lives in `PROJECT_
 - **Deterministic local E2E environment** — standalone asset preparation, fail-loud
   server binding, guarded local-only fixture seeding (`7c31712`)
 - **Prisma user-relation schema alignment** (`f709b64`) — see the entry below
-- **Deployed functionality** — three production releases recorded in `docs/CHANGELOG.md`
+- **Deployed functionality** — three production releases recorded in `docs/CHANGELOG.md
   (`neolife-web:11e64fa`, `neolife-web:b371fcf`, `neolife-web:92ee361`). The D-020
   official product/category image rebuild shipped in `b371fcf`; production now serves
   `92ee361`.
@@ -75,14 +75,14 @@ Worth recording, because the symptom was misleading. Both `toggleUserActive` and
 ~32-character alphanumeric IDs — so every real user ID was rejected before reaching the
 database. `toggleUserActive` silently no-opped and `assignLead` returned
 "Invalid assignee." for every real Staff user. Fixed in `73d73e0`. The E2E suite could
-not have surfaced it while the environment was unreliable, which is why the environment
+not have surfaced it while the environment was unreliable, which is why the environmen
 work in `7c31712` preceded the green run.
 
 ### Prisma schema reconciliation (`f709b64`)
 
 `Lead.assignedUserId` and `LeadEvent.userId` were declared `@db.Uuid` while the
 migrations and the live database both use `TEXT`. Verified with
-`prisma migrate diff --from-migrations` that generating a migration from the schema as it
+`prisma migrate diff --from-migrations` that generating a migration from the schema as i
 stood proposed `DROP COLUMN "assignedUserId", ADD COLUMN "assignedUserId" UUID` — which
 would have destroyed every lead-ownership assignment and every audit-event actor, and
 could never have stored a Better Auth ID again.
@@ -96,7 +96,7 @@ declared without the annotation.
 
 1. `FunnelEvent.leadId` foreign key omits the `ON UPDATE CASCADE` the schema declares
 2. `QualificationToken.leadId` foreign key omits the `ON UPDATE CASCADE` the schema declares
-3. `FunnelEvent.createdAt` is `TIMESTAMP` where the schema wants `TIMESTAMP(3)`
+3. `FunnelEvent.createdAt` is `TIMESTAMP` where the schema wants `TIMESTAMP(3)
 4. `QualificationToken` `expiresAt` / `consumedAt` / `createdAt` lack `(3)` precision
 
 These are non-destructive but mean a future `prisma migrate dev` **will** generate a
@@ -104,8 +104,8 @@ migration. It requires separate investigation before that is run.
 
 ### 🟩 Production deployment `92ee361` — deployed and verified (2026-10-02)
 
-Production runs image **`neolife-web:92ee361`** at commit
-`92ee3610fbd4b704886a40f726af6ef52de6f14a`, recorded on the server at
+Production runs image **`neolife-web:92ee361`** at commi
+`92ee3610fbd4b704886a40f726af6ef52de6f14a`, recorded on the server a
 `/opt/ooflowdesk/neolife/.deployed-sha`. **10/10** Prisma migrations are applied.
 
 | Verification area | Result |
@@ -133,7 +133,7 @@ applied with `prisma migrate deploy` (`add_lead_ownership`, `add_leadevent_actor
 `add_funnel_events`, `add_user_management_fields`). Post-migration checks confirmed
 `Lead.assignedUserId` and `LeadEvent.userId` as TEXT with foreign keys and indexes, both
 new tables present, both new `User` columns present with migration defaults, and **all
-existing rows preserved** (1 user, 2 leads, 0 lead events). The database was behind, not
+existing rows preserved** (1 user, 2 leads, 0 lead events). The database was behind, no
 damaged; nothing was corrupted or lost. The previously running `b371fcf` image stayed
 healthy throughout, confirming the additive schema was backward-compatible.
 
@@ -150,7 +150,7 @@ the pre-change compose file are all retained on the server.
 
 ### Open technical issues
 
-1. **Residual Prisma drift** — the four items listed above. A future `prisma migrate dev`
+1. **Residual Prisma drift** — the four items listed above. A future `prisma migrate dev
    will generate a migration for them; it is non-destructive but needs review first.
 2. **`admin-actions` DB-test flakiness** — roughly 1 in 6 full-suite runs fails under
    parallel execution, because several suites write to the same database concurrently.
@@ -277,7 +277,7 @@ Public homepage visual redesign (Semrush-level UX polish + NeoLife botanical/wel
 - pnpm project (Node 24, pnpm 11): `package.json`, `tsconfig.json` (strict), `next.config.mjs` (standalone output), `postcss.config.mjs`, `eslint.config.mjs` (flat, typescript-eslint), `pnpm-workspace.yaml` (build-script approvals), `.gitignore`, `.env.example` (template only — no secrets committed)
 - Next.js 16 (App Router) + React 19 + TypeScript + Tailwind 4 app shell: `src/app/{layout,page,globals.css}` (placeholder home page — real landing page is Task 1.3)
 - Prisma 7 + PostgreSQL: `prisma/schema.prisma` (MVP application models: `Lead`, `LeadEvent`, `Meeting`, `FollowUp`; enums `LeadStatus`, `InterestType`, `MeetingStatus`), `prisma.config.ts`, `src/server/db/prisma.ts` (PrismaPg adapter, per ecosystem convention)
-- Dependencies installed (`pnpm install`); Prisma Client generated to `src/generated/prisma`
+- Dependencies installed (`pnpm install`); Prisma Client generated to `src/generated/prisma
 
 **Tests / verification performed:**
 
@@ -305,7 +305,7 @@ Public homepage visual redesign (Semrush-level UX polish + NeoLife botanical/wel
 
 **Tests / verification performed:**
 
-- `docker compose up -d` → `neolife-db Up (healthy)` on `localhost:5433`
+- `docker compose up -d` → `neolife-db Up (healthy)` on `localhost:5433
 - `prisma migrate dev --name init` → migration created & applied; database in sync
 - Smoke test (`pnpm exec tsx scripts/smoke.ts`) — **11/11 PASS**: lead created with attribution + consent record/timestamp → defaults to NEW_LEAD; first-party lead event created; meeting defaults SCHEDULED; follow-up created; status lifecycle update (QUALIFIED); meeting ATTENDED + outcome; relations readable; leads queryable by `utmCampaign`; deletion/cleanup verified
 - `pnpm lint` — PASS · `pnpm typecheck` — PASS
@@ -324,7 +324,7 @@ Public homepage visual redesign (Semrush-level UX polish + NeoLife botanical/wel
 **Tests / verification performed:**
 
 - `pnpm lint` — PASS (0 errors, 0 warnings) · `pnpm typecheck` — PASS
-- `pnpm build` (production, standalone) — PASS; 5 routes prerendered: `/`, `/privacy`, `/terms`, `/disclosures`, `/register-interest`
+- `pnpm build` (production, standalone) — PASS; 5 routes prerendered: `/`, `/privacy`, `/terms`, `/disclosures`, `/register-interes
 - Production server runtime check: all 5 routes return **HTTP 200**; home page content verified (hero, CTAs, disclosure wording present); no build errors
 - Data layer re-verified after changes: `scripts/smoke.ts` — **11/11 PASS** (Task 1.2 work intact)
 - Mobile/responsive and visual (desktop + mobile widths): implemented via responsive Tailwind breakpoints (mobile menu, stacked layouts); final visual sign-off is an Owner review item (see limitations)
@@ -623,8 +623,8 @@ Public homepage visual redesign (Semrush-level UX polish + NeoLife botanical/wel
 
 ### Deployment milestone (§11.7) — ✅ REACHED — production is LIVE
 
-> **Superseded (2026-10-01).** This milestone has been reached: production is live at
-> `https://neolife.ooflowdesk.com` serving `neolife-web:b371fcf`. The original gate text
+> **Superseded (2026-10-01).** This milestone has been reached: production is live a
+> `https://neolife.ooflowdesk.com` serving `neolife-web:b371fcf`. The original gate tex
 > is retained below as history. See `docs/DEPLOYMENT.md` §0 for the production record.
 
 Recorded by Owner (D-010): early production deployment of the landing page/MVP slice is authorized once the landing page passes local checks AND explicit Owner production-deployment authorization is given at that gate. Requires hosting/domain decision (§19 item 5) before the server step.
@@ -662,3 +662,58 @@ Recorded by Owner (D-010): early production deployment of the landing page/MVP s
 **Production:** 🟩 DEPLOYED (commit 7784de5, image `neolife-web:b371fcf`). All 65 product images load (HTTP 200, `image/webp`). `/health` → 200. `/products` → 200. Category, subcategory, and product detail routes → 200. The four Browse by Category cards now show compositions of actual catalogue products (nutritionals, weight-management, personal-care, home-care; `organic-skin-care.webp` removed). Source-product mapping documented in `docs/CATEGORY_IMAGE_SOURCES.md`. Composition script: `scripts/compose-category-images.cjs`.
 
 **Note:** Category images were rebuilt using `sharp` (devDependency) and deployed to production at commit `b371fcf` / `7784de5`. Deployment verified: all 4 category images serve `image/webp` (HTTP 200), old `organic-skin-care.webp` returns 404, product images intact, `neolife-web` container running `neolife-web:b371fcf`, health endpoint returns 200.
+
+
+---
+
+## Phase 26 - UI/UX, Phone Validation, Product Registration and Deployment (2026-10-20)
+
+**Status:** DONE (deployed to production)
+
+**Commit:** 3fa329f
+**Image:** neolife-web:3fa329f
+
+### Completed
+- International telephone-country selection and country-specific validation; E.164 normalization
+- Product-category-based prospect registration including 'Not sure yet.'
+- Backend registration and CRM integration improvements; preservation of catalogue relationships
+- Professional office-login frontend redesign using NEOLIFE colour theme
+- Login form validation, visibility controls, responsive behavior
+- Auth hardening, prevention of unauthorized public office-account registration, inactive-account restrictions
+- Password recovery implementation; session handling and sign-out improvements
+- Rate-limiting and authorization checks
+- Automated regression tests (364 passing) and production-build verification
+- GitHub publication and guarded production deploymen
+- Password resets for three accounts executed with verification
+
+### Validation
+- 364 automated tests passing; HTTP auth and browser checks passing
+- Production deployment verified; existing PostgreSQL data and runtime config preserved
+
+### Notes
+- Password reset email delivery not verified in production (Resend remains disabled)
+- Rahab email change deferred pending supported verification mechanism without enabling Resend
+
+
+
+---
+
+## Phase 27A, 27B & 27C - CRM Deepening (2026-10-21)
+
+**Status:** DONE and DEPLOYED
+**Commit:** f6049fb
+**Migration:** 20261021000000_phase2_followup_scheduling
+
+### Completed
+- Phase 27A: Contact search, filtering and scheduled follow-ups
+- Phase 27B: Qualification review and authorization controls
+- Phase 27C: Pipeline/conversion analytics; cohort analytics, follow-up performance and CSV expor
+
+### Validation
+- 391 passing automated tests at final local QA
+- Production deployment verified (new web container running; DB backup verified; homepage/login/registration HTTP checks passed)
+
+### Notes
+- Authenticated live CRM acceptance checks still pending
+- Email delivery not verified; production rollback restoration not tested
+- Phase 2 not fully complete (remaining automation/CRM functionality identified below)

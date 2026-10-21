@@ -37,7 +37,7 @@ Merge commit `f176a77` integrates `feature/two-user-resend-notifications` (commi
 **Schema corrections (Task #036):**
 - `Lead.assignedUserId` / `LeadEvent.userId`: removed `@db.Uuid` → `String?` (TEXT, matches Better Auth opaque IDs)
 - Added `ON UPDATE CASCADE` to `FunnelEvent.leadId` and `QualificationToken.leadId` FKs
-- Corrected `FunnelEvent.createdAt` / `QualificationToken.{createdAt,expiresAt,consumedAt}` to `TIMESTAMP(3)`
+- Corrected `FunnelEvent.createdAt` / `QualificationToken.{createdAt,expiresAt,consumedAt}` to `TIMESTAMP(3)
 
 **Validation:** 333/333 unit/DB tests PASS, 29/29 Playwright PASS (1 flaky), typecheck PASS, ESLint PASS, build PASS, Prisma validate PASS, `prisma migrate diff` empty (drift closed).
 
@@ -57,7 +57,7 @@ remains disabled there.
   profile fields are backfilled. Fresh 144-bit CSPRNG temporary passwords
   per NEW account, delivered only through a mode-0600 temp file (never
   stdout/Git); `mustChangePassword` forced on first login (D-033).
-- **Schema:** additive `User.phone` + `User.notificationEmail`
+- **Schema:** additive `User.phone` + `User.notificationEmail
   (migration `20261014000000_add_user_phone_notification_email`); the
   notification address falls back to the login email.
 - **Referral links:** eligibility extended to the ACTIVE Owner
@@ -105,8 +105,8 @@ were applied via `prisma migrate deploy`:
 
 - `20260917000000_add_lead_ownership` — adds `Lead.assignedUserId` TEXT + FK + indexes
 - `20260917120000_add_leadevent_actor` — adds `LeadEvent.userId` TEXT + FK + index
-- `20260918000000_add_funnel_events` — creates `FunnelEvent` + `QualificationToken`
-- `20260919000000_add_user_management_fields` — adds `User.mustChangePassword`, `User.isActive`
+- `20260918000000_add_funnel_events` — creates `FunnelEvent` + `QualificationToken
+- `20260919000000_add_user_management_fields` — adds `User.mustChangePassword`, `User.isActive
 
 Post-migration verification confirmed both user-reference columns as TEXT with foreign
 keys and indexes, both new tables present, both new `User` columns present with
@@ -121,7 +121,7 @@ accepting UUIDs and still rejecting malformed input.
 
 Deployment notes:
 
-- The `seed` service image reference was updated alongside `web` so the two cannot
+- The `seed` service image reference was updated alongside `web` so the two canno
   drift. The seed service was **not executed**.
 - The secret store is root-owned, so the documented
   `sudo docker compose --env-file …` workflow requires sudo on this server. Recorded in
@@ -173,10 +173,10 @@ password change on first login, activation/deactivation toggle, and password-cha
 
 `toggleUserActive` and `assignLead` validated user IDs with a UUID check, but Better Auth
 generates opaque ~32-character alphanumeric identifiers. Every real user ID was rejected
-before reaching the database: `toggleUserActive` silently no-opped and `assignLead`
+before reaching the database: `toggleUserActive` silently no-opped and `assignLead
 returned "Invalid assignee." for every real Staff user.
 
-- `src/lib/user-management.ts` — shared `BETTER_AUTH_USER_ID_PATTERN`
+- `src/lib/user-management.ts` — shared `BETTER_AUTH_USER_ID_PATTERN
   (`^[A-Za-z0-9_-]{16,64}$`) plus `isValidBetterAuthUserId`; `toggleUserSchema` now
   uses it. Accepts real Better Auth IDs and UUIDs; still rejects empty, oversized, and
   unsafe input.
@@ -204,7 +204,7 @@ application code changed.
   absent or local, and `DATABASE_URL` is loopback-local.
 - `e2e/admin-user-management.spec.ts` — the Owner row was located with
   `tr:has-text("Owner")`, but every admin row renders that role label, so the locator
-  matched two admins once the fixture seeder created a second. Now addressed by exact
+  matched two admins once the fixture seeder created a second. Now addressed by exac
   fixture email with a uniqueness guard; the Owner-protection assertion is unchanged.
 - `playwright.config.ts` — `testIgnore: "**/.kilo/**"` so stale specs in the untracked
   nested worktree are not discovered.
@@ -217,11 +217,11 @@ holding an opaque Better Auth identifier.
 
 Verified with `prisma migrate diff --from-migrations` against a throwaway shadow
 database: generating a migration from the schema as it stood proposed
-`DROP COLUMN "assignedUserId", ADD COLUMN "assignedUserId" UUID` — destructive, and it
+`DROP COLUMN "assignedUserId", ADD COLUMN "assignedUserId" UUID` — destructive, and i
 could never have stored a Better Auth ID again. Removing the annotations eliminates those
 statements entirely.
 
-**No migration was required and no database change was made.** The remaining 22 `@db.Uuid`
+**No migration was required and no database change was made.** The remaining 22 `@db.Uuid
 annotations (entity IDs) are correct and untouched. Residual drift remains open:
 `FunnelEvent.leadId` and `QualificationToken.leadId` foreign keys omit the declared
 `ON UPDATE CASCADE`, and `FunnelEvent.createdAt` plus the `QualificationToken` timestamps
@@ -353,7 +353,7 @@ Replaced all 65 product-image placeholders with official NEOLIFE product images 
 - All 65 product images downloaded from neolifeshop.com (Northern Europe market), converted to WebP, and stored as
   self-hosted assets under `public/products/<slug>/product.webp`.
 - Added required `image: string` field to `CatalogueProduct` type in `src/lib/catalogue-data.ts`; populated for all 65 products.
-- `ProductCard.tsx` and the product detail page now pass `src={product.image}` to the `Photo` component (real `<img>`
+- `ProductCard.tsx` and the product detail page now pass `src={product.image}` to the `Photo` component (real `<img>
   rendered; `next.config.mjs` `images.unoptimized: true`).
 - Added 2 tests verifying every product has a valid image path matching `/products/<slug>/product.webp` and that each
   file exists.
@@ -381,7 +381,7 @@ in the catalogue — no AI-generated imagery, no generic stock photos, no cross-
 - Updated `CATEGORY_IMAGES` in `src/lib/catalogue-meta.ts`: `weight-management → /categories/weight-management.webp`.
 - Updated `eslint.config.mjs` to ignore `scripts/**` (build utility scripts).
 - **Deployed to production** as image `neolife-web:b371fcf` (commits b371fcf, ab62506, 7784de5).
-- Audit notes: no misclassifications found; 6 products cross-listed between Nutritionals and Weight Management
+- Audit notes: no misclassifications found; 6 products cross-listed between Nutritionals and Weight Managemen
   per `categorySlugs` (correctly assigned to Weight Management image; Nutritionals image uses pure nutritional products).
 - **Production verification:** all 4 category images serve `image/webp` (HTTP 200); old `organic-skin-care.webp` returns 404; all 65 product images intact; `/health` → 200; `/products` → 200; DB/tunnel containers unaffected.
 
@@ -462,7 +462,7 @@ Implemented locally (public homepage only): botanical/wellness visual identity w
 - Authored `docs/DEPLOYMENT_EXECUTION_PLAN.md` (isolated additive deployment; root-owned secret file + `sudo docker compose --env-file` injection; corrected DB/migration/backup sequence).
 - Redesigned production secret handling (root-owned `/opt/ooflowdesk/secrets/neolife.env`, `${VAR}` interpolation only).
 
-### Release commit
+### Release commi
 The production image is tied to commit `3f535c5e565d6f3dd35848b4eb3595f9ee482ef7` (the Dockerfile commit). The deploy Compose file (`deploy/compose.yaml`) is added in a subsequent commit; it references `neolife-web:3f535c5`.
 
 ### Secret architecture (Owner decision A — accepted)
@@ -510,3 +510,31 @@ The product catalogue planning document (`docs/PRODUCT_CATALOGUE_PLAN.md`) has b
 - Typecheck: PASS (`tsc --noEmit`)
 - Tests: 71/71 PASS (43 original + 28 catalogue)
 - Build: PASS (9 static + 5 dynamic routes)
+
+
+## [Phase 26] - 2026-10-20
+
+### Added
+- International phone validation with country selection and E.164 normalization
+- Product-category-based prospect registration (including 'Not sure yet.')
+- Professional office login redesign and auth UX improvements
+- Password recovery utilities and hardening
+### Changed
+- Backend registration/CRM integration improvements
+- Auth hardening and authorization/rate-limiting
+### Fixed
+- Various validation and security improvements
+### Deployed
+- Production deploymen
+eolife-web:3fa329f (commit 3fa329f), verified 364 tests passing
+
+
+
+## [Phase 27A/B/C] - 2026-10-21
+
+### Added
+- Contact search, filtering and scheduled follow-ups (27A)
+- Qualification review and authorization controls (27B)
+- Pipeline/conversion analytics, cohort analytics, follow-up performance and CSV export (27C)
+### Deploymen
+- Commit f6049fb deployed; migration 20261021000000_phase2_followup_scheduling applied; 391 tests passing; HTTP checks passed

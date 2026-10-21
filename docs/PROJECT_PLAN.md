@@ -35,7 +35,7 @@ The first objective is **NOT** to finish the entire platform. The first objectiv
 
 **Decision rule:** when a decision is required, Kilo stops that work item and clearly reports:
 
-```
+
 🟨 OWNER DECISION REQUIRED
 - Phase:
 - Decision:
@@ -43,7 +43,7 @@ The first objective is **NOT** to finish the entire platform. The first objectiv
 - Option B:
 - Kilo recommendation:
 - Reason:
-```
+
 
 Kilo does not implement beyond the decision unless the owner approves it.
 
@@ -89,13 +89,13 @@ This is more important than having every page or feature of the eventual platfor
 
 ## 6. Core Funnel
 
-```
+
 PAID AD → LANDING PAGE → LEAD CAPTURE → QUALIFICATION / EDUCATION → REGISTRATION / BUSINESS INTEREST → OFFICE MEETING → FOLLOW-UP → PROMOTER / BUSINESS BUILDER
-```
+
 
 **North-star measurement chain (architected now, refined later):**
 
-`Ad spend → visitors → leads → qualified leads → registrations → meetings → attendance → promoters`
+`Ad spend → visitors → leads → qualified leads → registrations → meetings → attendance → promoters
 
 The first implementation does not need advanced analytics, but the architecture must not prevent this tracking.
 
@@ -112,12 +112,12 @@ The complete platform is expected to eventually include:
 5. Lead qualification
 6. CRM
 7. Registration/application
-8. Office meeting management
+8. Office meeting managemen
 9. Follow-up
 10. Promoter onboarding
 11. Promoter dashboard
-12. Customer management
-13. Product management
+12. Customer managemen
+13. Product managemen
 14. Orders/sales
 15. Referrals
 16. Team/downline relationships
@@ -133,7 +133,7 @@ The complete platform is expected to eventually include:
 26. Automation
 27. Monitoring
 28. Performance/scaling
-29. Production deployment
+29. Production deploymen
 30. Post-launch optimization
 
 The architecture must account for future expansion without implementing all of it now.
@@ -256,7 +256,7 @@ Cross-cutting concerns (security, audit logging, reporting) are introduced in Ph
 **CRM / admin:**
 
 - Secure admin authentication
-- Lead status management
+- Lead status managemen
 - Basic CRM/admin interface (view leads, view detail, update status, record follow-up, view campaign/source)
 
 > The CRM lifecycle is the Owner-approved **initial model** (§19 item 4, `docs/DECISIONS.md` D-003). Do not hard-code business assumptions beyond the approved MVP requirement; statuses must remain data-driven and extensible.
@@ -320,9 +320,9 @@ For first launch, DO NOT build a sophisticated calendar-booking system.
 
 Preferred MVP workflow:
 
-```
+
 Prospect submits interest → Lead enters CRM → Office/admin contacts prospect → Meeting date/time recorded → Attendance recorded → Outcome recorded → Follow-up
-```
+
 
 Self-service calendar booking is a later enhancement.
 
@@ -369,7 +369,7 @@ Once the public landing page has been implemented and passes its applicable loca
 
 **Deployment workflow:**
 
-```
+
 Local implementation
         ↓
 Local testing
@@ -391,7 +391,7 @@ Production smoke testing
 Owner production review/acceptance
         ↓
 Paid advertising launch
-```
+
 
 **Requirements:**
 
@@ -470,9 +470,9 @@ Each later phase will be fully specified (with its 11 attributes) before it begi
 
 The architecture must support dedicated campaign destinations. Example:
 
-```
+
 Paid Advertisement → neolife.ooflowdesk.com/business → Business opportunity presentation → CTA → Lead capture → Qualification → CRM → Office follow-up
-```
+
 
 The exact URL remains an owner decision, but the system must support campaign-specific landing pages/paths.
 
@@ -535,11 +535,11 @@ The platform must avoid deceptive marketing. Plan for:
 
 ---
 
-## 16. Local-First Development & Deployment
+## 16. Local-First Development & Deploymen
 
-```
+
 Local development → Local testing → MVP acceptance → Production deployment to owner's server → Paid advertising
-```
+
 
 - Development happens locally first.
 - Production deployment does not happen immediately.
@@ -635,10 +635,30 @@ When a phase meets its completion criteria, explicitly report: **"PHASE X IS COM
 
 **Next action:** Resolve the residual Prisma drift as a dedicated investigation *before*
 running any future `prisma migrate dev`, then reconcile the local test-hygiene items
-(`admin-actions` parallel flakiness, `.kilo` artifact cleanup). Phase 2 remains not
+(`admin-actions` parallel flakiness, `.kilo` artifact cleanup). Phase 2 remains no
 started, and paid advertising remains NOT AUTHORIZED, gated behind the §11.6 launch
 gate. See `docs/STATUS.md`.
 
 ---
 
 *Full platform = the destination. Traffic MVP = the first launchable slice.*
+
+
+## PHASE 26 — UI/UX, Phone Validation, Product Registration & Deployment (2026-10-20)
+
+**Status:** ðŸŸ© DONE (deployed to production)
+**Commit:** 3fa329f | Image: neolife-web:3fa329f
+
+**Completed:** International phone validation (country selection, E.164), product-category-based registration with 'Not sure yet', office login redesign, auth hardening, password recovery, rate limiting, 364 tests passing, production deployment.
+
+See docs/STATUS.md and docs/CHANGELOG.md for full details.
+
+
+
+## PHASE 27A/B/C - CRM Deepening (2026-10-21)
+
+**Status:** ðŸŸ© DONE and DEPLOYED (f6049fb, migration 20261021000000_phase2_followup_scheduling)
+
+**Completed:** Contact search/filtering/scheduled follow-ups; qualification review/authorization; pipeline/conversion analytics, cohorts, follow-up performance, CSV export. 391 tests passing.
+
+**Remaining (Phase 2):** CRM automation, deeper workflow automation, additional authorization/reporting polish, bulk actions where appropriate. Authenticated live CRM acceptance checks pending; email delivery unverified; rollback restoration untested.
