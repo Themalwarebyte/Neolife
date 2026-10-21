@@ -86,7 +86,10 @@ export default async function QualificationQueuePage({
             {user.role === "admin" ? " You are viewing office-wide qualified contacts." : " You are viewing only contacts assigned to you."}
           </p>
         </div>
-        <Link href="/admin/leads" className="rounded-full border border-mulberry-200 bg-white px-4 py-2 text-sm font-semibold text-mulberry-800 hover:bg-mulberry-50">All contacts</Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/admin/triage?view=review" className="rounded-full border border-mulberry-200 bg-white px-4 py-2 text-sm font-semibold text-mulberry-800 hover:bg-mulberry-50">Attention queue</Link>
+          <Link href="/admin/leads" className="rounded-full border border-mulberry-200 bg-white px-4 py-2 text-sm font-semibold text-mulberry-800 hover:bg-mulberry-50">All contacts</Link>
+        </div>
       </header>
 
       <nav aria-label="Qualification review filters" className="flex flex-wrap gap-2">

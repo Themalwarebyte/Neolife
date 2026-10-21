@@ -13,6 +13,7 @@ export function AdminNav({ role }: { role: string }) {
   const links = [
     { href: "/admin/leads", label: "Contacts", show: true },
     { href: "/admin/workflows", label: "Workspace", show: true },
+    { href: "/admin/triage", label: "Attention", show: true },
     { href: "/admin/qualification", label: "Qualification", show: true },
     { href: "/admin/follow-ups", label: "Follow-ups", show: true },
     { href: "/admin/analytics", label: "Insights", show: true },

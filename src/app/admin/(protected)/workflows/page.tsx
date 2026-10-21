@@ -4,6 +4,7 @@ import { prisma } from "@/server/db/prisma";
 import { BulkUnassignedLeadForm } from "@/components/admin/BulkUnassignedLeadForm";
 import { formatCrmStatus, CRM_PAGE_SIZE } from "@/lib/crm-phase2";
 import { MAX_WORKFLOW_BATCH } from "@/lib/crm-workflows";
+import { buildTriageWhere } from "@/lib/crm-triage";
 import { LeadStatus, Prisma } from "@/generated/prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +24,7 @@ export default async function WorkflowsPage({ searchParams }: { searchParams: Pr
 
   // Derived from current records, with no new business eligibility thresholds or
   // automatic status changes. Staff never see another Staff user's records.
-  const [visibleContacts, overdue, dueSoon, pendingReview, unassignedCount] = await Promise.all([
+  const [visibleContacts, overdue, dueSoon, pendingReview, unassignedCount, attentionCount] = await Promise.all([
     prisma.lead.count({ where: leadScope }),
     prisma.followUp.count({ where: { ...taskScope, completedAt: null, dueAt: { lt: now } } }),
     prisma.followUp.count({ where: { ...taskScope, completedAt: null, dueAt: { gte: now, lte: next7 } } }),
@@ -32,6 +33,7 @@ export default async function WorkflowsPage({ searchParams }: { searchParams: Pr
       events: { none: { type: "qualification_reviewed" } },
     } }),
     isOwner ? prisma.lead.count({ where: { assignedUserId: null } }) : Promise.resolve(0),
+    prisma.lead.count({ where: buildTriageWhere(user, "all", 7, now) }),
   ]);
 
   const pages = Math.max(1, Math.ceil(unassignedCount / CRM_PAGE_SIZE));
@@ -60,6 +62,7 @@ export default async function WorkflowsPage({ searchParams }: { searchParams: Pr
   }
 
   const figures = [
+    { label: "Needs office attention", value: attentionCount, href: "/admin/triage?view=all&days=7", note: "Unique contacts with operational attention signals" },
     { label: isOwner ? "Office contacts" : "My assigned contacts", value: visibleContacts, href: "/admin/leads", note: "Currently visible to you" },
     { label: "Overdue follow-ups", value: overdue, href: "/admin/follow-ups?view=overdue", note: "Open scheduled tasks past due" },
     { label: "Due within 7 days", value: dueSoon, href: "/admin/follow-ups?view=next7", note: "Open scheduled tasks due soon" },
@@ -74,6 +77,7 @@ export default async function WorkflowsPage({ searchParams }: { searchParams: Pr
       <p className="mt-2 max-w-3xl text-sm text-neutral-600">
         Live CRM workload from assigned contacts, qualification reviews and scheduled tasks.
         No prospects are automatically reassigned and no emails are sent by this workspace.
+        Visit the <Link href="/admin/triage" className="font-semibold text-mulberry-700 hover:underline">attention queue</Link> for fact-based next-action suggestions.
       </p>
     </header>
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
