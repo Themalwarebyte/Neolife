@@ -25,6 +25,7 @@ enum ContactState {
   IMPORTED_QUEUE
   DUPLICATE_REVIEW
   ARCHIVED
+  MERGED
 }
 
 enum ContactOrigin {
@@ -72,9 +73,17 @@ model Contact {
   importRowNumber Int?
   importBatch ContactImportBatch? @relation("batch_contacts", fields: [importBatchId], references: [id], onDelete: SetNull)
   importRow ContactImportRow? @relation("imported_row_contact")
+  // A merge never deletes the original contact or its import/audit trail.
+  mergedIntoContactId String? @db.Uuid
+  mergedAt DateTime?
+  mergedInto Contact? @relation("ContactMergeLineage", fields: [mergedIntoContactId], references: [id], onDelete: SetNull)
+  mergedFrom Contact[] @relation("ContactMergeLineage")
+  duplicateLeftIssues ContactDuplicateIssue[] @relation("ContactDuplicateLeft")
+  duplicateRightIssues ContactDuplicateIssue[] @relation("ContactDuplicateRight")
 
   @@index([ownerUserId, state, createdAt])
   @@index([state, createdAt])
+  @@index([mergedIntoContactId])
   @@index([importBatchId, importRowNumber])
   @@unique([importBatchId, importRowNumber])
 }
@@ -169,6 +178,44 @@ model ContactImportRow {
 
   @@unique([batchId, rowNumber])
   @@index([batchId, status])
+}
+
+// Batch C: human-reviewed, same-owner duplicate candidates and durable decisions.
+// A dismissed issue is never automatically reopened by another scan.
+enum ContactDuplicateStatus {
+  OPEN
+  DISMISSED
+  MERGED
+  CLOSED
+}
+
+model ContactDuplicateIssue {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerUserId String?
+  ownerSnapshot String
+  // Canonical UUID ordering: leftContactId < rightContactId.
+  leftContactId String @db.Uuid
+  rightContactId String @db.Uuid
+  leftVersion Int
+  rightVersion Int
+  signals Json
+  status ContactDuplicateStatus @default(OPEN)
+  reviewedByUserId String?
+  reviewedBySnapshot String?
+  reviewReason String?
+  reviewedAt DateTime?
+  retainedContactId String? @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner User? @relation("user_contact_duplicate_owner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  reviewer User? @relation("user_contact_duplicate_reviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  leftContact Contact @relation("ContactDuplicateLeft", fields: [leftContactId], references: [id], onDelete: Cascade)
+  rightContact Contact @relation("ContactDuplicateRight", fields: [rightContactId], references: [id], onDelete: Cascade)
+
+  @@unique([leftContactId, rightContactId])
+  @@index([ownerUserId, status, createdAt])
+  @@index([status, createdAt])
 }
 
 enum LeadStatus {
@@ -354,6 +401,8 @@ model User {
   ownedContacts Contact[] @relation("user_owned_contacts")
   contactAuditEvents ContactAuditEvent[] @relation("user_contact_audit")
   contactImports ContactImportBatch[] @relation("user_contact_imports")
+  contactDuplicateIssues ContactDuplicateIssue[] @relation("user_contact_duplicate_owner")
+  contactDuplicateReviews ContactDuplicateIssue[] @relation("user_contact_duplicate_reviewer")
 }
 
 // Staff referral links (D-034). One code per Staff user; Owner-managed.

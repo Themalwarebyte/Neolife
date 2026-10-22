@@ -15,6 +15,7 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
     where: { id, ...contactRecordScope(user.role, user.id) },
     include: {
       methods: { orderBy: [{ type: "asc" }, { isPrimary: "desc" }, { createdAt: "asc" }] },
+      mergedFrom: { select: { id: true, firstName: true, lastName: true, mergedAt: true }, orderBy: { mergedAt: "desc" } },
       audit: { orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 30,
         select: { id: true, action: true, actorSnapshot: true, createdAt: true },
       },
@@ -22,19 +23,29 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
   });
   if (!contact) notFound();
   const imported = contact.state === "IMPORTED_QUEUE";
+  const merged = contact.state === "MERGED";
   const archived = contact.state === "ARCHIVED";
   const inMain = contact.state === "MAIN";
   return <div className="mx-auto max-w-4xl space-y-6">
     <header>
-      <Link href={`/admin/my-contacts?view=${imported ? "queue" : archived ? "archived" : "main"}`} className="text-sm font-semibold text-mulberry-700 hover:underline">← My Contacts</Link>
+      <Link href={`/admin/my-contacts?view=${imported ? "queue" : archived ? "archived" : merged ? "duplicates" : "main"}`} className="text-sm font-semibold text-mulberry-700 hover:underline">← My Contacts</Link>
       <p className="mt-4 text-xs font-bold uppercase tracking-widest text-mulberry-600">Personal contact · {contact.origin === "MANUAL" ? "Manual" : "Imported"}</p>
       <h1 className="mt-1 text-2xl font-extrabold text-neutral-900">{contact.firstName} {contact.lastName || ""}</h1>
       <p className="mt-2 text-sm text-neutral-600">Created {contact.createdAt.toLocaleString()} · Owner: {contact.ownerSnapshot}</p>
       {contact.doNotContact ? <p role="status" className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-800">Do Not Contact — do not message or call this person.</p> : null}
     </header>
+    {merged ? <section className="space-y-3 rounded-2xl border border-neutral-200 bg-neutral-50 p-5 text-sm text-neutral-800">
+      <h2 className="text-lg font-bold text-neutral-900">Merged source — preserved history</h2>
+      <p>This original record was retained for audit and recovery. Its contact methods, notes, source file and consent history remain available here, but this source cannot be edited or contacted as a separate active record.</p>
+      {contact.mergedIntoContactId ? <Link className="font-semibold text-mulberry-700 underline" href={`/admin/my-contacts/${contact.mergedIntoContactId}`}>View retained contact</Link> : null}
+      <p>Name: {contact.firstName} {contact.lastName || ""} · City: {contact.city || "—"}</p>
+      <p>Source: {contact.sourceDetail || "—"} · Notes: {contact.notes || "—"}</p>
+      <p>Consent: {contact.consentStatus} · Do Not Contact: {contact.doNotContact ? "Yes" : "No"}</p>
+      <ul>{contact.methods.map(m => <li key={m.id}>{m.type}: {m.value}</li>)}</ul>
+    </section> : null}
     {imported ? <section className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-neutral-800">
       <h2 className="font-bold text-amber-900">Imported · awaiting review</h2>
-      <p>Imported contacts remain in a separate unreviewed queue. Duplicate review and processing are not yet available. Do not contact people without recorded permission.</p>
+      <p>Imported contacts remain in a separate unreviewed queue. Duplicate suggestions can be reviewed under Duplicate Issues. Queue processing arrives in Batch D. Do not contact people without recorded permission.</p>
       <p><strong>Source:</strong> {contact.sourceDetail || "Unknown"}{contact.importBatchId ? <> · <Link className="font-semibold text-mulberry-800 underline" href={`/admin/my-contacts/import/${contact.importBatchId}`}>View import history</Link></> : null}</p>
       <p><strong>City:</strong> {contact.city || "—"}</p><p><strong>Notes:</strong> {contact.notes || "—"}</p>
       <p><strong>Consent:</strong> {contact.consentStatus}{contact.consentEvidence ? ` · ${contact.consentEvidence}` : ""}</p>
@@ -45,11 +56,19 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
       lastName: contact.lastName, city: contact.city, sourceDetail: contact.sourceDetail,
       notes: contact.notes, consentStatus: contact.consentStatus, consentEvidence: contact.consentEvidence, doNotContact: contact.doNotContact,
       methods: contact.methods.map(m => ({ type: m.type, value: m.value })),
-    }} /> : <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">This imported record is awaiting Batch C/D review. Editing is not available until review is complete.</p>}
+    }} /> : <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">This record is not editable in its current state. Imported queue processing arrives in Batch D; merged sources remain read-only.</p>}
     {inMain || archived ? <section className="rounded-2xl border border-neutral-200 bg-white p-5">
       <h2 className="mb-3 text-sm font-bold text-neutral-800">Contact list status</h2>
       <p className="mb-4 text-sm text-neutral-600">Archiving removes the record from Main Contacts without deleting its details or history.</p>
       <ContactStateForm id={id} version={contact.version} archived={archived} />
+    </section> : null}
+    {contact.mergedFrom.length ? <section className="rounded-2xl border border-neutral-200 bg-white p-5">
+      <h2 className="text-base font-bold text-neutral-900">Preserved merged sources</h2>
+      <p className="mt-1 text-sm text-neutral-600">These records retain their original notes, methods, import attribution and audit histories.</p>
+      <ul className="mt-3 space-y-2">{contact.mergedFrom.map(source => <li key={source.id} className="text-sm">
+        <Link href={`/admin/my-contacts/${source.id}`} className="font-semibold text-mulberry-700 underline">{source.firstName} {source.lastName || ""}</Link>
+        {source.mergedAt ? <span className="text-neutral-500"> · merged {source.mergedAt.toLocaleString()}</span> : null}
+      </li>)}</ul>
     </section> : null}
     <section className="rounded-2xl border border-neutral-200 bg-white p-5">
       <h2 className="text-base font-bold text-neutral-900">Change history</h2>

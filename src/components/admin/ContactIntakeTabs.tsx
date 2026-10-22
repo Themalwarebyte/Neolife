@@ -5,7 +5,7 @@ const tabs: { key: ContactView; label: string; future?: string }[] = [
   { key: "main", label: "Main Contacts" },
   { key: "archived", label: "Archived" },
   { key: "queue", label: "Imported Queue" },
-  { key: "duplicates", label: "Duplicate Issues", future: "Batch C" },
+  { key: "duplicates", label: "Duplicate Issues" },
   { key: "history", label: "Import History" },
 ];
 
