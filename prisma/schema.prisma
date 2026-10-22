@@ -18,6 +18,99 @@ datasource db {
   provider = "postgresql"
 }
 
+// Separate personal contact intake, never an implicit Lead or NEW_LEAD.
+// Batch B/C will use the reserved queue/review states and import metadata.
+enum ContactState {
+  MAIN
+  IMPORTED_QUEUE
+  DUPLICATE_REVIEW
+  ARCHIVED
+}
+
+enum ContactOrigin {
+  MANUAL
+  IMPORT
+}
+
+enum ContactConsentStatus {
+  UNKNOWN
+  GRANTED
+  DENIED
+}
+
+enum ContactMethodType {
+  PHONE
+  EMAIL
+}
+
+model Contact {
+  id            String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  // NULL only if Better Auth deletes the owner. Contacts remain recoverable
+  // under explicit Owner oversight; staff never see orphaned records.
+  ownerUserId   String?
+  ownerSnapshot String
+  firstName     String
+  lastName      String?
+  city          String?
+  sourceDetail  String?
+  notes         String?
+  consentEvidence String? // recorder-provided permission provenance; required when GRANTED
+  consentUpdatedAt DateTime?
+  doNotContactAt DateTime?
+  version       Int                  @default(1) // optimistic concurrency guard
+  origin        ContactOrigin        @default(MANUAL)
+  state         ContactState         @default(MAIN)
+  consentStatus ContactConsentStatus @default(UNKNOWN)
+  doNotContact  Boolean              @default(false)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  owner   User?               @relation("user_owned_contacts", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  methods ContactMethod[]
+  audit   ContactAuditEvent[]
+
+  @@index([ownerUserId, state, createdAt])
+  @@index([state, createdAt])
+}
+
+// Multiple methods permit shared household numbers and duplicate candidates.
+// No global unique constraint: Batch C will detect conflicts for manual review.
+model ContactMethod {
+  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contactId       String            @db.Uuid
+  type            ContactMethodType
+  value           String
+  normalizedValue String
+  isPrimary       Boolean           @default(false)
+  createdAt       DateTime          @default(now())
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([contactId, type, normalizedValue])
+  @@index([type, normalizedValue])
+  @@index([contactId, type])
+}
+
+// Append-only audit rows for recovery, future duplicate/merge investigations
+// and accountable manual changes. The UI never edits or deletes audit rows.
+model ContactAuditEvent {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contactId   String   @db.Uuid
+  actorUserId String?
+  actorSnapshot String
+  action      String
+  reason      String? // required when a Do Not Contact restriction is lifted
+  before      Json?
+  after       Json?
+  createdAt   DateTime @default(now())
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  actor   User?   @relation("user_contact_audit", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([contactId, createdAt])
+  @@index([actorUserId, createdAt])
+}
+
 enum LeadStatus {
   NEW_LEAD
   CONTACTED
@@ -198,6 +291,8 @@ model User {
   referralCode  ReferralCode?
   notifications Notification[]
   events LeadEvent[]
+  ownedContacts Contact[] @relation("user_owned_contacts")
+  contactAuditEvents ContactAuditEvent[] @relation("user_contact_audit")
 }
 
 // Staff referral links (D-034). One code per Staff user; Owner-managed.

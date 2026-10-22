@@ -5,13 +5,14 @@ import { usePathname } from "next/navigation";
 
 /**
  * Mulberry sidebar navigation (Phase 5). Owner sees Users + Referrals;
- * Staff see only Contacts. Active route is highlighted; keyboard reachable.
+ * Staff see their own private contacts and assigned CRM leads. Active route is highlighted.
  */
 export function AdminNav({ role }: { role: string }) {
   const pathname = usePathname();
 
   const links = [
-    { href: "/admin/leads", label: "Contacts", show: true },
+    { href: "/admin/my-contacts", label: "My Contacts", show: true },
+    { href: "/admin/leads", label: "Lead pipeline", show: true },
     { href: "/admin/workflows", label: "Workspace", show: true },
     { href: "/admin/triage", label: "Attention", show: true },
     { href: "/admin/qualification", label: "Qualification", show: true },
