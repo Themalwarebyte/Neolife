@@ -5,6 +5,10 @@ import { requireCrmUser } from "@/server/auth/requireCrmUser";
 import { contactRecordScope, isContactUuid } from "@/lib/contact-intake";
 import { ManualContactForm } from "@/components/admin/ManualContactForm";
 import { ContactStateForm } from "@/components/admin/ContactStateForm";
+import { ContactQueueReviewForm } from "@/components/admin/ContactQueueReviewForm";
+import { ContactFollowUpScheduleForm } from "@/components/admin/ContactFollowUpScheduleForm";
+import { ContactFollowUpUpdateForms } from "@/components/admin/ContactFollowUpUpdateForms";
+import { mayScheduleOutreach } from "@/lib/contact-processing";
 
 export const dynamic = "force-dynamic";
 export default async function ContactDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -16,6 +20,7 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
     include: {
       methods: { orderBy: [{ type: "asc" }, { isPrimary: "desc" }, { createdAt: "asc" }] },
       mergedFrom: { select: { id: true, firstName: true, lastName: true, mergedAt: true }, orderBy: { mergedAt: "desc" } },
+      followUps: { orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 20 },
       audit: { orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 30,
         select: { id: true, action: true, actorSnapshot: true, createdAt: true },
       },
@@ -26,6 +31,8 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
   const merged = contact.state === "MERGED";
   const archived = contact.state === "ARCHIVED";
   const inMain = contact.state === "MAIN";
+  const rejectedImport = contact.origin === "IMPORT" && contact.queueReviewOutcome === "REJECTED";
+  const canContact = mayScheduleOutreach(contact);
   return <div className="mx-auto max-w-4xl space-y-6">
     <header>
       <Link href={`/admin/my-contacts?view=${imported ? "queue" : archived ? "archived" : merged ? "duplicates" : "main"}`} className="text-sm font-semibold text-mulberry-700 hover:underline">← My Contacts</Link>
@@ -45,23 +52,48 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
     </section> : null}
     {imported ? <section className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-neutral-800">
       <h2 className="font-bold text-amber-900">Imported · awaiting review</h2>
-      <p>Imported contacts remain in a separate unreviewed queue. Duplicate suggestions can be reviewed under Duplicate Issues. Queue processing arrives in Batch D. Do not contact people without recorded permission.</p>
+      <p>Imported contacts remain separate until a reviewer makes a recorded decision. Resolve duplicate suggestions before approval. This review does not send messages or grant consent.</p>
       <p><strong>Source:</strong> {contact.sourceDetail || "Unknown"}{contact.importBatchId ? <> · <Link className="font-semibold text-mulberry-800 underline" href={`/admin/my-contacts/import/${contact.importBatchId}`}>View import history</Link></> : null}</p>
       <p><strong>City:</strong> {contact.city || "—"}</p><p><strong>Notes:</strong> {contact.notes || "—"}</p>
       <p><strong>Consent:</strong> {contact.consentStatus}{contact.consentEvidence ? ` · ${contact.consentEvidence}` : ""}</p>
       <ul className="space-y-1">{contact.methods.map(m => <li key={m.id}>{m.type === "PHONE" ? "Phone" : "Email"}: {m.value}</li>)}</ul>
     </section> : null}
-    {inMain || archived ? <ManualContactForm contact={{
+    {imported && <ContactQueueReviewForm contactId={contact.id} version={contact.version} />}
+    {rejectedImport && <section className="rounded-2xl border border-neutral-200 bg-neutral-50 p-5 text-sm">
+      <h2 className="font-bold text-neutral-900">Rejected import — preserved, read-only</h2>
+      <p className="mt-2">Reason: {contact.queueReviewReason || "—"}. Reviewed by {contact.queueReviewedBySnapshot || "Unknown"} on {contact.queueReviewedAt?.toLocaleString() || "—"}.</p>
+      <p className="mt-2">Name: {contact.firstName} {contact.lastName || ""} · City: {contact.city || "—"}</p>
+      <p className="mt-2">Source: {contact.sourceDetail || "—"} · Notes: {contact.notes || "—"}</p>
+      <ul className="mt-2">{contact.methods.map(m => <li key={m.id}>{m.type}: {m.value}</li>)}</ul>
+      <p className="mt-2">This imported rejection cannot use the generic restore-to-Main action.</p>
+    </section>}
+    {(inMain || archived) && !rejectedImport ? <ManualContactForm contact={{
       id: contact.id, version: contact.version, firstName: contact.firstName,
       lastName: contact.lastName, city: contact.city, sourceDetail: contact.sourceDetail,
       notes: contact.notes, consentStatus: contact.consentStatus, consentEvidence: contact.consentEvidence, doNotContact: contact.doNotContact,
       methods: contact.methods.map(m => ({ type: m.type, value: m.value })),
-    }} /> : <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">This record is not editable in its current state. Imported queue processing arrives in Batch D; merged sources remain read-only.</p>}
-    {inMain || archived ? <section className="rounded-2xl border border-neutral-200 bg-white p-5">
+    }} /> : <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">This record is not editable in its current state. Imported decisions and merged records retain a permanent audit trail.</p>}
+    {(inMain || archived) && !rejectedImport ? <section className="rounded-2xl border border-neutral-200 bg-white p-5">
       <h2 className="mb-3 text-sm font-bold text-neutral-800">Contact list status</h2>
       <p className="mb-4 text-sm text-neutral-600">Archiving removes the record from Main Contacts without deleting its details or history.</p>
       <ContactStateForm id={id} version={contact.version} archived={archived} />
     </section> : null}
+    {inMain && contact.ownerUserId && <ContactFollowUpScheduleForm contactId={contact.id} version={contact.version} outreachAllowed={canContact} />}
+    {inMain && !contact.ownerUserId && <p className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm">This contact has no active owner. Follow-up scheduling is paused pending authorized ownership recovery.</p>}
+    {(inMain || archived || merged) && <section className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-bold text-neutral-900">Contact follow-up history</h2>
+        <Link href="/admin/my-contacts/follow-ups" className="text-sm font-semibold text-mulberry-700 hover:underline">All follow-ups →</Link>
+      </div>
+      {contact.followUps.length === 0 ? <p className="text-sm text-neutral-600">No follow-up tasks recorded.</p> :
+        contact.followUps.map(task => <div key={task.id} className="space-y-3 rounded-xl border border-neutral-100 p-3">
+          <p className="text-sm font-semibold">{task.kind} · {task.status} · Due {task.dueAt.toLocaleString()}</p>
+          <p className="whitespace-pre-wrap break-words text-sm">{task.note}</p>
+          {task.resolutionNote && <p className="text-xs text-neutral-600">Outcome: {task.resolutionNote}</p>}
+          {task.status === "OPEN" && <ContactFollowUpUpdateForms taskId={task.id} version={task.version}
+            allowOutreachUpdate={inMain && (task.kind === "INTERNAL" || canContact)} />}
+        </div>)}
+    </section>}
     {contact.mergedFrom.length ? <section className="rounded-2xl border border-neutral-200 bg-white p-5">
       <h2 className="text-base font-bold text-neutral-900">Preserved merged sources</h2>
       <p className="mt-1 text-sm text-neutral-600">These records retain their original notes, methods, import attribution and audit histories.</p>

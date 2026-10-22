@@ -96,9 +96,9 @@ export default async function MyContactsPage({ searchParams }: { searchParams: P
   return <div className="space-y-6">
     <header className="flex flex-wrap items-start justify-between gap-4">
       <div>
-        <p className="text-xs font-bold uppercase tracking-widest text-mulberry-600">Contact intake · Batch C</p>
+        <p className="text-xs font-bold uppercase tracking-widest text-mulberry-600">Contact intake · Batch D</p>
         <h1 className="mt-1 text-2xl font-extrabold text-neutral-900">My Contacts</h1>
-        <p className="mt-2 max-w-2xl text-sm text-neutral-600">Personal contacts are separate from CRM leads. Spreadsheet rows enter a private unreviewed queue; imports never create sales leads or send messages.</p>
+        <p className="mt-2 max-w-2xl text-sm text-neutral-600">Personal contacts are separate from CRM leads. Spreadsheet rows enter a review queue. Approved contacts enter Main only after duplicate checks; no import or review creates a Lead or sends a message.</p>
       </div>
       <div className="flex flex-wrap gap-2">
         <Link href="/admin/my-contacts/import" className="rounded-full border border-mulberry-300 bg-white px-5 py-3 text-sm font-semibold text-mulberry-800 hover:bg-mulberry-50">Import spreadsheet</Link>
@@ -106,6 +106,10 @@ export default async function MyContactsPage({ searchParams }: { searchParams: P
       </div>
     </header>
     <ContactIntakeTabs view={view} scopeAll={all} />
+    {!["history", "duplicates"].includes(view) && <div className="flex flex-wrap gap-3 text-xs font-semibold">
+      <a href={`/admin/my-contacts/export?view=${view}${all ? "&scope=all" : ""}`} className="rounded-full border border-neutral-300 bg-white px-4 py-2 text-mulberry-800">Export {view} (max 1,000)</a>
+      <Link href="/admin/my-contacts/follow-ups" className="rounded-full border border-neutral-300 bg-white px-4 py-2 text-mulberry-800">Manage contact follow-ups →</Link>
+    </div>}
     {user.role === "admin" ? <div className="flex flex-wrap items-center gap-2 text-sm">
       <span className="font-semibold text-neutral-700">Owner scope:</span>
       <Link href={listUrl(view, q, false, 1, reviewed)} className={`rounded-full px-4 py-2 ${!all ? "bg-mulberry-100 font-semibold text-mulberry-900" : "border border-neutral-200 bg-white text-neutral-700"}`}>My records</Link>
@@ -161,7 +165,7 @@ export default async function MyContactsPage({ searchParams }: { searchParams: P
         <Link href={listUrl(view, "", all, 1)} className="py-2 text-sm font-semibold text-mulberry-700 hover:underline">Clear</Link>
       </form>
       <p className="text-sm text-neutral-600">{total} {view === "history" ? "import batches" : view === "queue" ? "unreviewed imported contacts" : view === "archived" ? "archived contacts" : "main contacts"} found.</p>
-      {view === "queue" ? <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">These are newly imported contacts, not yet reviewed. There is no automated outreach or sales status. Duplicate issues can be reviewed in Batch C. Processing and promotion to Main Contacts are reserved for Batch D.</p> : null}
+      {view === "queue" ? <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Imported contacts must be reviewed individually. Open a contact to approve or reject it; potential duplicate matches must be resolved first. Review never grants consent or creates a Lead.</p> : null}
       {isHistory ? (imports.length === 0 ? <p className="rounded-2xl border border-dashed border-neutral-300 bg-white p-9 text-center text-sm text-neutral-600">No imports found. <Link href="/admin/my-contacts/import" className="font-semibold text-mulberry-800 underline">Import a spreadsheet</Link>.</p> :
         <div className="overflow-x-auto rounded-2xl border border-neutral-200 bg-white shadow-sm"><table className="w-full min-w-[660px] text-left text-sm">
           <thead className="bg-neutral-50 text-xs uppercase tracking-wide text-neutral-600"><tr>

@@ -132,6 +132,10 @@ export async function updateManualContact(
       const previous = await tx.contact.findFirst({ where, include: { methods: true } });
       if (!previous) return "missing" as const;
       if (previous.version !== expectedVersion) return "stale" as const;
+      // A rejected import remains archived and cannot be edited into an approved record.
+      if (previous.origin === "IMPORT" && previous.queueReviewOutcome === "REJECTED") {
+        return "unsupported" as const;
+      }
       if (previous.state !== "MAIN" && previous.state !== "ARCHIVED") {
         // Batch B/C will supply distinct imported/duplicate review actions.
         return "unsupported" as const;
@@ -173,6 +177,35 @@ export async function updateManualContact(
           await tx.contactMethod.create({ data: { contactId: id, ...item } });
         }
       }
+      // Existing outreach reminders cease to be actionable when consent is restricted.
+      if (parsed.value.consentStatus !== "GRANTED" || parsed.value.doNotContact) {
+        const cancelled = await tx.contactFollowUp.updateMany({
+          where: { contactId: id, status: "OPEN", kind: { in: ["CALL", "EMAIL"] } },
+          data: { status: "CANCELLED", version: { increment: 1 },
+            resolvedAt: new Date(), resolvedByUserId: user.id, resolvedBySnapshot: user.name,
+            resolutionNote: "Contact consent is no longer eligible for outreach." },
+        });
+        if (cancelled.count) await tx.contactAuditEvent.create({ data: {
+          contactId: id, actorUserId: user.id, actorSnapshot: user.name,
+          action: "CONTACT_FOLLOWUPS_AUTO_CANCELLED", reason: "Consent or Do Not Contact restriction.",
+          after: { count: cancelled.count, scope: "OPEN_CALL_EMAIL" },
+        } });
+      }
+      // A removed phone/email also makes a pending task of that kind unsafe.
+      for (const kind of ["PHONE", "EMAIL"] as const) {
+        if (parsed.value.methods.some(m => m.type === kind)) continue;
+        const removedTasks = await tx.contactFollowUp.updateMany({
+          where: { contactId: id, kind: kind === "PHONE" ? "CALL" : "EMAIL", status: "OPEN" },
+          data: { status: "CANCELLED", version: { increment: 1 }, resolvedAt: new Date(),
+            resolvedByUserId: user.id, resolvedBySnapshot: user.name,
+            resolutionNote: `Contact no longer has a ${kind.toLowerCase()} method.` },
+        });
+        if (removedTasks.count) await tx.contactAuditEvent.create({ data: {
+          contactId: id, actorUserId: user.id, actorSnapshot: user.name,
+          action: "CONTACT_FOLLOWUPS_AUTO_CANCELLED", reason: `${kind} method removed.`,
+          after: { count: removedTasks.count, scope: kind },
+        } });
+      }
       const current = await tx.contact.findFirstOrThrow({ where, include: { methods: true } });
       await tx.contactAuditEvent.create({
         data: {
@@ -211,11 +244,28 @@ async function changeContactState(form: FormData, target: "MAIN" | "ARCHIVED"): 
       const previous = await tx.contact.findFirst({ where, include: { methods: true } });
       if (!previous) return "missing" as const;
       if (previous.version !== expectedVersion) return "stale" as const;
+      // An imported rejection must NEVER use the generic restore-to-MAIN action.
+      if (target === "MAIN" && previous.origin === "IMPORT" && previous.queueReviewOutcome !== "APPROVED") {
+        return "review_required" as const;
+      }
       const changed = await tx.contact.updateMany({
         where: { ...where, version: expectedVersion },
         data: { state: target, version: { increment: 1 }, updatedAt: new Date() },
       });
       if (changed.count !== 1) return "stale" as const;
+      if (target === "ARCHIVED") {
+        const cancelled = await tx.contactFollowUp.updateMany({
+          where: { contactId: id, status: "OPEN" },
+          data: { status: "CANCELLED", version: { increment: 1 }, resolvedAt: new Date(),
+            resolvedByUserId: user.id, resolvedBySnapshot: user.name,
+            resolutionNote: "Contact was archived." },
+        });
+        if (cancelled.count) await tx.contactAuditEvent.create({ data: {
+          contactId: id, actorUserId: user.id, actorSnapshot: user.name,
+          action: "CONTACT_FOLLOWUPS_AUTO_CANCELLED", reason: "Contact archived.",
+          after: { count: cancelled.count, scope: "ALL_OPEN" },
+        } });
+      }
       const current = await tx.contact.findFirstOrThrow({ where: { id }, include: { methods: true } });
       await tx.contactAuditEvent.create({
         data: {
@@ -231,6 +281,7 @@ async function changeContactState(form: FormData, target: "MAIN" | "ARCHIVED"): 
     });
     if (result === "missing") return { status: "error", message: "Contact not available for this action." };
     if (result === "stale") return { status: "error", message: "This contact changed. Refresh the page." };
+    if (result === "review_required") return { status: "error", message: "A rejected imported contact cannot be restored to Main Contacts." };
     invalidate(id);
     return { status: "success", message: target === "ARCHIVED" ? "Contact archived." : "Contact restored to Main Contacts.", contactId: id };
   } catch {

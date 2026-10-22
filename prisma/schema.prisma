@@ -44,6 +44,24 @@ enum ContactMethodType {
   EMAIL
 }
 
+// Batch D: explicit, human-reviewed imported-queue decisions.
+enum ContactQueueReviewOutcome {
+  APPROVED
+  REJECTED
+}
+
+enum ContactFollowUpKind {
+  INTERNAL
+  CALL
+  EMAIL
+}
+
+enum ContactFollowUpStatus {
+  OPEN
+  COMPLETED
+  CANCELLED
+}
+
 model Contact {
   id            String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   // NULL only if Better Auth deletes the owner. Contacts remain recoverable
@@ -63,12 +81,19 @@ model Contact {
   state         ContactState         @default(MAIN)
   consentStatus ContactConsentStatus @default(UNKNOWN)
   doNotContact  Boolean              @default(false)
+  queueReviewOutcome ContactQueueReviewOutcome?
+  queueReviewedAt DateTime?
+  queueReviewedByUserId String?
+  queueReviewedBySnapshot String?
+  queueReviewReason String?
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
 
   owner   User?               @relation("user_owned_contacts", fields: [ownerUserId], references: [id], onDelete: SetNull)
   methods ContactMethod[]
   audit   ContactAuditEvent[]
+  queueReviewer User? @relation("user_contact_queue_review", fields: [queueReviewedByUserId], references: [id], onDelete: SetNull)
+  followUps ContactFollowUp[]
   importBatchId String? @db.Uuid
   importRowNumber Int?
   importBatch ContactImportBatch? @relation("batch_contacts", fields: [importBatchId], references: [id], onDelete: SetNull)
@@ -85,6 +110,7 @@ model Contact {
   @@index([state, createdAt])
   @@index([mergedIntoContactId])
   @@index([importBatchId, importRowNumber])
+  @@index([ownerUserId, queueReviewOutcome, queueReviewedAt])
   @@unique([importBatchId, importRowNumber])
 }
 
@@ -124,6 +150,49 @@ model ContactAuditEvent {
 
   @@index([contactId, createdAt])
   @@index([actorUserId, createdAt])
+}
+
+// Batch D: Contact-only tasks. There is intentionally no Lead foreign key.
+model ContactFollowUp {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contactId String @db.Uuid
+  kind ContactFollowUpKind
+  status ContactFollowUpStatus @default(OPEN)
+  note String
+  dueAt DateTime
+  version Int @default(1)
+  createdByUserId String?
+  createdBySnapshot String
+  resolvedByUserId String?
+  resolvedBySnapshot String?
+  resolutionNote String?
+  resolvedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  createdBy User? @relation("user_contact_task_created", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  resolvedBy User? @relation("user_contact_task_resolved", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([contactId, status, dueAt])
+  @@index([status, dueAt])
+}
+
+// One export audit record per authorized download, not per contact row.
+model ContactExportAudit {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorUserId String?
+  actorSnapshot String
+  scopeAll Boolean
+  category String
+  view String
+  rowCount Int
+  createdAt DateTime @default(now())
+
+  actor User? @relation("user_contact_exports", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId, createdAt])
+  @@index([createdAt])
 }
 
 // Batch B: upload preview, user-confirmed mapping, atomic import and row-level history.
@@ -403,6 +472,10 @@ model User {
   contactImports ContactImportBatch[] @relation("user_contact_imports")
   contactDuplicateIssues ContactDuplicateIssue[] @relation("user_contact_duplicate_owner")
   contactDuplicateReviews ContactDuplicateIssue[] @relation("user_contact_duplicate_reviewer")
+  contactQueueReviews Contact[] @relation("user_contact_queue_review")
+  contactTasksCreated ContactFollowUp[] @relation("user_contact_task_created")
+  contactTasksResolved ContactFollowUp[] @relation("user_contact_task_resolved")
+  contactExports ContactExportAudit[] @relation("user_contact_exports")
 }
 
 // Staff referral links (D-034). One code per Staff user; Owner-managed.

@@ -248,6 +248,30 @@ export async function mergeDuplicateIssue(_previous: DuplicateActionResult | nul
         data: { state: "MERGED", mergedIntoContactId: retained.id, mergedAt: now, version: { increment: 1 } },
       });
       if (updatedSource.count !== 1) throw new Error("STALE_DUPLICATE_MERGE");
+      // Never leave an open task on a read-only merged source. Nor may the
+      // retained record keep outreach tasks when the merge restricts consent.
+      const sourceTasks = await tx.contactFollowUp.updateMany({
+        where: { contactId: source.id, status: "OPEN" },
+        data: { status: "CANCELLED", version: { increment: 1 }, resolvedAt: now,
+          resolvedByUserId: user.id, resolvedBySnapshot: user.name,
+          resolutionNote: "Contact was merged into another record." },
+      });
+      const retainedTasks = consentStatus !== "GRANTED" || doNotContact
+        ? await tx.contactFollowUp.updateMany({
+          where: { contactId: retained.id, status: "OPEN", kind: { in: ["CALL", "EMAIL"] } },
+          data: { status: "CANCELLED", version: { increment: 1 }, resolvedAt: now,
+            resolvedByUserId: user.id, resolvedBySnapshot: user.name,
+            resolutionNote: "Merged consent restricts outreach." },
+        })
+        : { count: 0 };
+      if (sourceTasks.count || retainedTasks.count) await tx.contactAuditEvent.createMany({ data: [
+        ...(sourceTasks.count ? [{ contactId: source.id, actorUserId: user.id, actorSnapshot: user.name,
+          action: "CONTACT_FOLLOWUPS_AUTO_CANCELLED", reason: "Source contact merged.",
+          after: { count: sourceTasks.count, scope: "ALL_OPEN" } }] : []),
+        ...(retainedTasks.count ? [{ contactId: retained.id, actorUserId: user.id, actorSnapshot: user.name,
+          action: "CONTACT_FOLLOWUPS_AUTO_CANCELLED", reason: "Consent restricted by merge.",
+          after: { count: retainedTasks.count, scope: "OPEN_CALL_EMAIL" } }] : []),
+      ] });
       const claimed = await tx.contactDuplicateIssue.updateMany({
         where: { id: issue.id, status: "OPEN", leftVersion, rightVersion },
         data: { status: "MERGED", reviewedByUserId: user.id, reviewedBySnapshot: user.name,
