@@ -68,9 +68,15 @@ model Contact {
   owner   User?               @relation("user_owned_contacts", fields: [ownerUserId], references: [id], onDelete: SetNull)
   methods ContactMethod[]
   audit   ContactAuditEvent[]
+  importBatchId String? @db.Uuid
+  importRowNumber Int?
+  importBatch ContactImportBatch? @relation("batch_contacts", fields: [importBatchId], references: [id], onDelete: SetNull)
+  importRow ContactImportRow? @relation("imported_row_contact")
 
   @@index([ownerUserId, state, createdAt])
   @@index([state, createdAt])
+  @@index([importBatchId, importRowNumber])
+  @@unique([importBatchId, importRowNumber])
 }
 
 // Multiple methods permit shared household numbers and duplicate candidates.
@@ -109,6 +115,60 @@ model ContactAuditEvent {
 
   @@index([contactId, createdAt])
   @@index([actorUserId, createdAt])
+}
+
+// Batch B: upload preview, user-confirmed mapping, atomic import and row-level history.
+// No lead references, outbound actions, or automatic promotion are permitted.
+enum ContactImportStatus {
+  PREVIEW
+  COMPLETE
+}
+
+enum ContactImportRowStatus {
+  PENDING
+  IMPORTED
+  INVALID
+}
+
+model ContactImportBatch {
+  id             String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerUserId    String?
+  ownerSnapshot  String
+  filename       String
+  fileType       String
+  fileSha256     String
+  status         ContactImportStatus @default(PREVIEW)
+  headers        Json
+  mapping        Json?
+  totalRows      Int
+  importedRows   Int @default(0)
+  invalidRows    Int @default(0)
+  createdAt      DateTime @default(now())
+  completedAt    DateTime?
+
+  owner          User? @relation("user_contact_imports", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  rows           ContactImportRow[]
+  contacts       Contact[] @relation("batch_contacts")
+
+  @@unique([ownerUserId, fileSha256])
+  @@index([ownerUserId, createdAt])
+}
+
+model ContactImportRow {
+  id           String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  batchId      String @db.Uuid
+  rowNumber    Int
+  values       Json
+  status       ContactImportRowStatus @default(PENDING)
+  error        String?
+  contactId    String? @unique @db.Uuid
+  createdAt    DateTime @default(now())
+
+  batch        ContactImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  contact      Contact? @relation("imported_row_contact", fields: [contactId], references: [id], onDelete: SetNull)
+
+  @@unique([batchId, rowNumber])
+  @@index([batchId, status])
 }
 
 enum LeadStatus {
@@ -293,6 +353,7 @@ model User {
   events LeadEvent[]
   ownedContacts Contact[] @relation("user_owned_contacts")
   contactAuditEvents ContactAuditEvent[] @relation("user_contact_audit")
+  contactImports ContactImportBatch[] @relation("user_contact_imports")
 }
 
 // Staff referral links (D-034). One code per Staff user; Owner-managed.

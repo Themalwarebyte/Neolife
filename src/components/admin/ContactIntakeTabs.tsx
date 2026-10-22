@@ -4,9 +4,9 @@ type ContactView = "main" | "archived" | "queue" | "duplicates" | "history";
 const tabs: { key: ContactView; label: string; future?: string }[] = [
   { key: "main", label: "Main Contacts" },
   { key: "archived", label: "Archived" },
-  { key: "queue", label: "Imported Queue", future: "Batch B" },
+  { key: "queue", label: "Imported Queue" },
   { key: "duplicates", label: "Duplicate Issues", future: "Batch C" },
-  { key: "history", label: "Import History", future: "Batch B" },
+  { key: "history", label: "Import History" },
 ];
 
 export function ContactIntakeTabs({ view, scopeAll = false }: { view: ContactView; scopeAll?: boolean }) {
