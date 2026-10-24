@@ -144,6 +144,14 @@ checklist for contributors and automated agents.
 
 ---
 
+## Batch E (Development and Release Status)
+
+- Implemented locally in commit `e3a7127`: user-owned contacts, Owner-managed Contact Pool, consent-preserving transfers, rejected-import corrections, and password-verified export PIN protection.
+- As of 2026-10-24, Batch E has not been pushed to GitHub, deployed or production-accepted.
+- Local validation passed using disposable PostgreSQL; production deployment remains separately gated.
+
+---
+
 ## Security
 
 - **No secrets are committed to this repository.** `.env`, `.env*.local`, and

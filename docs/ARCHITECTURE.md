@@ -341,7 +341,7 @@ Any user with mustChangePassword = true
 
 ## Testing
 
-- **Official totals:** the suite contains **247 tests** — **179** run without
+- **Historical suite totals (superseded):** the suite previously contained **247 tests** — **179** run without
   `DATABASE_URL`, plus **68** DB-enabled tests that require local PostgreSQL. Tests gate
   on `const DB_AVAILABLE = Boolean(process.env.DATABASE_URL)`, so a run without that
   variable legitimately reports fewer tests. Both `DATABASE_URL` and
@@ -361,3 +361,8 @@ Any user with mustChangePassword = true
   two local-only fixture accounts via `e2e/seed-e2e-users.ts`, which refuses to run
   unless `E2E_SEED_USERS=1`, `NODE_ENV` is not `production`, and `DATABASE_URL` is
   loopback-local.
+
+
+### Batch E Notes
+- Contacts model extended for ownership/pool/transfers with audit history; deletion guard enforced; import/correction workflows preserve history; export PIN uses password verification, hashing, throttling, concurrency protection.
+- **Batch E verification (2026-10-24):** Latest general regression 344 passed and 190 skipped (not a new official suite total). Disposable PostgreSQL: 23 migrations applied and up to date; one real-database PIN concurrency test and five focused PIN tests passed. Next.js production build passed with temporary exclusions for 12 unrelated untracked malformed TypeScript scripts; original configuration was restored. Production acceptance was not performed.

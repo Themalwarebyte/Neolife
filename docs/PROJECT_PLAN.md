@@ -663,3 +663,11 @@ See docs/STATUS.md and docs/CHANGELOG.md for full details.
 
 **Remaining (Phase 2):** CRM automation, deeper workflow automation, additional authorization/reporting polish, bulk actions where appropriate. Authenticated live CRM acceptance checks pending; email delivery unverified; rollback restoration untested.
 
+
+
+## Batch E - Contacts & Export Security (LOCALLY COMMITTED, NOT RELEASED)
+
+- **Commit:** e3a7127 (locally committed on master)
+- **Status (2026-10-24):** Implementation complete and committed locally as `e3a7127`. Documentation is maintained in a separate update. GitHub push, production deployment and production acceptance have not occurred; production preflight and verified backups are release gates.
+- **Scope:** Contacts ownership/oversight, Shared Contact Pool (Owner-managed), recipient-approved transfers (with rejection/audit/cancel/recover), deletion guard for contacts with transfer history, import/correction workflows preserving history, export PIN security (password-verified, hashed, throttled, concurrency-protected).
+- **Validation:** 23 migrations up to date (disposable DB); PIN concurrency + 5 PIN tests PASS; production build PASS; 344 passed, 190 skipped.

@@ -97,6 +97,11 @@ This project uses **pnpm** (see `pnpm-lock.yaml` / `pnpm-workspace.yaml`). Do no
 
 1. `pnpm typecheck` — must pass
 2. `pnpm exec eslint . --max-warnings 0` — must pass
-3. `pnpm test` — all non-DB tests must pass (222); DB tests skip without `DATABASE_URL`
-   (111) and must pass when PostgreSQL is available (333 total)
+3. `pnpm test` - all applicable non-DB tests must pass; DB-dependent tests must pass with an approved disposable PostgreSQL database. Historical baseline: 333 tests (222 non-DB, 111 DB). Latest Batch E general regression: 344 passed, 190 skipped; real PostgreSQL PIN concurrency: 1 passed, and five focused PIN tests passed separately. Do not treat historical totals as current.
 4. Confirm no secrets, credentials, or production configuration are staged
+
+## Batch E verification (2026-10-24)
+
+- Implementation commit `e3a7127` is local; GitHub push, deployment and production acceptance are not complete.
+- Disposable PostgreSQL: 23 migrations applied and up to date. Next.js production build passed.
+- Standard TypeScript checking is currently affected by unrelated malformed untracked utility scripts; the validated build temporarily excluded these files and restored configuration afterwards. CI typecheck and lint requirements remain in force.

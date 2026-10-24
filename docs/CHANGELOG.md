@@ -538,3 +538,17 @@ eolife-web:3fa329f (commit 3fa329f), verified 364 tests passing
 - Pipeline/conversion analytics, cohort analytics, follow-up performance and CSV export (27C)
 ### Deploymen
 - Commit f6049fb deployed; migration 20261021000000_phase2_followup_scheduling applied; 391 tests passing; HTTP checks passed
+
+
+## [Batch E] - 2026-10-24 (Locally committed, not released)
+
+### Added
+- User-owned contacts with Owner oversight; bulk archive/restore/assignment
+- Shared Contact Pool (Owner-managed)
+- Recipient-approved transfers with rejection (audit retained, returns to Owner-visible resolution), Owner cancellation/recovery
+- Permanent deletion restriction for contacts with transfer history (archive/retention)
+- Rejected spreadsheet-row correction/revalidation and rejected imported-contact correction/requeue with original import and correction/decision history preserved
+- Password-verified export PIN setup/reset, hashing, throttling and concurrency protection
+
+### Notes
+- Implementation committed locally as `e3a7127`; documentation recorded in a separate update. As of 2026-10-24, nothing in Batch E has been pushed, deployed or production-accepted. Disposable PostgreSQL: 23 migrations up to date; PIN concurrency regression and five focused PIN tests PASS; Next.js production build PASS; general regression: 344 passed, 190 skipped.
