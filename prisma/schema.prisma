@@ -26,6 +26,8 @@ enum ContactState {
   DUPLICATE_REVIEW
   ARCHIVED
   MERGED
+  CONTACT_POOL
+  TRANSFER_PENDING
 }
 
 enum ContactOrigin {
@@ -103,6 +105,7 @@ model Contact {
   mergedAt DateTime?
   mergedInto Contact? @relation("ContactMergeLineage", fields: [mergedIntoContactId], references: [id], onDelete: SetNull)
   mergedFrom Contact[] @relation("ContactMergeLineage")
+  transfers ContactTransfer[]
   duplicateLeftIssues ContactDuplicateIssue[] @relation("ContactDuplicateLeft")
   duplicateRightIssues ContactDuplicateIssue[] @relation("ContactDuplicateRight")
 
@@ -195,6 +198,34 @@ model ContactExportAudit {
   @@index([createdAt])
 }
 
+// PIN hashes protect exports after the first password-verified setup.
+model ContactExportCredential {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String @unique
+  pinHash String
+  failedAttempts Int @default(0)
+  lockedUntil DateTime?
+  lastVerifiedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ContactExportSecurityEvent {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String?
+  actorSnapshot String
+  action String
+  detail String?
+  createdAt DateTime @default(now())
+
+  actor User? @relation("user_contact_export_security", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
+}
+
 // Batch B: upload preview, user-confirmed mapping, atomic import and row-level history.
 // No lead references, outbound actions, or automatic promotion are permitted.
 enum ContactImportStatus {
@@ -206,6 +237,7 @@ enum ContactImportRowStatus {
   PENDING
   IMPORTED
   INVALID
+  REJECTED
 }
 
 model ContactImportBatch {
@@ -240,13 +272,77 @@ model ContactImportRow {
   status       ContactImportRowStatus @default(PENDING)
   error        String?
   contactId    String? @unique @db.Uuid
+  correctedValues Json?
+  correctionCount Int @default(0)
+  lastCorrectedAt DateTime?
+  lastCorrectedBySnapshot String?
   createdAt    DateTime @default(now())
 
   batch        ContactImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
   contact      Contact? @relation("imported_row_contact", fields: [contactId], references: [id], onDelete: SetNull)
+  corrections ContactImportRowCorrection[]
 
   @@unique([batchId, rowNumber])
   @@index([batchId, status])
+}
+
+// Append-only corrections preserve original imported cells and every revalidation attempt.
+model ContactImportRowCorrection {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  rowId String @db.Uuid
+  actorUserId String?
+  actorSnapshot String
+  submittedValues Json
+  validationPassed Boolean
+  validationError String?
+  createdAt DateTime @default(now())
+
+  row ContactImportRow @relation(fields: [rowId], references: [id], onDelete: Cascade)
+  actor User? @relation("user_contact_import_row_correction", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([rowId, createdAt])
+  @@index([actorUserId, createdAt])
+}
+
+enum ContactTransferStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+// A transfer is a durable hand-off request. Ownership changes only on recipient approval.
+model ContactTransfer {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contactId String @db.Uuid
+  sourceOwnerUserId String?
+  sourceOwnerSnapshot String
+  recipientUserId String?
+  recipientSnapshot String
+  requestedByUserId String?
+  requestedBySnapshot String
+  decidedByUserId String?
+  decidedBySnapshot String?
+  sourceState ContactState
+  expectedContactVersion Int
+  status ContactTransferStatus @default(PENDING)
+  rejectionReason String?
+  decisionReason String?
+  decidedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Transfer history is durable: a contact with any transfer record cannot be hard-deleted.
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  sourceOwner User? @relation("contact_transfer_source_owner", fields: [sourceOwnerUserId], references: [id], onDelete: SetNull)
+  recipient User? @relation("contact_transfer_recipient", fields: [recipientUserId], references: [id], onDelete: SetNull)
+  requestedBy User? @relation("contact_transfer_requester", fields: [requestedByUserId], references: [id], onDelete: SetNull)
+  decidedBy User? @relation("contact_transfer_decider", fields: [decidedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([recipientUserId, status, createdAt])
+  @@index([status, createdAt])
+  @@index([contactId, createdAt])
+  @@index([requestedByUserId, createdAt])
 }
 
 // Batch C: human-reviewed, same-owner duplicate candidates and durable decisions.
@@ -476,6 +572,13 @@ model User {
   contactTasksCreated ContactFollowUp[] @relation("user_contact_task_created")
   contactTasksResolved ContactFollowUp[] @relation("user_contact_task_resolved")
   contactExports ContactExportAudit[] @relation("user_contact_exports")
+  contactExportCredential ContactExportCredential?
+  contactExportSecurityEvents ContactExportSecurityEvent[] @relation("user_contact_export_security")
+  contactImportRowCorrections ContactImportRowCorrection[] @relation("user_contact_import_row_correction")
+  contactTransfersFrom ContactTransfer[] @relation("contact_transfer_source_owner")
+  contactTransfersTo ContactTransfer[] @relation("contact_transfer_recipient")
+  contactTransfersRequested ContactTransfer[] @relation("contact_transfer_requester")
+  contactTransfersDecided ContactTransfer[] @relation("contact_transfer_decider")
 }
 
 // Staff referral links (D-034). One code per Staff user; Owner-managed.

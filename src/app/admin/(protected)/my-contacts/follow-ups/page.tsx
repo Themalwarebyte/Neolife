@@ -48,7 +48,7 @@ export default async function ContactFollowUpsPage({ searchParams }: { searchPar
       <h1 className="mt-2 text-2xl font-extrabold text-neutral-900">Contact follow-ups</h1>
       <p className="mt-1 text-sm text-neutral-600">Personal-contact tasks are separate from CRM Lead follow-ups. Scheduling never sends messages.</p>
     </header>
-    <ContactIntakeTabs view="follow-ups" scopeAll={all} />
+    <ContactIntakeTabs view="follow-ups" scopeAll={all} role={user.role} />
     {user.role === "admin" && <nav aria-label="Owner scope" className="flex gap-4 text-sm">
       <Link href={href(filter, 1, false)} className={!all ? "font-bold text-mulberry-800 underline" : "text-neutral-700"}>My tasks</Link>
       <Link href={href(filter, 1, true)} className={all ? "font-bold text-mulberry-800 underline" : "text-neutral-700"}>Team oversight</Link>

@@ -33,15 +33,15 @@ export default async function ContactImportDetails({ params }: { params: Promise
     </div>
     {isPreview ? <ContactImportMapping batchId={batch.id} headers={headers} mapping={guessMapping(headers)}
       sample={batch.rows.slice(0, 5).map(row => Array.isArray(row.values) ? row.values.map(String) : [])} total={batch.totalRows} /> : <>
-      <p className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">Imported contacts remain in the unreviewed queue. Invalid spreadsheet rows were not imported. Uploading the exact same file again does not create duplicate records.</p>
-      <div className="flex flex-wrap gap-3"><Link href="/admin/my-contacts?view=queue" className="rounded-full bg-mulberry-700 px-5 py-2 text-sm font-semibold text-white">View Imported Queue</Link>
+      <p className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">Imported contacts remain in the unreviewed queue. Rows that failed validation remain accessible under Rejected Imports; correct them there and revalidate without uploading the entire file again. Uploading the exact same file again does not create duplicate records.</p>
+      <div className="flex flex-wrap gap-3"><Link href="/admin/my-contacts/rejected-imports" className="rounded-full border border-red-200 bg-white px-5 py-2 text-sm font-semibold text-red-800">Review rejected imports</Link><Link href="/admin/my-contacts?view=queue" className="rounded-full bg-mulberry-700 px-5 py-2 text-sm font-semibold text-white">View Imported Queue</Link>
         <Link href="/admin/my-contacts/import" className="rounded-full border border-neutral-200 px-5 py-2 text-sm font-semibold text-mulberry-800">Upload another file</Link></div>
       <div className="overflow-x-auto rounded-2xl border border-neutral-200 bg-white"><table className="w-full min-w-[600px] text-left text-sm"><thead className="bg-neutral-50 text-xs uppercase tracking-wide text-neutral-600"><tr>
         <th className="px-4 py-3">Spreadsheet row</th><th className="px-4 py-3">Result</th><th className="px-4 py-3">Detail</th>
       </tr></thead><tbody className="divide-y divide-neutral-100">
         {batch.rows.map(row => <tr key={row.id}>
-          <td className="px-4 py-3">{row.rowNumber}</td><td className="px-4 py-3">{row.status === "IMPORTED" ? "Imported · review required" : "Invalid"}</td>
-          <td className="px-4 py-3 text-neutral-700">{row.contactId ? <Link className="font-semibold text-mulberry-700 hover:underline" href={`/admin/my-contacts/${row.contactId}`}>View queued contact</Link> : row.error || "Needs correction"}</td>
+          <td className="px-4 py-3">{row.rowNumber}</td><td className="px-4 py-3">{row.status === "IMPORTED" ? "Imported · review required" : "Rejected during import"}</td>
+          <td className="px-4 py-3 text-neutral-700">{row.contactId ? <Link className="font-semibold text-mulberry-700 hover:underline" href={`/admin/my-contacts/${row.contactId}`}>View queued contact</Link> : <>{row.error || "Needs correction"} · <Link className="font-semibold text-red-800 underline" href={`/admin/my-contacts/rejected-imports/${row.id}`}>Correct row</Link></>}</td>
         </tr>)}
       </tbody></table></div>
     </>}
