@@ -1,0 +1,85 @@
+name: NEOLIFE Batch E pinned release image
+
+on:
+  push:
+    branches:
+      - release-build/batch-e-4ad82a7
+
+permissions:
+  contents: read
+
+jobs:
+  build-release-image:
+    name: Build and export approved release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout exact approved release
+        uses: actions/checkout@v4
+        with:
+          ref: 4ad82a7add55acb751713a85f8fcd17147377d8a
+          persist-credentials: false
+
+      - name: Verify pinned source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "4ad82a7add55acb751713a85f8fcd17147377d8a"
+          test -z "$(git status --porcelain)"
+          test -f Dockerfile
+          echo "RELEASE_SOURCE=VERIFIED"
+
+      - name: Build NEOLIFE release image
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build \
+            --platform linux/amd64 \
+            --tag neolife-web:4ad82a7 \
+            --label org.opencontainers.image.revision=4ad82a7add55acb751713a85f8fcd17147377d8a \
+            --label org.opencontainers.image.source=https://github.com/Themalwarebyte/Neolife \
+            --file Dockerfile \
+            .
+
+      - name: Verify and export release image
+        shell: bash
+        run: |
+          set -euo pipefail
+          revision="$(docker image inspect \
+            --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' \
+            neolife-web:4ad82a7)"
+          platform="$(docker image inspect \
+            --format '{{.Os}}/{{.Architecture}}' \
+            neolife-web:4ad82a7)"
+
+          test "$revision" = "4ad82a7add55acb751713a85f8fcd17147377d8a"
+          test "$platform" = "linux/amd64"
+
+          mkdir -p release-artifact
+
+          docker save \
+            --output release-artifact/neolife-web-4ad82a7.tar \
+            neolife-web:4ad82a7
+
+          (
+            cd release-artifact
+            sha256sum neolife-web-4ad82a7.tar \
+              > neolife-web-4ad82a7.tar.sha256
+            sha256sum --check neolife-web-4ad82a7.tar.sha256
+          )
+
+          echo "IMAGE_VERIFICATION=PASS"
+          echo "IMAGE_ARCHIVE_SHA256=VERIFIED"
+          echo "IMAGE_EXPORT=PASS"
+
+      - name: Upload verified image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: neolife-batch-e-image-4ad82a7
+          path: |
+            release-artifact/neolife-web-4ad82a7.tar
+            release-artifact/neolife-web-4ad82a7.tar.sha256
+          if-no-files-found: error
+          retention-days: 3
+          compression-level: 0
