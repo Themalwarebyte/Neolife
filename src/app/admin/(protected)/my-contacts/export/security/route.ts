@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/server/db/prisma";
+import { recordActivityAudit } from "@/lib/activity-audit";
 import { getCrmUser } from "@/server/auth/requireCrmUser";
 import { hashExportPin, isWeakExportPin } from "@/lib/contact-export-pin";
 import { isFourDigitExportPin } from "@/lib/contact-workflow";
@@ -96,6 +97,9 @@ export async function POST(request: Request): Promise<Response> {
     return destination(request, view, scopeAll, "fields");
   }
 
+  if (passwordCheck !== "verified") {
+    await recordActivityAudit({ actorUserId: user.id, actorSnapshot: user.name, action: passwordCheck === "locked" ? "EXPORT_PIN_PASSWORD_VERIFICATION_THROTTLED" : passwordCheck === "invalid" ? "EXPORT_PIN_PASSWORD_VERIFICATION_FAILED" : "EXPORT_PIN_PASSWORD_VERIFICATION_UNAVAILABLE", entityType: "EXPORT_CREDENTIAL", entitySnapshot: "Contact export PIN", outcome: "FAILURE", details: { mode } });
+  }
   if (passwordCheck === "locked") return destination(request, view, scopeAll, "passwordLocked");
   if (passwordCheck === "invalid") return destination(request, view, scopeAll, "password");
   if (passwordCheck === "unavailable") return destination(request, view, scopeAll, "fields");
@@ -114,5 +118,6 @@ export async function POST(request: Request): Promise<Response> {
   } catch {
     return destination(request, view, scopeAll, "fields");
   }
+  await recordActivityAudit({ actorUserId: user.id, actorSnapshot: user.name, action: mode === "setup" ? "EXPORT_PIN_CREATED" : "EXPORT_PIN_RESET", entityType: "EXPORT_CREDENTIAL", entitySnapshot: "Contact export PIN", outcome: "SUCCESS", details: { mode } });
   return destination(request, view, scopeAll, undefined, true);
 }

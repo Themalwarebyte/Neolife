@@ -9,7 +9,7 @@ import { prisma } from "@/server/db/prisma";
  *   callers that cannot fail the main flow use `tryNewNotification`.
  */
 
-export const NOTIFICATION_TYPES = ["lead_assigned", "system"] as const;
+export const NOTIFICATION_TYPES = ["lead_assigned", "system", "contact_transfer_assignment"] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
 export type NewNotificationInput = {

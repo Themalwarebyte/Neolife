@@ -241,3 +241,32 @@ export async function activeAdminsForQueueAlert(): Promise<
     orderBy: { createdAt: "asc" },
   });
 }
+
+// BATCH F: privacy-conscious summary for contact transfer requests. Email remains disabled unless the Owner-approved operational email gate is enabled.
+export function buildContactTransferSummaryEmail(input: { baseUrl: string; recipientName: string; count: number }): { subject: string; text: string; html: string } | null {
+  if (!Number.isSafeInteger(input.count) || input.count < 1 || input.count > 100) return null;
+  const base = input.baseUrl.replace(/\/+$/, "");
+  let parsed: URL;
+  try { parsed = new URL(base); } catch { return null; }
+  if (parsed.protocol !== "https:" && parsed.hostname !== "localhost") return null;
+  const link = base + "/admin/my-contacts?view=queue";
+  const safeName = input.recipientName.trim().replace(/[<>&"']/g, "").slice(0, 80) || "there";
+  const noun = input.count === 1 ? "contact transfer request" : "contact transfer requests";
+  const subject = input.count + " contact" + (input.count === 1 ? "" : "s") + " awaiting your review — NEOLIFE";
+  const text = ["Hi " + safeName + ",", "", "You have " + input.count + " " + noun + " awaiting your approval in NEOLIFE.", "Open My Contacts and review Incoming Contact Transfers. After approval, contacts remain in the appropriate queue for further review.", link, "", "This alert contains no client contact details. Sign-in is required to view records."].join("\n");
+  const htmlName = safeName.replace(/&/g, "&amp;");
+  const html = '<div style="font-family:system-ui,sans-serif;font-size:14px;line-height:1.6;color:#1f2937"><p>Hi ' + htmlName + ',</p><p>You have <strong>' + input.count + '</strong> ' + noun + ' awaiting your approval in NEOLIFE.</p><p><a href="' + link + '" style="font-weight:600">Open My Contacts and review Incoming Contact Transfers</a>.</p><p style="font-size:12px;color:#6b7280">No client contact details are included. Sign-in is required.</p></div>';
+  return { subject, text, html };
+}
+
+export async function trySendContactTransferSummaryEmail(input: { recipientEmail: string; recipientName: string; count: number }): Promise<TryLeadAlertOutcome> {
+  if (!isOperationalEmailSendingEnabled()) return { attempted: false, ok: false, status: "disabled" };
+  const built = buildContactTransferSummaryEmail({ baseUrl: crmBaseUrl(), recipientName: input.recipientName, count: input.count });
+  if (!built) return { attempted: false, ok: false, status: "skipped", error: "invalid_contact_transfer_alert_input" };
+  try {
+    const result: SendMailResult = await sendMail({ to: input.recipientEmail, ...built });
+    return result.ok ? { attempted: true, ok: true, status: "sent" } : { attempted: true, ok: false, status: "failed", error: result.error };
+  } catch (error) {
+    return { attempted: true, ok: false, status: "failed", error: error instanceof Error ? error.message : "unknown_error" };
+  }
+}

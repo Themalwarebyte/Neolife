@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/server/db/prisma";
+import { recordActivityAudit } from "@/lib/activity-audit";
 import { requireCrmUser, type CrmUser } from "@/server/auth/requireCrmUser";
 import {
   contactRecordScope,
@@ -108,6 +109,7 @@ export async function createManualContact(
       return record;
     });
     invalidate(contact.id);
+    await recordActivityAudit({ actorUserId: user.id, actorSnapshot: user.name, action: "CONTACT_CREATED", entityType: "CONTACT", entityId: contact.id, entitySnapshot: "Manual contact", outcome: "SUCCESS", details: { state: "MAIN", origin: "MANUAL" } });
     return { status: "success", message: "Contact saved to Main Contacts.", contactId: contact.id };
   } catch {
     return { status: "error", message: "Could not save contact. Please retry." };
@@ -225,6 +227,7 @@ export async function updateManualContact(
     if (result === "dnc_reason") return { status: "error", message: "Explain why a Do Not Contact restriction is being lifted (10–300 characters)." };
     if (result === "unsupported") return { status: "error", message: "This contact requires queue review." };
     invalidate(id);
+    await recordActivityAudit({ actorUserId: user.id, actorSnapshot: user.name, action: "CONTACT_UPDATED", entityType: "CONTACT", entityId: id, entitySnapshot: "Manual contact", outcome: "SUCCESS", details: { changed: true } });
     return { status: "success", message: "Contact updated.", contactId: id };
   } catch {
     return { status: "error", message: "Could not update contact. Please retry." };
@@ -283,6 +286,7 @@ async function changeContactState(form: FormData, target: "MAIN" | "ARCHIVED"): 
     if (result === "stale") return { status: "error", message: "This contact changed. Refresh the page." };
     if (result === "review_required") return { status: "error", message: "A rejected imported contact cannot be restored to Main Contacts." };
     invalidate(id);
+    await recordActivityAudit({ actorUserId: user.id, actorSnapshot: user.name, action: target === "ARCHIVED" ? "CONTACT_ARCHIVED" : "CONTACT_RESTORED", entityType: "CONTACT", entityId: id, entitySnapshot: "Manual contact", outcome: "SUCCESS", details: { state: target } });
     return { status: "success", message: target === "ARCHIVED" ? "Contact archived." : "Contact restored to Main Contacts.", contactId: id };
   } catch {
     return { status: "error", message: "Could not change contact status." };

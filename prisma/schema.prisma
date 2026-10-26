@@ -579,6 +579,7 @@ model User {
   contactTransfersTo ContactTransfer[] @relation("contact_transfer_recipient")
   contactTransfersRequested ContactTransfer[] @relation("contact_transfer_requester")
   contactTransfersDecided ContactTransfer[] @relation("contact_transfer_decider")
+  activityAuditEvents ActivityAuditEvent[]
 }
 
 // Staff referral links (D-034). One code per Staff user; Owner-managed.
@@ -657,6 +658,27 @@ model Notification {
   @@index([userId, createdAt])
   @@index([userId, readAt])
   @@index([leadId])
+}
+
+model ActivityAuditEvent {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorUserId    String?
+  actorSnapshot  String
+  action         String
+  entityType     String
+  entityId       String?
+  entitySnapshot String?
+  outcome        String
+  details        Json?
+  createdAt      DateTime @default(now())
+
+  actor User? @relation(fields: [actorUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([actorUserId, createdAt])
+  @@index([action, createdAt])
+  @@index([entityType, entityId])
+  @@index([outcome, createdAt])
+  @@index([createdAt])
 }
 
 model Session {

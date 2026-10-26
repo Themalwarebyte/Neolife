@@ -8,6 +8,7 @@ import { requireCrmUser } from "@/server/auth/requireCrmUser";
 import { contactRecordScope, isContactUuid, parseManualContactData } from "@/lib/contact-intake";
 import { IMPORT_FIELDS, readMapping, parseImportContact, type ImportMapping } from "@/lib/contact-import";
 import { boundedImportValues } from "@/lib/contact-workflow";
+import { recordActivityAudit } from "@/lib/activity-audit";
 
 export type CorrectRejectedImportState = { status: "success" | "error"; message: string; contactId?: string };
 
@@ -120,7 +121,11 @@ export async function correctRejectedImport(_previous: CorrectRejectedImportStat
     revalidatePath(`/admin/my-contacts/import/${row.batchId}`);
     revalidatePath("/admin/my-contacts");
     if (outcome.kind === "stale") return { status: "error", message: "This row changed or was already processed. Refresh the page." };
-    if (outcome.kind === "invalid") return { status: "error", message: `The row remains rejected: ${outcome.message}` };
+    if (outcome.kind === "invalid") {
+      await recordActivityAudit({ actorUserId: user.id, actorSnapshot: user.name, action: "REJECTED_IMPORT_CORRECTION_VALIDATION_FAILED", entityType: "IMPORT_ROW", entityId: row.id, entitySnapshot: "Rejected import row", outcome: "FAILURE", details: { validationPassed: false } });
+      return { status: "error", message: `The row remains rejected: ${outcome.message}` };
+    }
+    await recordActivityAudit({ actorUserId: user.id, actorSnapshot: user.name, action: "REJECTED_IMPORT_CORRECTED_AND_QUEUED", entityType: "CONTACT", entityId: outcome.contactId, entitySnapshot: "Corrected imported contact", outcome: "SUCCESS", details: { state: "IMPORTED_QUEUE", validationPassed: true } });
     return { status: "success", contactId: outcome.contactId, message: "Correction validated. Contact moved to Imported Queue; the original row and correction history were retained." };
   } catch {
     return { status: "error", message: "Correction could not be saved. No partial contact import was committed; refresh and retry." };
@@ -272,11 +277,11 @@ export async function requeueRejectedContact(_previous: CorrectRejectedImportSta
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 10000, timeout: 30000 });
     revalidatePath("/admin/my-contacts");
     revalidatePath("/admin/my-contacts/rejected-imports");
-    revalidatePath(`/admin/my-contacts/${contactId}`);
     if (result === "missing") return { status: "error", message: "Rejected contact not found or not authorized." };
     if (result === "stale") return { status: "error", message: "Contact changed. Refresh the correction page before retrying." };
     if (result === "unsupported") return { status: "error", message: "Only rejected imported contacts can be corrected and returned to Imported Queue." };
     if (result === "dnc_reason") return { status: "error", message: "Explain why the Do Not Contact restriction is being lifted (10–300 characters), or leave it enabled." };
+    await recordActivityAudit({ actorUserId: user.id, actorSnapshot: user.name, action: "REJECTED_IMPORT_CORRECTED_AND_REQUEUED", entityType: "CONTACT", entityId: contactId, entitySnapshot: "Rejected imported contact", outcome: "SUCCESS", details: { state: "IMPORTED_QUEUE" } });
     return { status: "success", contactId, message: "Contact corrections saved and returned to Imported Queue for a fresh review. The prior rejection remains in the audit history." };
   } catch {
     return { status: "error", message: "Rejected contact could not be requeued. No partial correction was committed; refresh and retry." };

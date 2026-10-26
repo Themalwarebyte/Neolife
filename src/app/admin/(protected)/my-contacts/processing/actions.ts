@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/server/db/prisma";
+import { recordActivityAudit } from "@/lib/activity-audit";
 import { requireCrmUser, type CrmUser } from "@/server/auth/requireCrmUser";
 import { contactRecordScope, isContactUuid } from "@/lib/contact-intake";
 import {
@@ -103,6 +104,7 @@ export async function reviewImportedContact(_previous: ContactProcessingResult |
     if (result === "limit") return error("This owner has too many candidates for a safe approval check. Contact the Owner for a bounded review.");
     if (result === "duplicates") return error("Potential or open duplicate matches require manual review. Run Duplicate Issues scan and resolve each match before approving.");
     invalidate(contactId);
+    await recordActivityAudit({ actorUserId: user.id, actorSnapshot: user.name, action: decision === "APPROVE" ? "IMPORT_APPROVED" : "IMPORT_REJECTED", entityType: "CONTACT", entityId: contactId, entitySnapshot: "Imported contact", outcome: "SUCCESS", details: { decision, state: decision === "APPROVE" ? "MAIN" : "ARCHIVED" } });
     return { status: "success", message: decision === "APPROVE"
       ? "Imported contact approved into Main Contacts. No messaging or Lead creation occurred."
       : "Imported contact rejected and archived with an audit record.", contactId };
@@ -156,6 +158,7 @@ export async function scheduleContactFollowUp(_previous: ContactProcessingResult
     if (result === "limit") return error("This contact already has 50 open tasks; close existing tasks before adding another.");
     if (result === "method") return error("Add a verified contact method of the selected type before scheduling this task.");
     invalidate(contactId);
+    await recordActivityAudit({ actorUserId: user.id, actorSnapshot: user.name, action: "CONTACT_FOLLOWUP_SCHEDULED", entityType: "CONTACT_FOLLOW_UP", entityId: contactId, entitySnapshot: "Contact follow-up", outcome: "SUCCESS", details: { kind, dueAt: dueAt.toISOString() } });
     return { status: "success", message: "Contact follow-up scheduled. This does not send a message.", contactId };
   } catch {
     return error("Could not save the task. Refresh and retry.");
@@ -219,6 +222,7 @@ export async function changeContactFollowUp(_previous: ContactProcessingResult |
     if (result.kind === "missing") return error("Task not available.");
     if (result.kind === "stale") return error("Task or contact changed. Refresh before updating.");
     if (result.kind === "consent") return error("Consent or Do Not Contact now prohibits outreach. Cancel the task or use an internal task.");
+    await recordActivityAudit({ actorUserId: user.id, actorSnapshot: user.name, action: action === "RESCHEDULE" ? "CONTACT_FOLLOWUP_RESCHEDULED" : action === "COMPLETE" ? "CONTACT_FOLLOWUP_COMPLETED" : "CONTACT_FOLLOWUP_CANCELLED", entityType: "CONTACT_FOLLOW_UP", entityId: id, entitySnapshot: "Contact follow-up", outcome: "SUCCESS", details: { taskAction: action } });
     invalidate(result.contactId);
     return { status: "success", message: action === "RESCHEDULE" ? "Follow-up rescheduled." :
       action === "COMPLETE" ? "Follow-up completed with recorded outcome." : "Follow-up cancelled with reason.", contactId: result.contactId };

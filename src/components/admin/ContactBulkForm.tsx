@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { bulkManageContacts, type BulkContactState } from "@/app/admin/(protected)/my-contacts/bulk-actions";
 
-type Recipient = { id: string; name: string; email: string };
+type Recipient = { id: string; name: string; email: string; phone: string | null };
 
 export function ContactBulkForm({ children, view, role, scopeAll, users }: {
   children: ReactNode; view: string; role: string; scopeAll: boolean; users: Recipient[];
@@ -41,5 +41,6 @@ export function ContactBulkForm({ children, view, role, scopeAll, users }: {
     </div>
     {children}
     {state ? <p role={state.status === "error" ? "alert" : "status"} className={`rounded-xl p-3 text-sm ${state.status === "error" ? "bg-red-50 text-red-800" : "bg-emerald-50 text-emerald-900"}`}>{state.message}</p> : null}
+    {state?.whatsappUrl ? <a href={state.whatsappUrl} target="_blank" rel="noopener noreferrer" className="inline-flex rounded-full bg-green-700 px-4 py-2 text-sm font-semibold text-white">Open WhatsApp message</a> : null}
   </form>;
 }

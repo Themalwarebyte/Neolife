@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/server/db/prisma";
+import { recordActivityAudit } from "@/lib/activity-audit";
 import { requireCrmUser } from "@/server/auth/requireCrmUser";
 import { guessMapping, isValidImportFilename, parseImportContact, readMapping, readUploadedSheet, type ImportMapping } from "@/lib/contact-import";
 import { isContactUuid } from "@/lib/contact-intake";
@@ -150,6 +151,7 @@ export async function confirmContactSheet(_previous: ConfirmState | null, form: 
     }, { maxWait: 10000, timeout: 180000 });
     revalidatePath("/admin/my-contacts");
     revalidatePath(`/admin/my-contacts/import/${batch.id}`);
+    await recordActivityAudit({ actorUserId: user.id, actorSnapshot: user.name, action: "CONTACT_IMPORT_COMPLETED", entityType: "CONTACT_IMPORT_BATCH", entityId: batch.id, entitySnapshot: "Contact import batch", outcome: invalidCount > 0 ? "PARTIAL" : "SUCCESS", details: { importedRows: validCount, invalidRows: invalidCount } });
     return { status: "success", batchId: batch.id,
       message: `Import complete: ${validCount} contacts added to Imported Queue; ${invalidCount} rows need correction. No CRM leads were created.` };
   } catch (error) {

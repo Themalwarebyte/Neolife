@@ -127,7 +127,7 @@ export default async function MyContactsPage({ searchParams }: { searchParams: P
   const bulkUsers = user.role !== "admin" ? [] : await prisma.user.findMany({
     where: { isActive: true, role: { in: ["admin", "staff"] }, id: { not: user.id } },
     orderBy: [{ name: "asc" }, { email: "asc" }], take: 200,
-    select: { id: true, name: true, email: true },
+    select: { id: true, name: true, email: true, phone: true },
   });
   return <div className="space-y-6">
     <header className="flex flex-wrap items-start justify-between gap-4">

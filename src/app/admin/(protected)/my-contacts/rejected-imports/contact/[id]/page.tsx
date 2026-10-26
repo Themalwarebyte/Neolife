@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/server/db/prisma";
 import { requireCrmUser } from "@/server/auth/requireCrmUser";
 import { contactRecordScope, isContactUuid } from "@/lib/contact-intake";
@@ -11,12 +11,18 @@ export default async function RejectedQueueContactPage({ params }: { params: Pro
   const { id } = await params;
   if (!isContactUuid(id)) notFound();
   const contact = await prisma.contact.findFirst({
-    where: { id, ...contactRecordScope(user.role, user.id), state: "ARCHIVED", origin: "IMPORT", queueReviewOutcome: "REJECTED" },
+    where: { id, ...contactRecordScope(user.role, user.id) },
     include: { methods: { orderBy: [{ type: "asc" }, { isPrimary: "desc" }, { createdAt: "asc" }], select: { type: true, value: true } },
       audit: { where: { action: "IMPORT_REJECTED" }, orderBy: [{ createdAt: "desc" }], take: 1, select: { actorSnapshot: true, reason: true, createdAt: true } },
       importBatch: { select: { filename: true } } },
   });
   if (!contact) notFound();
+  // A successful requeue changes this record so it no longer matches the rejected-contact page.
+  // Redirect before rendering the stale correction route; keep the original contact scope above.
+  if (contact.origin === "IMPORT" && contact.state === "IMPORTED_QUEUE" && contact.queueReviewOutcome === null) {
+    redirect("/admin/my-contacts?view=queue");
+  }
+  if (contact.state !== "ARCHIVED" || contact.origin !== "IMPORT" || contact.queueReviewOutcome !== "REJECTED") notFound();
   return <div className="mx-auto max-w-4xl space-y-6">
     <header><Link href="/admin/my-contacts/rejected-imports" className="text-sm font-semibold text-mulberry-700 hover:underline">← Rejected Imports</Link>
       <p className="mt-4 text-xs font-bold uppercase tracking-widest text-red-700">Rejected import review</p>

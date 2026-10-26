@@ -21,6 +21,7 @@ export function AdminNav({ role }: { role: string }) {
     { href: "/admin/notifications", label: "Notifications", show: true },
     { href: "/admin/referrals", label: "Referral links", show: role === "admin" },
     { href: "/admin/users", label: "Users", show: role === "admin" },
+    { href: "/admin/activity-audit", label: "Activity Audit", show: role === "admin" },
   ].filter((link) => link.show);
 
   return (

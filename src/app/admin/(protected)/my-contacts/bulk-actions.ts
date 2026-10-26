@@ -2,13 +2,18 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { randomUUID } from "node:crypto";
+import { tryNewNotification } from "@/lib/notifications";
+import { crmBaseUrl, notificationRecipientEmail, trySendContactTransferSummaryEmail } from "@/lib/notificationsEmail";
+import { buildContactTransferWhatsAppUrl } from "@/lib/contact-transfer-message";
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/server/db/prisma";
 import { requireCrmUser } from "@/server/auth/requireCrmUser";
 import { contactRecordScope } from "@/lib/contact-intake";
 import { parseContactBulkAction, parseContactIds } from "@/lib/contact-workflow";
+import { recordActivityAudit } from "@/lib/activity-audit";
 
-export type BulkContactState = { status: "success" | "error"; message: string };
+export type BulkContactState = { status: "success" | "error"; message: string; whatsappUrl?: string; whatsappUnavailable?: boolean };
 const SERIALIZABLE = { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 10000, timeout: 30000 } as const;
 
 function exactText(form: FormData, key: string): string | null {
@@ -43,12 +48,12 @@ export async function bulkManageContacts(_previous: BulkContactState | null, for
     return { status: "error", message: "Only the Owner can manage the shared Contact Pool and transfer contacts." };
   }
 
-  let recipient: { id: string; name: string; role: string } | null = null;
+  let recipient: { id: string; name: string; role: string; email: string; notificationEmail: string | null; phone: string | null } | null = null;
   if (action === "SEND_TO_USER") {
     if (!recipientId || recipientId.length > 180 || hasControlCharacters(recipientId)) {
       return { status: "error", message: "Choose a valid recipient." };
     }
-    recipient = await prisma.user.findFirst({ where: { id: recipientId, isActive: true, role: { in: ["admin", "staff"] } }, select: { id: true, name: true, role: true } });
+    recipient = await prisma.user.findFirst({ where: { id: recipientId, isActive: true, role: { in: ["admin", "staff"] } }, select: { id: true, name: true, role: true, email: true, notificationEmail: true, phone: true } });
     if (!recipient) return { status: "error", message: "Recipient is unavailable or inactive." };
   }
 
@@ -137,12 +142,38 @@ export async function bulkManageContacts(_previous: BulkContactState | null, for
     }
   }
 
+  let whatsappUrl: string | undefined;
+  let whatsappUnavailable = false;
+  if (action === "SEND_TO_USER" && recipient && succeeded.length > 0) {
+    const count = succeeded.length;
+    const operationId = randomUUID();
+    await Promise.all([
+      tryNewNotification({
+        userId: recipient.id,
+        type: "contact_transfer_assignment",
+        title: count + " contact" + (count === 1 ? "" : "s") + " awaiting your review",
+        body: count + " contact transfer request" + (count === 1 ? " is" : "s are") + " awaiting your approval. Open My Contacts and review Incoming Contact Transfers.",
+        dedupKey: "contact_transfer_assignment:" + recipient.id + ":" + operationId,
+      }),
+      trySendContactTransferSummaryEmail({ recipientEmail: notificationRecipientEmail(recipient), recipientName: recipient.name, count }),
+    ]);
+    whatsappUrl = buildContactTransferWhatsAppUrl({ phone: recipient.phone, recipientName: recipient.name, count, baseUrl: crmBaseUrl() }) || undefined;
+    whatsappUnavailable = !whatsappUrl;
+  }
   revalidatePath("/admin/my-contacts");
   revalidatePath("/admin/my-contacts/transfers");
   revalidatePath("/admin/my-contacts/rejected-imports");
   const summary = `${succeeded.length} succeeded; ${failed.length} failed out of ${ids.length}.`;
   const details = failed.slice(0, 5).join(" | ");
-  return failed.length === 0
-    ? { status: "success", message: `${summary} ${action === "SEND_TO_USER" ? "Transfers are awaiting recipient approval." : action === "MOVE_TO_POOL" ? "Contacts are now in the shared Contact Pool." : action === "RESTORE" ? "Contacts restored." : "Contacts archived."}` }
-    : { status: succeeded.length ? "success" : "error", message: `${summary}${details ? ` Details: ${details}` : ""}${failed.length > 5 ? ` (+${failed.length - 5} more failures)` : ""}` };
+  await recordActivityAudit({
+    actorUserId: user.id, actorSnapshot: user.name, action: `CONTACT_BULK_${action}`,
+    entityType: "CONTACT_BATCH", entitySnapshot: "Bulk contact operation",
+    outcome: failed.length === 0 ? "SUCCESS" : succeeded.length > 0 ? "PARTIAL" : "FAILURE",
+    details: { requestedCount: ids.length, succeededCount: succeeded.length, failedCount: failed.length },
+  });
+  const suffix = whatsappUnavailable ? " Recipient phone is missing or not in international format; update the user's phone to enable WhatsApp." : "";
+  const result: BulkContactState = failed.length === 0
+    ? { status: "success", message: `${summary} ${action === "SEND_TO_USER" ? "Transfers are awaiting recipient approval." : action === "MOVE_TO_POOL" ? "Contacts are now in the shared Contact Pool." : action === "RESTORE" ? "Contacts restored." : "Contacts archived."}` + suffix }
+    : { status: succeeded.length ? "success" : "error", message: `${summary}${details ? ` Details: ${details}` : ""}${failed.length > 5 ? ` (+${failed.length - 5} more failures)` : ""}` + suffix };
+  return { ...result, ...(whatsappUrl ? { whatsappUrl } : {}), ...(whatsappUnavailable && action === "SEND_TO_USER" && succeeded.length > 0 ? { whatsappUnavailable: true } : {}) };
 }

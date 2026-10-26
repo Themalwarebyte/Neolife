@@ -7,6 +7,7 @@ import { prisma } from "@/server/db/prisma";
 import { requireCrmUser } from "@/server/auth/requireCrmUser";
 import { isContactUuid } from "@/lib/contact-intake";
 import { exactlyOne, reviewReason } from "@/lib/contact-processing";
+import { recordActivityAudit } from "@/lib/activity-audit";
 
 export type TransferDecisionState = { status: "success" | "error"; message: string };
 const SERIALIZABLE = { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 10000, timeout: 30000 } as const;
@@ -63,6 +64,9 @@ export async function respondToContactTransfer(_previous: TransferDecisionState 
     }, SERIALIZABLE);
     if (result === "missing") return { status: "error", message: "This transfer is not available to your account." };
     if (result === "stale") return { status: "error", message: "This transfer has already been decided or the contact changed. Refresh the queue." };
+    await recordActivityAudit({ actorUserId: user.id, actorSnapshot: user.name,
+      action: decision === "APPROVE" ? "CONTACT_TRANSFER_APPROVED" : "CONTACT_TRANSFER_REJECTED",
+      entityType: "CONTACT_TRANSFER", entityId: id, entitySnapshot: "Contact transfer", outcome: "SUCCESS", details: { decision } });
     revalidatePath("/admin/my-contacts");
     revalidatePath("/admin/my-contacts/transfers");
     revalidatePath("/admin/my-contacts/rejected-imports");
@@ -198,6 +202,9 @@ export async function cancelPendingContactTransfer(
       return { status: "error", message: "This transfer is no longer pending or the contact changed concurrently. Refresh and review its status." };
     }
 
+    await recordActivityAudit({ actorUserId: user.id, actorSnapshot: user.name,
+      action: "CONTACT_TRANSFER_ADMIN_CANCELLED", entityType: "CONTACT_TRANSFER", entityId: id,
+      entitySnapshot: "Contact transfer", outcome: "SUCCESS", details: { restoredContact: result.restoredContact } });
     revalidatePath("/admin/my-contacts");
     revalidatePath("/admin/my-contacts/transfers");
     revalidatePath("/admin/my-contacts/rejected-imports");

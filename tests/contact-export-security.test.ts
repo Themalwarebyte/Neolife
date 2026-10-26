@@ -37,6 +37,7 @@ vi.mock("@/server/db/prisma", () => {
         update: credentialUpdate,
       },
       contactExportSecurityEvent: { create: createEvent },
+      activityAuditEvent: { create: async ({ data }: { data: Record<string, unknown> }) => data },
       $transaction: async (callback: (tx: unknown) => Promise<unknown>) => callback({
         $queryRaw: async () => state.user ? [{ id: state.user.id }] : [],
         contactExportSecurityEvent: {

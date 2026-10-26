@@ -12,7 +12,7 @@ export function RejectedQueueContactCorrectionForm({ contact }: {
 }) {
   const router = useRouter();
   const [state, action, pending] = useActionState<CorrectRejectedImportState | null, FormData>(requeueRejectedContact, null);
-  useEffect(() => { if (state?.status === "success") router.push("/admin/my-contacts?view=queue"); }, [state, router]);
+  useEffect(() => { if (state?.status === "success") router.replace("/admin/my-contacts?view=queue"); }, [state, router]);
   const phones = contact.methods.filter(method => method.type === "PHONE").map(method => method.value);
   const emails = contact.methods.filter(method => method.type === "EMAIL").map(method => method.value);
   while (phones.length < 3) phones.push("");

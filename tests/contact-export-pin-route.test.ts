@@ -89,6 +89,7 @@ vi.mock("@/server/db/prisma", () => {
       $transaction: transaction,
       contactExportCredential: { findUnique: findCredential },
       contactExportSecurityEvent: { create: createEvent },
+      activityAuditEvent: { create: async ({ data }: { data: Record<string, unknown> }) => data },
       contactExportAudit: { create: async ({ data }: { data: Record<string, unknown> }) => data },
       contactFollowUp: { findMany: async () => [] },
       contact: { findMany: async () => [] },

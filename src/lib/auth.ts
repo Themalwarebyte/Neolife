@@ -3,6 +3,7 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "@/server/db/prisma";
 import { isEmailConfigured, sendMail } from "@/lib/email";
 import { buildOfficeResetEmail } from "@/lib/auth-recovery-email";
+import { recordActivityAudit } from "@/lib/activity-audit";
 
 /**
  * Task 1.7 — Better Auth (Owner-approved architecture, docs/PROJECT_PLAN.md §15).
@@ -72,6 +73,7 @@ export const auth = betterAuth({
         // a secondary profile update. Existing CRM guard remains fail-safe.
         console.warn("[auth] Password reset completed; profile sync failed.");
       }
+      await recordActivityAudit({ actorUserId: user.id, actorSnapshot: user.id, action: "PASSWORD_RESET_COMPLETED", entityType: "USER", entityId: user.id, outcome: "SUCCESS" });
     },
   },
   ...(isE2ERun ? { rateLimit: { enabled: false } } : {}),

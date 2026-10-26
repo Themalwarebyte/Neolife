@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/server/db/prisma";
+import { recordActivityAudit } from "@/lib/activity-audit";
 import { requireCrmUser } from "@/server/auth/requireCrmUser";
 import { contactRecordScope, isContactUuid } from "@/lib/contact-intake";
 import {
@@ -95,6 +96,7 @@ export async function scanDuplicateIssues(_previous: DuplicateActionResult | nul
       });
       return { contacts: contacts.length, candidates: candidates.length, expired: expired.length };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 10000, timeout: 60000 });
+    await recordActivityAudit({ actorUserId: user.id, actorSnapshot: user.name, action: "DUPLICATE_SCAN_COMPLETED", entityType: "CONTACT_DUPLICATE_SCAN", entitySnapshot: "Duplicate review scan", outcome: "SUCCESS", details: { contactsChecked: counts.contacts, candidatesFound: counts.candidates, obsoleteIssuesClosed: counts.expired } });
     revalidatePath("/admin/my-contacts");
     return {
       status: "success",
@@ -182,6 +184,7 @@ export async function dismissDuplicateIssue(_previous: DuplicateActionResult | n
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     if (result === "missing") return { status: "error", message: "Duplicate issue is not available for review." };
     if (result === "stale") return { status: "error", message: "A contact or issue changed. Rescan and reopen the issue before reviewing." };
+    await recordActivityAudit({ actorUserId: user.id, actorSnapshot: user.name, action: "DUPLICATE_DISMISSED", entityType: "CONTACT_DUPLICATE_ISSUE", entityId: issueId, entitySnapshot: "Duplicate issue", outcome: "SUCCESS", details: { decision: "KEEP_SEPARATE" } });
     invalidate([]);
     return { status: "success", message: "Marked as separate people. The decision and explanation were recorded; future scans will not reopen this pair." };
   } catch {
@@ -303,6 +306,7 @@ export async function mergeDuplicateIssue(_previous: DuplicateActionResult | nul
     if (result.kind === "stale" || result.kind === "no_match") return { status: "error", message: "The contact or match changed. Scan again before merging." };
     if (result.kind === "state") return { status: "error", message: "Merging requires two active contacts in the same list (both Main or both Imported Queue). No implicit queue promotion is allowed." };
     if (result.kind === "methods") return { status: "error", message: result.message };
+    await recordActivityAudit({ actorUserId: user.id, actorSnapshot: user.name, action: "DUPLICATE_MERGED", entityType: "CONTACT", entityId: result.retainedId, entitySnapshot: "Merged contacts", outcome: "SUCCESS", details: { sourceContactId: result.sourceId, retainedContactId: result.retainedId } });
     invalidate([result.retainedId, result.sourceId]);
     return { status: "success", message: "Reviewed merge saved. Both contact histories were preserved; communication restrictions remain conservative. No Lead was created.", retainedId: result.retainedId };
   } catch {

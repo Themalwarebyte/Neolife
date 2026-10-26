@@ -76,6 +76,9 @@ export default async function NotificationsPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
+                  {notification.type === "contact_transfer_assignment" ? (
+                    <Link href="/admin/my-contacts?view=queue" className="rounded-full border border-neutral-300 bg-white px-4 py-1.5 text-xs font-semibold text-neutral-700 transition-colors hover:bg-neutral-100">Review incoming transfers</Link>
+                  ) : null}
                   {notification.leadId ? (
                     <Link
                       href={`/admin/leads/${notification.leadId}`}

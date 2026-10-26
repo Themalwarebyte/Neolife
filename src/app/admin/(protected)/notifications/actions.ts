@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/server/db/prisma";
+import { recordActivityAudit } from "@/lib/activity-audit";
 import { requireCrmUser } from "@/server/auth/requireCrmUser";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -19,10 +20,13 @@ export default async function markNotificationReadAction(
   if (!UUID.test(id)) return;
 
   try {
-    await prisma.notification.updateMany({
+    const updated = await prisma.notification.updateMany({
       where: { id, userId: user.id, readAt: null },
       data: { readAt: new Date() },
     });
+    if (updated.count === 1) {
+      await recordActivityAudit({ actorUserId: user.id, actorSnapshot: user.name, action: "NOTIFICATION_MARKED_READ", entityType: "NOTIFICATION", entityId: id, entitySnapshot: "In-app notification", outcome: "SUCCESS", details: { read: true } });
+    }
     revalidatePath("/admin/notifications");
   } catch {
     // Non-critical UI state — never fail the page over a read-flag.

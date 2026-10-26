@@ -46,6 +46,7 @@ import {
   trySendLeadAlertEmail,
 } from "@/lib/notificationsEmail";
 import { Prisma } from "@/generated/prisma/client";
+import { recordActivityAudit } from "@/lib/activity-audit";
 
 // ─── Referral link management (D-034) ────────────────────────────────────
 
@@ -68,7 +69,7 @@ function newReferralCode(): string {
  * Owner-controlled rotation.
  */
 export async function generateStaffReferralLink(formData: FormData): Promise<CrmActionResult> {
-  await requireAdmin();
+  const owner = await requireAdmin();
   const staffUserId = String(formData.get("staffUserId") ?? "").trim();
   const publicName = String(formData.get("publicName") ?? "").trim();
 
@@ -152,6 +153,7 @@ export async function generateStaffReferralLink(formData: FormData): Promise<Crm
       throw error;
     }
 
+    await recordActivityAudit({ actorUserId: owner.id, actorSnapshot: owner.id, action: "REFERRAL_LINK_ROTATED", entityType: "USER", entityId: staffUserId, outcome: "SUCCESS" });
     revalidatePath("/admin/referrals");
     return {
       status: "success",
@@ -164,7 +166,7 @@ export async function generateStaffReferralLink(formData: FormData): Promise<Crm
 
 /** Owner-only: revoke a referral link (existing links fail safely). */
 export async function revokeStaffReferralLink(formData: FormData): Promise<CrmActionResult> {
-  await requireAdmin();
+  const owner = await requireAdmin();
   const staffUserId = String(formData.get("staffUserId") ?? "").trim();
   if (!isValidBetterAuthUserId(staffUserId)) {
     return { status: "error", message: "Invalid staff user." };
@@ -181,6 +183,9 @@ export async function revokeStaffReferralLink(formData: FormData): Promise<CrmAc
         publicNameNormal: null,
       },
     });
+    if (updated.count > 0) {
+      await recordActivityAudit({ actorUserId: owner.id, actorSnapshot: owner.id, action: "REFERRAL_LINK_REVOKED", entityType: "USER", entityId: staffUserId, outcome: "SUCCESS" });
+    }
     revalidatePath("/admin/referrals");
     return updated.count > 0
       ? { status: "success", message: "Referral link revoked." }
@@ -279,6 +284,9 @@ export async function markQualificationReviewed(
       });
     }
 
+    if (!existing) {
+      await recordActivityAudit({ actorUserId: user.id, actorSnapshot: user.id, action: "LEAD_QUALIFICATION_REVIEWED", entityType: "LEAD", entityId: id, outcome: "SUCCESS" });
+    }
     revalidatePath("/admin/qualification");
     revalidatePath("/admin/analytics");
     revalidatePath(`/admin/leads/${id}`);
@@ -318,6 +326,7 @@ export async function updateLeadStatus(
       }),
     ]);
 
+    await recordActivityAudit({ actorUserId: user.id, actorSnapshot: user.id, action: "LEAD_STATUS_CHANGED", entityType: "LEAD", entityId: leadId, outcome: "SUCCESS", details: { status } });
     revalidatePath("/admin/leads");
     revalidatePath(`/admin/leads/${id}`);
     return { status: "success", message: "Status updated." };
@@ -357,6 +366,7 @@ export async function addFollowUp(
       }),
     ]);
 
+    await recordActivityAudit({ actorUserId: user.id, actorSnapshot: user.id, action: schedule.dueAt ? "LEAD_FOLLOW_UP_SCHEDULED" : "LEAD_FOLLOW_UP_ADDED", entityType: "LEAD", entityId: leadId, outcome: "SUCCESS" });
     revalidatePath(`/admin/leads/${id}`);
     revalidatePath("/admin/follow-ups");
     revalidatePath("/admin/leads");
@@ -417,6 +427,7 @@ export async function completeFollowUp(
     if (result.kind === "note") return { status: "error", message: "This is a note, not a scheduled task." };
     if (result.kind === "completed") return { status: "success", message: "Task was already completed." };
     if (result.kind === "stale") return { status: "error", message: "Task changed; refresh and try again." };
+    await recordActivityAudit({ actorUserId: user.id, actorSnapshot: user.id, action: "LEAD_FOLLOW_UP_COMPLETED", entityType: "LEAD", entityId: result.leadId, outcome: "SUCCESS", details: { followUpId } });
     revalidatePath("/admin/follow-ups");
     revalidatePath("/admin/leads");
     revalidatePath("/admin/analytics");
@@ -481,6 +492,8 @@ export async function assignUnassignedLeadsBulk(
     if (outcome.kind === "changed") {
       return { status: "error", message: "One or more contacts are no longer unassigned. Refresh the queue." };
     }
+
+    await recordActivityAudit({ actorUserId: owner.id, actorSnapshot: owner.id, action: "LEAD_BULK_ASSIGNED", entityType: "USER", entityId: outcome.targetId, outcome: "SUCCESS", details: { count: selection.ids.length } });
 
     // Durable in-app notifications are best-effort AFTER the DB transaction.
     // No email or automatic redistribution is performed by this batch.
@@ -556,6 +569,7 @@ export async function rescheduleFollowUp(
     if (outcome.kind === "missing") return { status: "error", message: "Task not found, already completed, or not assigned to you." };
     if (outcome.kind === "changed") return { status: "error", message: "Task was rescheduled elsewhere; refresh and retry." };
     if (outcome.kind === "unchanged") return { status: "success", message: "Due date is unchanged." };
+    await recordActivityAudit({ actorUserId: user.id, actorSnapshot: user.id, action: "LEAD_FOLLOW_UP_RESCHEDULED", entityType: "LEAD", entityId: outcome.leadId, outcome: "SUCCESS", details: { followUpId } });
     revalidatePath("/admin/follow-ups");
     revalidatePath("/admin/workflows");
     revalidatePath("/admin/analytics");
@@ -609,6 +623,7 @@ export async function completeFollowUpsBulk(
     if (result.kind === "inaccessible") return { status: "error", message: "A selected task is no longer accessible. Refresh the queue." };
     if (result.kind === "note") return { status: "error", message: "Plain CRM notes cannot be completed as tasks." };
     if (result.kind === "already") return { status: "success", message: "All selected tasks were already completed." };
+    await recordActivityAudit({ actorUserId: user.id, actorSnapshot: user.id, action: "LEAD_FOLLOW_UPS_BULK_COMPLETED", entityType: "FOLLOW_UP", outcome: "SUCCESS", details: { count: result.count } });
     revalidatePath("/admin/follow-ups");
     revalidatePath("/admin/workflows");
     revalidatePath("/admin/analytics");
@@ -652,6 +667,7 @@ export async function scheduleMeeting(
       }),
     ]);
 
+    await recordActivityAudit({ actorUserId: user.id, actorSnapshot: user.id, action: "LEAD_MEETING_SCHEDULED", entityType: "LEAD", entityId: ownedLeadId, outcome: "SUCCESS" });
     revalidatePath(`/admin/leads/${leadId}`);
     return { status: "success", message: "Meeting scheduled." };
   } catch {
@@ -710,6 +726,7 @@ export async function updateMeeting(
       }),
     ]);
 
+    await recordActivityAudit({ actorUserId: user.id, actorSnapshot: user.id, action: "LEAD_MEETING_UPDATED", entityType: "MEETING", entityId: meetingId, outcome: "SUCCESS", details: { status } });
     revalidatePath(`/admin/leads/${meeting.leadId}`);
     return { status: "success", message: "Meeting updated." };
   } catch {
@@ -766,6 +783,7 @@ export async function assignLead(
           },
         }),
       ]);
+      await recordActivityAudit({ actorUserId: admin.id, actorSnapshot: admin.id, action: "LEAD_UNASSIGNED", entityType: "LEAD", entityId: leadId, outcome: "SUCCESS" });
       revalidatePath("/admin/leads");
       revalidatePath(`/admin/leads/${leadId}`);
       return { status: "success", message: "Lead unassigned." };
@@ -841,6 +859,8 @@ export async function assignLead(
       // Never propagate: the assignment itself is already committed.
     }
 
+    await recordActivityAudit({ actorUserId: admin.id, actorSnapshot: admin.id, action: "LEAD_ASSIGNED", entityType: "LEAD", entityId: leadId, outcome: "SUCCESS", details: { targetUserId: target.id } });
+
     revalidatePath("/admin/leads");
     revalidatePath(`/admin/leads/${leadId}`);
     return { status: "success", message: `Lead assigned to ${target.name}.` };
@@ -853,7 +873,7 @@ export async function createCrmUser(
   _prevState: unknown,
   formData: FormData,
 ): Promise<CrmActionResult> {
-  await requireAdmin();
+  const owner = await requireAdmin();
 
   const result = createUserSchema.safeParse({
     name: formData.get("name"),
@@ -885,6 +905,9 @@ export async function createCrmUser(
       });
     }
 
+    if (userId) {
+      await recordActivityAudit({ actorUserId: owner.id, actorSnapshot: owner.id, action: "CRM_USER_CREATED", entityType: "USER", entityId: userId, outcome: "SUCCESS" });
+    }
     return {
       status: "success",
       message: "User created successfully.",
@@ -930,6 +953,7 @@ export async function toggleUserActive(userId: string): Promise<void> {
       data: { isActive: !target.isActive },
     });
 
+    await recordActivityAudit({ actorUserId: admin.id, actorSnapshot: admin.id, action: target.isActive ? "CRM_USER_DEACTIVATED" : "CRM_USER_ACTIVATED", entityType: "USER", entityId: result.data.userId, outcome: "SUCCESS" });
     revalidatePath("/admin/users");
   } catch {
     return;
@@ -1058,6 +1082,7 @@ export async function sendClientEmail(
     // against the limits either way.
     await finalizeClientEmailReservation(reservation.reservationId, sendStatus);
 
+    await recordActivityAudit({ actorUserId: user.id, actorSnapshot: user.id, action: "CLIENT_EMAIL_ATTEMPT", entityType: "LEAD", entityId: lead.id, outcome: result.ok && provider === "resend" ? "SUCCESS" : sendStatus === "failed" ? "FAILURE" : "PARTIAL", details: { provider, sendStatus } });
     revalidatePath(`/admin/leads/${lead.id}`);
 
     if (result.ok) {
@@ -1118,6 +1143,7 @@ export async function changePasswordAction(
       data: { mustChangePassword: false },
     });
 
+    await recordActivityAudit({ actorUserId: user.id, actorSnapshot: user.id, action: "PASSWORD_CHANGED", entityType: "USER", entityId: user.id, outcome: "SUCCESS" });
     return { status: "success", message: "Password changed successfully." };
   } catch {
     return { status: "error", message: "Could not change password." };

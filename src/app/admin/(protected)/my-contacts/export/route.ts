@@ -1,5 +1,6 @@
 import { getCrmUser } from "@/server/auth/requireCrmUser";
 import { prisma } from "@/server/db/prisma";
+import { recordActivityAudit } from "@/lib/activity-audit";
 import { contactListScope } from "@/lib/contact-intake";
 import { CONTACT_EXPORT_LIMIT, csvRows } from "@/lib/contact-processing";
 import { verifyExportPin } from "@/lib/contact-export-pin";
@@ -98,6 +99,9 @@ export async function POST(request: Request): Promise<Response> {
     return authorizeUrl(request, view, all, "fields");
   }
 
+  if (pinCheck !== "verified") {
+    await recordActivityAudit({ actorUserId: user.id, actorSnapshot: user.name, action: pinCheck === "locked" ? "CONTACT_EXPORT_PIN_LOCKED" : pinCheck === "invalid" ? "CONTACT_EXPORT_PIN_FAILED" : "CONTACT_EXPORT_PIN_UNAVAILABLE", entityType: "CONTACT_EXPORT", entitySnapshot: view, outcome: "FAILURE", details: { view } });
+  }
   if (pinCheck === "missing") return authorizeUrl(request, view, all, "fields");
   if (pinCheck === "locked") return authorizeUrl(request, view, all, "locked");
   if (pinCheck === "invalid") return authorizeUrl(request, view, all, "pin");
@@ -139,6 +143,7 @@ export async function POST(request: Request): Promise<Response> {
   const contents = csvRows(rows);
   const date = new Date().toISOString().slice(0, 10);
   const filename = `neolife-contact-${view}-${date}.csv`;
+  await recordActivityAudit({ actorUserId: user.id, actorSnapshot: user.name, action: "CONTACT_EXPORT_COMPLETED", entityType: "CONTACT_EXPORT", entitySnapshot: view, outcome: "SUCCESS", details: { view, rowCount: rows.length - 1, scopeAll: all } });
   return new Response(contents, { status: 200, headers: {
     ...PRIVATE_HEADERS, "Content-Type": "text/csv; charset=utf-8",
     "Content-Disposition": `attachment; filename="${filename}"`,
